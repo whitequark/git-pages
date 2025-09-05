@@ -1,16 +1,18 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"os"
 )
 
 func main() {
 	dataDir := os.Args[1]
+	listenAddr := os.Args[2]
 
-	Fetch(dataDir, "codeberg.page/.index", "https://codeberg.org/Codeberg/pages-server/", "pages")
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", Serve(dataDir))
-	http.ListenAndServe(":3333", mux)
+	http.HandleFunc("/", Serve(dataDir))
+	err := http.ListenAndServe(listenAddr, nil)
+	if err != nil {
+		log.Fatalln("failed to listen:", err)
+	}
 }
