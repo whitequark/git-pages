@@ -62,7 +62,7 @@ func fetch(
 		}
 		defer os.RemoveAll(tempDir)
 
-		repo, err = git.Open(storer, osfs.New(tempDir))
+		repo, err = git.Open(storer, osfs.New(tempDir, osfs.WithBoundOS()))
 		if err != nil {
 			return nil, 0, fmt.Errorf("git open: %s", err)
 		}
