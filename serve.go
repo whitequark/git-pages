@@ -2,6 +2,10 @@ package main
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -93,30 +97,32 @@ func getPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
 	return err
 }
 
-type putResult struct {
-	head   string
-	result FetchResult
-	err    error
-}
-
-func putPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
-	host := getHost(r)
-
+func getProjectName(w http.ResponseWriter, r *http.Request) (string, error) {
 	// path must be either `/` or `/foo/` (`/foo` is accepted as an alias)
 	path, _ := strings.CutPrefix(r.URL.Path, "/")
 	path, _ = strings.CutSuffix(path, "/")
 	if strings.HasPrefix(path, ".") {
 		http.Error(w, "this directory name is reserved for system use", http.StatusBadRequest)
-		return fmt.Errorf("reserved name")
+		return "", fmt.Errorf("reserved name")
 	} else if strings.Contains(path, "/") {
 		http.Error(w, "only one level of nesting is allowed", http.StatusBadRequest)
-		return fmt.Errorf("nesting too deep")
+		return "", fmt.Errorf("nesting too deep")
 	}
 
-	// path `/` corresponds to pseudo-project `.index`
-	projectName := ".index"
-	if path != "" {
-		projectName = path
+	if path == "" {
+		// path `/` corresponds to pseudo-project `.index`
+		return ".index", nil
+	} else {
+		return path, nil
+	}
+}
+
+func putPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
+	host := getHost(r)
+
+	projectName, err := getProjectName(w, r)
+	if err != nil {
+		return err
 	}
 
 	requestBody, err := io.ReadAll(r.Body)
@@ -133,36 +139,100 @@ func putPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
 		branch = "pages"
 	}
 
-	// fetch the updated content with a timeout
-	c := make(chan putResult, 1)
-	go func() {
-		head, result, err := Fetch(dataDir, webRoot, repoURL, branch)
-		c <- putResult{head, result, err}
-	}()
-	select {
-	case putResult := <-c:
-		if putResult.err == nil {
-			w.Header().Add("Content-Location", r.URL.String())
-		}
-		switch putResult.result {
-		case FetchError:
-			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprintln(w, putResult.err)
-			return putResult.err
-			// HTTP prescribes these response codes to be used
-		case FetchNoChange:
-			w.WriteHeader(http.StatusNoContent)
-		case FetchCreated:
-			w.WriteHeader(http.StatusCreated)
-		case FetchUpdated:
-			w.WriteHeader(http.StatusOK)
-		}
-		fmt.Fprintln(w, putResult.head)
-		return nil
-	case <-time.After(fetchTimeout):
-		w.WriteHeader(http.StatusGatewayTimeout)
-		return fmt.Errorf("fetch timeout")
+	result := FetchWithTimeout(dataDir, webRoot, repoURL, branch, fetchTimeout)
+	if result.err == nil {
+		w.Header().Add("Content-Location", r.URL.String())
 	}
+	switch result.outcome {
+	case FetchError:
+		w.WriteHeader(http.StatusServiceUnavailable)
+	case FetchTimeout:
+		w.WriteHeader(http.StatusGatewayTimeout)
+		// HTTP prescribes these response codes to be used
+	case FetchNoChange:
+		w.WriteHeader(http.StatusNoContent)
+	case FetchCreated:
+		w.WriteHeader(http.StatusCreated)
+	case FetchUpdated:
+		w.WriteHeader(http.StatusOK)
+	}
+	if result.err != nil {
+		fmt.Fprintln(w, result.err)
+	} else {
+		fmt.Fprintln(w, result.head)
+	}
+	return result.err
+}
+
+const hmacSecret = ""
+
+func postPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
+	host := getHost(r)
+
+	projectName, err := getProjectName(w, r)
+	if err != nil {
+		return err
+	}
+
+	if r.Header.Get("Content-Type") != "application/json" {
+		http.Error(w, "only JSON payload is allowed", http.StatusBadRequest)
+		return fmt.Errorf("invalid content type")
+	}
+
+	if r.Header.Get("X-Forgejo-Event") != "push" {
+		http.Error(w, "only push events are allowed", http.StatusBadRequest)
+		return fmt.Errorf("invalid event")
+	}
+
+	requestBody, err := io.ReadAll(r.Body)
+	if err != nil {
+		return fmt.Errorf("body read: %s", err)
+	}
+
+	if hmacSecret != "" {
+		signature, err := hex.DecodeString(r.Header.Get("X-Forgejo-Signature"))
+		if err != nil {
+			http.Error(w, "malformed signature", http.StatusBadRequest)
+			return fmt.Errorf("malformed signature")
+		}
+
+		mac := hmac.New(sha256.New, []byte(hmacSecret))
+		mac.Write(requestBody)
+		if !hmac.Equal(mac.Sum(nil), signature) {
+			http.Error(w, "invalid signature", http.StatusBadRequest)
+			return fmt.Errorf("invalid hmac")
+		}
+	}
+
+	var event map[string]any
+	err = json.NewDecoder(bytes.NewReader(requestBody)).Decode(&event)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid request body: %s", err), http.StatusBadRequest)
+		return err
+	}
+
+	eventRef := event["ref"].(string)
+	if eventRef != "refs/heads/pages" {
+		w.WriteHeader(http.StatusOK)
+		return nil
+	}
+
+	webRoot := fmt.Sprintf("%s/%s", host, projectName)
+	repoURL := event["repository"].(map[string]any)["clone_url"].(string)
+
+	result := FetchWithTimeout(dataDir, webRoot, repoURL, "pages", fetchTimeout)
+	switch result.outcome {
+	case FetchError:
+		w.WriteHeader(http.StatusServiceUnavailable)
+	case FetchTimeout:
+		w.WriteHeader(http.StatusGatewayTimeout)
+	default:
+		w.WriteHeader(http.StatusOK)
+	}
+	if result.err != nil {
+		fmt.Fprintln(w, result.err)
+	}
+	return result.err
 }
 
 func Serve(dataDir string) func(http.ResponseWriter, *http.Request) {
@@ -174,6 +244,8 @@ func Serve(dataDir string) func(http.ResponseWriter, *http.Request) {
 			err = getPage(dataDir, w, r)
 		case http.MethodPut:
 			err = putPage(dataDir, w, r)
+		case http.MethodPost:
+			err = postPage(dataDir, w, r)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			err = fmt.Errorf("method %s not allowed", r.Method)
