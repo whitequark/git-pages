@@ -1,7 +1,7 @@
 git-pages
 =========
 
-This is a simple Go service implemented as a strawman proposal of how https://codeberg.page could work. It lacks any form of authentication and must not be used in production.
+This is a simple Go service implemented as a strawman proposal of how https://codeberg.page could work.
 
 
 Features
