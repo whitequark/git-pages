@@ -179,14 +179,33 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
+	eventName := ""
+	for _, header := range []string{
+		"X-Forgejo-Event",
+		"X-GitHub-Event",
+		"X-Gitea-Event",
+		"X-Gogs-Event",
+	} {
+		eventName = r.Header.Get(header)
+		if eventName != "" {
+			break
+		}
+	}
+
+	if eventName == "" {
+		http.Error(w,
+			"expected a Forgejo, GitHub, Gitea, or Gogs webhook request", http.StatusBadRequest)
+		return fmt.Errorf("event expected")
+	}
+
+	if eventName != "push" {
+		http.Error(w, "only push events are allowed", http.StatusBadRequest)
+		return fmt.Errorf("invalid event")
+	}
+
 	if r.Header.Get("Content-Type") != "application/json" {
 		http.Error(w, "only JSON payload is allowed", http.StatusBadRequest)
 		return fmt.Errorf("invalid content type")
-	}
-
-	if r.Header.Get("X-Forgejo-Event") != "push" {
-		http.Error(w, "only push events are allowed", http.StatusBadRequest)
-		return fmt.Errorf("invalid event")
 	}
 
 	requestBody, err := io.ReadAll(r.Body)
