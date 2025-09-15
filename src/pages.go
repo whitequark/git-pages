@@ -248,13 +248,19 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 	switch result.outcome {
 	case FetchError:
 		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprintf(w, "fetch error: %s\n", result.err)
 	case FetchTimeout:
 		w.WriteHeader(http.StatusGatewayTimeout)
-	default:
+		fmt.Fprintln(w, "fetch timeout")
+	case FetchNoChange:
 		w.WriteHeader(http.StatusOK)
-	}
-	if result.err != nil {
-		fmt.Fprintln(w, result.err)
+		fmt.Fprintln(w, "unchanged")
+	case FetchCreated:
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, "created")
+	case FetchUpdated:
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, "updated")
 	}
 	return result.err
 }
