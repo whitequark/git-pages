@@ -12,6 +12,11 @@ type Config struct {
 		Protocol string `toml:"protocol"`
 		Address  string `toml:"address"`
 	} `toml:"listen"`
+	Wildcard struct {
+		Domain    string `toml:"domain"`
+		CloneURL  string `toml:"clone-url"`
+		IndexRepo string `toml:"index-repo"`
+	} `toml:"wildcard"`
 }
 
 func readConfig(path string, config *Config) error {

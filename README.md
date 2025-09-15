@@ -53,7 +53,11 @@ $ curl http://127.0.0.1:3333/ -H 'Host: codeberg.page'
 Authorization
 -------------
 
-DNS is used for authorization of content updates for custom domain names. Whenever a `PUT` or `POST` request is received at `hostname.tld` that has an `Authorization: Pages <token>` header, the TXT record(s) at `_git-pages-challenge.hostname.tld` are compared with `sha256("hostname.tld <token>")`. If there is a match then updates from any clone URLs are allowed.
+DNS is used for authorization of content updates.
+
+- If a `[wildcard]` configuration section is specified, and if the suffix of a hostname in a `POST` request is equal to `[wildcard].domain`, then the request is authorized when and only when the repository URL in the event body matches the repository URL computed from the configuration file. Otherwise the next rule is used.
+
+- If a `PUT` or `POST` request is received at `<hostname>` with an `Authorization: Pages <token>` header, then the request is authorized when any of the the TXT records at `_git-pages-challenge.<hostname>` are equal to `SHA256("<hostname> <token>")`.
 
 
 Architecture

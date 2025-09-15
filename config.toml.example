@@ -3,3 +3,8 @@ data-dir = "./data"
 [listen]
 protocol = "tcp"
 address = ":3333"
+
+[wildcard]
+domain = "codeberg.page"
+clone-url = "https://codeberg.org/%s/%s.git"
+index-repo = "%s.codeberg.page"

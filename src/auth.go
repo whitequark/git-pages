@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func getHost(r *http.Request) string {
+func GetHost(r *http.Request) string {
 	// FIXME: handle IDNA
 	host, _, err := net.SplitHostPort(r.Host)
 	if err != nil {
@@ -19,8 +19,8 @@ func getHost(r *http.Request) string {
 	return host
 }
 
-func authorize(w http.ResponseWriter, r *http.Request) error {
-	host := getHost(r)
+func Authorize(w http.ResponseWriter, r *http.Request) error {
+	host := GetHost(r)
 
 	authorization := r.Header.Get("Authorization")
 	if authorization == "" {

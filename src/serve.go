@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -20,7 +21,7 @@ import (
 const fetchTimeout = 30 * time.Second
 
 func getPage(w http.ResponseWriter, r *http.Request) error {
-	host := getHost(r)
+	host := GetHost(r)
 
 	// if the first directory of the path exists under `www/$host`, use it as the root,
 	// else use `www/$host/.index`
@@ -104,9 +105,9 @@ func getProjectName(w http.ResponseWriter, r *http.Request) (string, error) {
 }
 
 func putPage(w http.ResponseWriter, r *http.Request) error {
-	host := getHost(r)
+	host := GetHost(r)
 
-	err := authorize(w, r)
+	err := Authorize(w, r)
 	if err != nil {
 		return err
 	}
@@ -156,16 +157,26 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 }
 
 func postPage(w http.ResponseWriter, r *http.Request) error {
-	host := getHost(r)
-
-	err := authorize(w, r)
-	if err != nil {
-		return err
-	}
+	host := GetHost(r)
+	hostParts := strings.Split(host, ".")
 
 	projectName, err := getProjectName(w, r)
 	if err != nil {
 		return err
+	}
+
+	allowRepoURL := ""
+	if slices.Equal(hostParts[1:], strings.Split(config.Wildcard.Domain, ".")) {
+		userName := hostParts[0]
+		repoName := projectName
+		if repoName == ".index" {
+			repoName = fmt.Sprintf(config.Wildcard.IndexRepo, userName)
+		}
+		allowRepoURL = fmt.Sprintf(config.Wildcard.CloneURL, userName, repoName)
+	} else {
+		if err := Authorize(w, r); err != nil {
+			return err
+		}
 	}
 
 	if r.Header.Get("Content-Type") != "application/json" {
@@ -197,7 +208,15 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	webRoot := fmt.Sprintf("%s/%s", host, projectName)
+
 	repoURL := event["repository"].(map[string]any)["clone_url"].(string)
+	if allowRepoURL != "" && repoURL != allowRepoURL {
+		http.Error(w,
+			fmt.Sprintf("wildcard domain requires repository to be %s", allowRepoURL),
+			http.StatusUnauthorized,
+		)
+		return fmt.Errorf("invalid clone URL")
+	}
 
 	result := FetchWithTimeout(webRoot, repoURL, "pages", fetchTimeout)
 	switch result.outcome {
