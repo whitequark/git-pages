@@ -210,7 +210,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 	webRoot := fmt.Sprintf("%s/%s", host, projectName)
 
 	repoURL := event["repository"].(map[string]any)["clone_url"].(string)
-	if allowRepoURL != "" && repoURL != allowRepoURL {
+	if allowRepoURL != "" && !strings.EqualFold(repoURL, allowRepoURL) {
 		http.Error(w,
 			fmt.Sprintf("wildcard domain requires repository to be %s", allowRepoURL),
 			http.StatusUnauthorized,
