@@ -9,21 +9,30 @@ import (
 
 var config Config
 
+func serveHandler(name string, listen Listen, serve func(http.ResponseWriter, *http.Request)) {
+	listener, err := net.Listen(listen.Protocol, listen.Address)
+	if err != nil {
+		log.Fatalf("%s: %s\n", name, err)
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", serve)
+	if err := http.Serve(listener, mux); err != nil {
+		log.Fatalf("%s: %s\n", name, err)
+	}
+}
+
 func main() {
 	configPath := flag.String("config", "config.toml", "path to configuration file")
 	flag.Parse()
 
 	if err := readConfig(*configPath, &config); err != nil {
-		log.Fatalln("failed to read configuration:", err)
+		log.Fatalln("configuration:", err)
 	}
 
-	listener, err := net.Listen(config.Listen.Protocol, config.Listen.Address)
-	if err != nil {
-		log.Fatalln("failed to listen:", err)
+	if config.Caddy != (Listen{}) {
+		go serveHandler("caddy", config.Caddy, ServeCaddy)
 	}
 
-	http.HandleFunc("/", Serve)
-	if err := http.Serve(listener, nil); err != nil {
-		log.Fatalln("failed to serve:", err)
-	}
+	serveHandler("pages", config.Pages, ServePages)
 }

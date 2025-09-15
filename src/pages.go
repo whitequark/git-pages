@@ -233,8 +233,8 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 	return result.err
 }
 
-func Serve(w http.ResponseWriter, r *http.Request) {
-	log.Println("serve:", r.Method, r.Host, r.URL)
+func ServePages(w http.ResponseWriter, r *http.Request) {
+	log.Println("pages:", r.Method, r.Host, r.URL)
 	err := error(nil)
 	switch r.Method {
 	case http.MethodGet:
@@ -248,6 +248,6 @@ func Serve(w http.ResponseWriter, r *http.Request) {
 		err = fmt.Errorf("method %s not allowed", r.Method)
 	}
 	if err != nil {
-		log.Println("serve err:", err)
+		log.Println("pages err:", err)
 	}
 }

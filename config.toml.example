@@ -1,8 +1,12 @@
 data-dir = "./data"
 
-[listen]
+[pages]
 protocol = "tcp"
 address = ":3333"
+
+[caddy]
+protocol = "tcp"
+address = ":3334"
 
 [wildcard]
 domain = "codeberg.page"

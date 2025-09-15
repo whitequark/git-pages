@@ -6,12 +6,15 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
+type Listen struct {
+	Protocol string `toml:"protocol"`
+	Address  string `toml:"address"`
+}
+
 type Config struct {
-	DataDir string `toml:"data-dir"`
-	Listen  struct {
-		Protocol string `toml:"protocol"`
-		Address  string `toml:"address"`
-	} `toml:"listen"`
+	DataDir  string `toml:"data-dir"`
+	Pages    Listen `toml:"pages"`
+	Caddy    Listen `toml:"caddy"`
 	Wildcard struct {
 		Domain    string `toml:"domain"`
 		CloneURL  string `toml:"clone-url"`
