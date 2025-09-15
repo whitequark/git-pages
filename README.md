@@ -9,7 +9,7 @@ Features
 
 * In response to a `PUT` or `POST` request, performs a shallow in-memory clone of a git repository, checks out a tree to the filesystem, and atomically updates the version of content being served.
     - `PUT` method is a custom REST endpoint, `POST` method is a Forgejo webhook endpoint.
-* In response to a `GET` request, selects an appropriate tree and serves files from it. Supported URL patterns:
+* In response to a `GET` or `HEAD` request, selects an appropriate tree and serves files from it. Supported URL patterns:
     - `https://domain.tld/project/` (routed to project-specific tree)
     - `https://domain.tld/` (routed to domain-specific tree by exclusion)
 

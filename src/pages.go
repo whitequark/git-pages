@@ -237,7 +237,7 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 	log.Println("pages:", r.Method, r.Host, r.URL)
 	err := error(nil)
 	switch r.Method {
-	case http.MethodGet:
+	case http.MethodGet, http.MethodHead:
 		err = getPage(w, r)
 	case http.MethodPut:
 		err = putPage(w, r)
