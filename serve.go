@@ -2,15 +2,11 @@ package main
 
 import (
 	"bytes"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -22,16 +18,6 @@ import (
 )
 
 const fetchTimeout = 30 * time.Second
-
-func getHost(r *http.Request) string {
-	// FIXME: handle IDNA
-	host, _, err := net.SplitHostPort(r.Host)
-	if err != nil {
-		// dirty but the go stdlib doesn't have a "split port if present" function
-		host = r.Host
-	}
-	return host
-}
 
 func getPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
 	host := getHost(r)
@@ -120,6 +106,11 @@ func getProjectName(w http.ResponseWriter, r *http.Request) (string, error) {
 func putPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
 	host := getHost(r)
 
+	err := authorize(w, r)
+	if err != nil {
+		return err
+	}
+
 	projectName, err := getProjectName(w, r)
 	if err != nil {
 		return err
@@ -164,10 +155,13 @@ func putPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
 	return result.err
 }
 
-const hmacSecret = ""
-
 func postPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
 	host := getHost(r)
+
+	err := authorize(w, r)
+	if err != nil {
+		return err
+	}
 
 	projectName, err := getProjectName(w, r)
 	if err != nil {
@@ -187,21 +181,6 @@ func postPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
 	requestBody, err := io.ReadAll(r.Body)
 	if err != nil {
 		return fmt.Errorf("body read: %s", err)
-	}
-
-	if hmacSecret != "" {
-		signature, err := hex.DecodeString(r.Header.Get("X-Forgejo-Signature"))
-		if err != nil {
-			http.Error(w, "malformed signature", http.StatusBadRequest)
-			return fmt.Errorf("malformed signature")
-		}
-
-		mac := hmac.New(sha256.New, []byte(hmacSecret))
-		mac.Write(requestBody)
-		if !hmac.Equal(mac.Sum(nil), signature) {
-			http.Error(w, "invalid signature", http.StatusBadRequest)
-			return fmt.Errorf("invalid hmac")
-		}
 	}
 
 	var event map[string]any

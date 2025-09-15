@@ -49,6 +49,12 @@ $ curl http://127.0.0.1:3333/ -H 'Host: codeberg.page'
 ```
 
 
+Authorization
+-------------
+
+DNS is used for authorization of content updates for custom domain names. Whenever a `PUT` or `POST` request is received at `hostname.tld` that has an `Authorization: Pages <token>` header, the TXT record(s) at `_git-pages-challenge.hostname.tld` are compared with `sha256("hostname.tld <token>")`. If there is a match then updates from any clone URLs are allowed.
+
+
 Architecture
 ------------
 
@@ -65,8 +71,6 @@ Filesystem is used as the sole mechanism for state storage.
 This approach has the benefits of being easy to explore and debug, but places a lot of faith onto the filesystem implementation; partial data loss, write reordering, or incomplete journalling *will* result in confusing and persistent caching issues. This is probably fine, but needs to be understood.
 
 The specific arrangement used is clearly not optimal; at a minimum it is likely worth it to deduplicate files under `data/tree/` using hardlinks, or perhaps to put objects in a flat, content-addressed store with `data/www/` linking to each individual file. The key practical constraint will likely be the need to attribute excessively large trees to repositories they were built from (and to perform GC), which suggests adding structure and not removing it.
-
-I lack any interesting insight into authentication mechanisms applicable here. It would be straightforward to verify whether a custom domain contains a TXT record specifying the allowed source repositories.
 
 
 License
