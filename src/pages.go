@@ -50,6 +50,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	// if whatever we were serving doesn't exist, try to serve `$root/404.html`
 	if errors.Is(err, os.ErrNotExist) {
 		file, _ = securejoin.OpenInRoot(config.DataDir, filepath.Join(wwwRoot, "404.html"))
+		err = fmt.Errorf("not found: %s", err.(*os.PathError).Path)
 	}
 
 	// acquire read capability to the file being served (if possible)
