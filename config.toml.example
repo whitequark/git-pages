@@ -1,0 +1,5 @@
+data-dir = "./data"
+
+[listen]
+protocol = "tcp"
+address = ":3333"

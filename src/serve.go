@@ -19,7 +19,7 @@ import (
 
 const fetchTimeout = 30 * time.Second
 
-func getPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
+func getPage(w http.ResponseWriter, r *http.Request) error {
 	host := getHost(r)
 
 	// if the first directory of the path exists under `www/$host`, use it as the root,
@@ -29,26 +29,26 @@ func getPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
 	requestPath := path
 	if projectName, projectPath, found := strings.Cut(path, "/"); found {
 		projectRoot := filepath.Join("www", host, projectName)
-		if file, _ := securejoin.OpenInRoot(dataDir, projectRoot); file != nil {
+		if file, _ := securejoin.OpenInRoot(config.DataDir, projectRoot); file != nil {
 			file.Close()
 			wwwRoot, requestPath = projectRoot, projectPath
 		}
 	}
 
 	// try to serve `$root/$path` first
-	file, err := securejoin.OpenInRoot(dataDir, filepath.Join(wwwRoot, requestPath))
+	file, err := securejoin.OpenInRoot(config.DataDir, filepath.Join(wwwRoot, requestPath))
 	if err == nil {
 		// if it's a directory, serve `$root/$path/index.html`
 		stat, statErr := file.Stat()
 		if statErr == nil && stat.IsDir() {
 			defer file.Close()
-			file, err = securejoin.OpenInRoot(dataDir,
+			file, err = securejoin.OpenInRoot(config.DataDir,
 				filepath.Join(wwwRoot, requestPath, "index.html"))
 		}
 	}
 	// if whatever we were serving doesn't exist, try to serve `$root/404.html`
 	if errors.Is(err, os.ErrNotExist) {
-		file, _ = securejoin.OpenInRoot(dataDir, filepath.Join(wwwRoot, "404.html"))
+		file, _ = securejoin.OpenInRoot(config.DataDir, filepath.Join(wwwRoot, "404.html"))
 	}
 
 	// acquire read capability to the file being served (if possible)
@@ -103,7 +103,7 @@ func getProjectName(w http.ResponseWriter, r *http.Request) (string, error) {
 	}
 }
 
-func putPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
+func putPage(w http.ResponseWriter, r *http.Request) error {
 	host := getHost(r)
 
 	err := authorize(w, r)
@@ -130,7 +130,7 @@ func putPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
 		branch = "pages"
 	}
 
-	result := FetchWithTimeout(dataDir, webRoot, repoURL, branch, fetchTimeout)
+	result := FetchWithTimeout(webRoot, repoURL, branch, fetchTimeout)
 	if result.err == nil {
 		w.Header().Add("Content-Location", r.URL.String())
 	}
@@ -155,7 +155,7 @@ func putPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
 	return result.err
 }
 
-func postPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
+func postPage(w http.ResponseWriter, r *http.Request) error {
 	host := getHost(r)
 
 	err := authorize(w, r)
@@ -199,7 +199,7 @@ func postPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
 	webRoot := fmt.Sprintf("%s/%s", host, projectName)
 	repoURL := event["repository"].(map[string]any)["clone_url"].(string)
 
-	result := FetchWithTimeout(dataDir, webRoot, repoURL, "pages", fetchTimeout)
+	result := FetchWithTimeout(webRoot, repoURL, "pages", fetchTimeout)
 	switch result.outcome {
 	case FetchError:
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -214,23 +214,21 @@ func postPage(dataDir string, w http.ResponseWriter, r *http.Request) error {
 	return result.err
 }
 
-func Serve(dataDir string) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("serve:", r.Method, r.Host, r.URL)
-		err := error(nil)
-		switch r.Method {
-		case http.MethodGet:
-			err = getPage(dataDir, w, r)
-		case http.MethodPut:
-			err = putPage(dataDir, w, r)
-		case http.MethodPost:
-			err = postPage(dataDir, w, r)
-		default:
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			err = fmt.Errorf("method %s not allowed", r.Method)
-		}
-		if err != nil {
-			log.Println("serve err:", err)
-		}
+func Serve(w http.ResponseWriter, r *http.Request) {
+	log.Println("serve:", r.Method, r.Host, r.URL)
+	err := error(nil)
+	switch r.Method {
+	case http.MethodGet:
+		err = getPage(w, r)
+	case http.MethodPut:
+		err = putPage(w, r)
+	case http.MethodPost:
+		err = postPage(w, r)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		err = fmt.Errorf("method %s not allowed", r.Method)
+	}
+	if err != nil {
+		log.Println("serve err:", err)
 	}
 }

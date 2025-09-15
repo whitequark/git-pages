@@ -37,7 +37,6 @@ func splitHash(hash plumbing.Hash) string {
 }
 
 func fetch(
-	dataDir string,
 	webRoot string,
 	repoURL string,
 	branch string,
@@ -61,10 +60,10 @@ func fetch(
 	}
 	head := ref.Hash()
 
-	destDir := filepath.Join(dataDir, "tree", splitHash(head))
+	destDir := filepath.Join(config.DataDir, "tree", splitHash(head))
 	if _, err := os.Stat(destDir); errors.Is(err, os.ErrNotExist) {
 		// check out to a temporary directory to avoid TOCTTOU race on destDir
-		tempDir, err := os.MkdirTemp(dataDir, ".tree")
+		tempDir, err := os.MkdirTemp(config.DataDir, ".tree")
 		if err != nil {
 			return FetchResult{err: fmt.Errorf("mkdir temp: %s", err)}
 		}
@@ -96,10 +95,10 @@ func fetch(
 		}
 	}
 
-	webLink := filepath.Join(dataDir, "www", webRoot)
+	webLink := filepath.Join(config.DataDir, "www", webRoot)
 	destDirRel, _ := filepath.Rel(filepath.Dir(webLink), destDir)
 
-	tempLink := filepath.Join(dataDir,
+	tempLink := filepath.Join(config.DataDir,
 		fmt.Sprintf(".link.%s.%s", strings.ReplaceAll(webRoot, "/", ".."), head.String()))
 	if err := os.Symlink(destDirRel, tempLink); err != nil {
 		return FetchResult{err: fmt.Errorf("symlink temp: %s", err)}
@@ -131,13 +130,12 @@ func fetch(
 }
 
 func Fetch(
-	dataDir string,
 	webRoot string,
 	repoURL string,
 	branch string,
 ) FetchResult {
 	log.Println("fetch:", webRoot, repoURL, branch)
-	result := fetch(dataDir, webRoot, repoURL, branch)
+	result := fetch(webRoot, repoURL, branch)
 	if result.err == nil {
 		status := ""
 		switch result.outcome {
@@ -156,7 +154,6 @@ func Fetch(
 }
 
 func FetchWithTimeout(
-	dataDir string,
 	webRoot string,
 	repoURL string,
 	branch string,
@@ -165,7 +162,7 @@ func FetchWithTimeout(
 	// fetch the updated content with a timeout
 	c := make(chan FetchResult, 1)
 	go func() {
-		result := Fetch(dataDir, webRoot, repoURL, branch)
+		result := Fetch(webRoot, repoURL, branch)
 		c <- result
 	}()
 	select {

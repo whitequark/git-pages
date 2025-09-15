@@ -21,7 +21,8 @@ You will need [Go](https://go.dev/) 1.24 or newer. Run:
 
 ```console
 $ mkdir -p data
-$ go run . data :3333
+$ cp config.toml.example config.toml
+$ go run ./src
 ```
 
 This starts an HTTP server on `0.0.0.0:3333` whose behavior is fully determined by the `data` directory. It will accept requests to any virtual host, but must first be provisioned. For example:

@@ -1,18 +1,29 @@
 package main
 
 import (
+	"flag"
 	"log"
+	"net"
 	"net/http"
-	"os"
 )
 
-func main() {
-	dataDir := os.Args[1]
-	listenAddr := os.Args[2]
+var config Config
 
-	http.HandleFunc("/", Serve(dataDir))
-	err := http.ListenAndServe(listenAddr, nil)
+func main() {
+	configPath := flag.String("config", "config.toml", "path to configuration file")
+	flag.Parse()
+
+	if err := readConfig(*configPath, &config); err != nil {
+		log.Fatalln("failed to read configuration:", err)
+	}
+
+	listener, err := net.Listen(config.Listen.Protocol, config.Listen.Address)
 	if err != nil {
 		log.Fatalln("failed to listen:", err)
+	}
+
+	http.HandleFunc("/", Serve)
+	if err := http.Serve(listener, nil); err != nil {
+		log.Fatalln("failed to serve:", err)
 	}
 }
