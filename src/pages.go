@@ -230,6 +230,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 	eventRef := event["ref"].(string)
 	if eventRef != "refs/heads/pages" {
 		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "ref %s ignored\n", eventRef)
 		return nil
 	}
 
