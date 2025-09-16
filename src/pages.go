@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -47,6 +48,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				filepath.Join(wwwRoot, requestPath, "index.html"))
 		}
 	}
+
 	// if whatever we were serving doesn't exist, try to serve `$root/404.html`
 	if errors.Is(err, os.ErrNotExist) {
 		file, _ = securejoin.OpenInRoot(config.DataDir, filepath.Join(wwwRoot, "404.html"))
@@ -77,6 +79,18 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		// serve custom 404 page (if any)
 		io.Copy(w, reader)
 	} else {
+		// always check whether content has changed with the origin server; it is cheap to handle
+		// ETag or If-Modified-Since queries and it avoids stale content being served
+		w.Header().Set("Cache-Control", "public, max-age=0, must-revalidate")
+
+		// `www/$host` should be a symlink pointing to an immutable directory under `tree/...`;
+		// if it's not, assume the server administrator did it on purpose and degrade gracefully
+		wwwRootDest, err := os.Readlink(filepath.Join(config.DataDir, wwwRoot))
+		if err == nil {
+			w.Header().Set("ETag", fmt.Sprintf(`"%x"`, sha1.Sum([]byte(wwwRootDest))))
+		}
+
+		// http.ServeContent handles content type and caching
 		stat, _ := file.Stat()
 		http.ServeContent(w, r, path, stat.ModTime(), reader)
 	}
