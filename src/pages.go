@@ -83,6 +83,10 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Max-Age", "86400")
 
+		// allow the use of multi-threading in WebAssembly
+		w.Header().Set("Cross-Origin-Embedder-Policy", "credentialless")
+		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+
 		// always check whether content has changed with the origin server; it is cheap to handle
 		// ETag or If-Modified-Since queries and it avoids stale content being served
 		w.Header().Set("Cache-Control", "public, max-age=0, must-revalidate")
