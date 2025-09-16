@@ -44,8 +44,19 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		stat, statErr := file.Stat()
 		if statErr == nil && stat.IsDir() {
 			defer file.Close()
-			file, err = securejoin.OpenInRoot(config.DataDir,
-				filepath.Join(wwwRoot, requestPath, "index.html"))
+			if !strings.HasSuffix(r.URL.Path, "/") {
+				// redirect from `$root/$dir` to `$root/$dir/` or links in the document won't work
+				// correctly
+				newPath := r.URL.Path + "/"
+				w.Header().Set("Location", newPath)
+				w.WriteHeader(http.StatusFound)
+				fmt.Fprintf(w, "see %s\n", newPath)
+				return nil
+			} else {
+				// serve `$root/$dir/index.html` under `$root/$dir/`
+				file, err = securejoin.OpenInRoot(config.DataDir,
+					filepath.Join(wwwRoot, requestPath, "index.html"))
+			}
 		}
 	}
 
