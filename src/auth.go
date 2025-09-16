@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"net/http"
@@ -34,9 +35,32 @@ func Authorize(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("malformed Authorization header")
 	}
 
-	if scheme != "Pages" {
+	if scheme != "Pages" && scheme != "Basic" {
 		http.Error(w, "unknown Authorization scheme", http.StatusBadRequest)
 		return fmt.Errorf("unknown Authorization scheme")
+	}
+
+	// services like GitHub and Gogs cannot send a custom Authorization: header, but supplying
+	// username and password in the URL is basically just as good
+	if scheme == "Basic" {
+		basicParam, err := base64.StdEncoding.DecodeString(param)
+		if err != nil {
+			http.Error(w, "malformed Authorization: Basic header", http.StatusBadRequest)
+			return fmt.Errorf("malformed Authorization: Basic header")
+		}
+
+		username, password, found := strings.Cut(string(basicParam), ":")
+		if !found {
+			http.Error(w, "malformed Authorization: Basic parameter", http.StatusBadRequest)
+			return fmt.Errorf("malformed Authorization: Basic parameter")
+		}
+
+		if username != "Pages" {
+			http.Error(w, "unexpected Authorization: Basic username", http.StatusUnauthorized)
+			return fmt.Errorf("unexpected Authorization: Basic username")
+		}
+
+		param = password
 	}
 
 	challengeHostname := fmt.Sprintf("_git-pages-challenge.%s", host)

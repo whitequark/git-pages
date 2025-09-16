@@ -196,13 +196,6 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		}
 		allowRepoURL = fmt.Sprintf(config.Wildcard.CloneURL, userName, repoName)
 	} else {
-		// GitHub and Gogs cannot supply an `Authorization:` header.
-		if r.Header.Get("Authorization") == "" {
-			if value := r.URL.Query().Get("Authorization"); value != "" {
-				r.Header.Set("Authorization", value)
-			}
-		}
-
 		if err := Authorize(w, r); err != nil {
 			return err
 		}
