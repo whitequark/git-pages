@@ -76,6 +76,10 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
+	// allow JavaScript code to access responses (including errors) even across origins
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Max-Age", "86400")
+
 	// decide on the HTTP status
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -90,10 +94,6 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		// serve custom 404 page (if any)
 		io.Copy(w, reader)
 	} else {
-		// allow JavaScript code to download files even across origins
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Max-Age", "86400")
-
 		// allow the use of multi-threading in WebAssembly
 		w.Header().Set("Cross-Origin-Embedder-Policy", "credentialless")
 		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
