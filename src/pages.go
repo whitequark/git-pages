@@ -79,6 +79,10 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		// serve custom 404 page (if any)
 		io.Copy(w, reader)
 	} else {
+		// allow JavaScript code to download files even across origins
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Max-Age", "86400")
+
 		// always check whether content has changed with the origin server; it is cheap to handle
 		// ETag or If-Modified-Since queries and it avoids stale content being served
 		w.Header().Set("Cache-Control", "public, max-age=0, must-revalidate")
