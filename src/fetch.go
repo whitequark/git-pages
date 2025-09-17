@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -11,10 +12,10 @@ import (
 	"github.com/go-git/go-git/v6/storage/memory"
 )
 
-func FetchRepository(repoURL string, branch string) (*Manifest, error) {
+func FetchRepository(ctx context.Context, repoURL string, branch string) (*Manifest, error) {
 	storer := memory.NewStorage()
 
-	repo, err := git.Clone(storer, nil, &git.CloneOptions{
+	repo, err := git.CloneContext(ctx, storer, nil, &git.CloneOptions{
 		Bare:          true,
 		URL:           repoURL,
 		ReferenceName: plumbing.ReferenceName(branch),

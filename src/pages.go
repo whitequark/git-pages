@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -176,7 +177,9 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		branch = "pages"
 	}
 
-	result := UpdateWithTimeout(webRoot, repoURL, branch, updateTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), updateTimeout)
+	defer cancel()
+	result := Update(ctx, webRoot, repoURL, branch)
 	if result.manifest != nil {
 		w.Header().Add("Content-Location", r.URL.String())
 	}
@@ -285,7 +288,9 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("invalid clone URL")
 	}
 
-	result := UpdateWithTimeout(webRoot, repoURL, "pages", updateTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), updateTimeout)
+	defer cancel()
+	result := Update(ctx, webRoot, repoURL, "pages")
 	switch result.outcome {
 	case UpdateError:
 		w.WriteHeader(http.StatusServiceUnavailable)

@@ -1,9 +1,10 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
-	"time"
 )
 
 type UpdateOutcome int
@@ -23,6 +24,7 @@ type UpdateResult struct {
 }
 
 func Update(
+	ctx context.Context,
 	webRoot string,
 	repoURL string,
 	branch string,
@@ -33,8 +35,11 @@ func Update(
 	log.Println("update:", webRoot, repoURL, branch)
 
 	outcome := UpdateError
-	fetchManifest, err = FetchRepository(repoURL, branch)
-	if err == nil {
+	fetchManifest, err = FetchRepository(ctx, repoURL, branch)
+	if errors.Is(err, context.DeadlineExceeded) {
+		outcome = UpdateTimeout
+		err = fmt.Errorf("update timeout")
+	} else if err == nil {
 		oldManifest, _ = backend.GetManifest(webRoot)
 		newManifest, err = StoreManifest(backend, webRoot, fetchManifest)
 		if err == nil {
@@ -64,23 +69,4 @@ func Update(
 	}
 
 	return UpdateResult{outcome, newManifest, err}
-}
-
-func UpdateWithTimeout(
-	webRoot string,
-	repoURL string,
-	branch string,
-	timeout time.Duration,
-) UpdateResult {
-	c := make(chan UpdateResult, 1)
-	go func() {
-		result := Update(webRoot, repoURL, branch)
-		c <- result
-	}()
-	select {
-	case result := <-c:
-		return result
-	case <-time.After(timeout):
-		return UpdateResult{outcome: UpdateTimeout, err: fmt.Errorf("update timeout")}
-	}
 }
