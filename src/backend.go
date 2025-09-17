@@ -322,7 +322,7 @@ func NewS3Backend(
 
 	siteCacheOptions, err := defaultCacheConfig[string, *CachedManifest](
 		config.Backend.S3.SiteCache,
-		5*time.Second, 16*1048576,
+		60*time.Second, 16*1048576,
 		func(key string, value *CachedManifest) uint32 { return value.weight })
 	if err != nil {
 		return nil, err
