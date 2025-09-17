@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -48,6 +49,15 @@ type Backend interface {
 
 	// Delete a manifest.
 	DeleteManifest(name string) error
+}
+
+func splitBlobName(name string) []string {
+	algo, hash, found := strings.Cut(name, "-")
+	if found {
+		return slices.Concat([]string{algo}, splitBlobName(hash))
+	} else {
+		return []string{name[0:2], name[2:4], name[4:]}
+	}
 }
 
 type FSBackend struct {
@@ -103,15 +113,6 @@ func NewFSBackend(dir string) (*FSBackend, error) {
 
 func (fs *FSBackend) Backend() Backend {
 	return fs
-}
-
-func splitBlobName(name string) []string {
-	algo, hash, found := strings.Cut(name, "-")
-	if found {
-		return slices.Concat([]string{algo}, splitBlobName(hash))
-	} else {
-		return []string{name[0:2], name[2:4], name[4:]}
-	}
 }
 
 func (fs *FSBackend) GetBlob(name string) (io.ReadSeeker, time.Time, error) {
@@ -320,7 +321,7 @@ func (s3 *S3Backend) Backend() Backend {
 }
 
 func blobObjectName(name string) string {
-	return fmt.Sprintf("blob/%s", name)
+	return fmt.Sprintf("blob/%s", path.Join(splitBlobName(name)...))
 }
 
 func (s3 *S3Backend) GetBlob(name string) (io.ReadSeeker, time.Time, error) {
