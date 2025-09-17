@@ -222,14 +222,20 @@ func (fs *FSBackend) CheckDomain(domain string) (bool, error) {
 	}
 }
 
+// Blobs can be safely cached indefinitely. They only need to be evicted to preserve memory.
 type CachedBlob struct {
 	blob  []byte
 	mtime time.Time
 }
 
+// Manifests can only be cached for a short time to avoid serving stale content. Browser
+// page loads cause a large burst of manifest accesses that are essential for serving
+// `304 No Content` responses and these need to be handled very quickly, so both hits and
+// misses are cached.
 type CachedManifest struct {
 	manifest *Manifest
 	weight   uint32
+	err      error
 }
 
 type S3Backend struct {
@@ -412,34 +418,42 @@ func stagedManifestObjectName(manifestData []byte) string {
 
 func (s3 *S3Backend) GetManifest(name string) (*Manifest, error) {
 	loader := func(ctx context.Context, name string) (*CachedManifest, error) {
-		log.Printf("s3: get manifest %s\n", name)
+		manifest, size, err := func() (*Manifest, uint32, error) {
+			log.Printf("s3: get manifest %s\n", name)
 
-		object, err := s3.client.GetObject(s3.ctx, s3.bucket, manifestObjectName(name),
-			minio.GetObjectOptions{})
+			object, err := s3.client.GetObject(s3.ctx, s3.bucket, manifestObjectName(name),
+				minio.GetObjectOptions{})
+			if err != nil {
+				return nil, 0, err
+			}
+			defer object.Close()
+
+			data, err := io.ReadAll(object)
+			if err != nil {
+				return nil, 0, err
+			}
+
+			manifest, err := DecodeManifest(data)
+			if err != nil {
+				return nil, 0, err
+			}
+
+			return manifest, uint32(len(data)), nil
+		}()
+
 		if err != nil {
-			return nil, err
+			return &CachedManifest{nil, 1, err}, nil
+		} else {
+			return &CachedManifest{manifest, size, err}, nil
 		}
-		defer object.Close()
-
-		data, err := io.ReadAll(object)
-		if err != nil {
-			return nil, err
-		}
-
-		manifest, err := DecodeManifest(data)
-		if err != nil {
-			return nil, err
-		}
-
-		return &CachedManifest{manifest, uint32(len(data))}, nil
 	}
 
 	cached, err := s3.siteCache.Get(s3.ctx, name, otter.LoaderFunc[string, *CachedManifest](loader))
 	if err != nil {
 		return nil, err
+	} else {
+		return cached.manifest, cached.err
 	}
-
-	return cached.manifest, err
 }
 
 func (s3 *S3Backend) StageManifest(manifest *Manifest) error {
