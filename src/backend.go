@@ -475,6 +475,7 @@ func (s3 *S3Backend) CommitManifest(name string, manifest *Manifest) error {
 		bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{})
 	removeErr := s3.client.RemoveObject(s3.ctx, s3.bucket, stagedManifestObjectName(data),
 		minio.RemoveObjectOptions{})
+	s3.siteCache.Invalidate(name)
 	if putErr != nil {
 		return putErr
 	} else if removeErr != nil {
@@ -487,8 +488,10 @@ func (s3 *S3Backend) CommitManifest(name string, manifest *Manifest) error {
 func (s3 *S3Backend) DeleteManifest(name string) error {
 	log.Printf("s3: delete manifest %s\n", name)
 
-	return s3.client.RemoveObject(s3.ctx, s3.bucket, manifestObjectName(name),
+	err := s3.client.RemoveObject(s3.ctx, s3.bucket, manifestObjectName(name),
 		minio.RemoveObjectOptions{})
+	s3.siteCache.Invalidate(name)
+	return err
 }
 
 func (s3 *S3Backend) CheckDomain(domain string) (bool, error) {
