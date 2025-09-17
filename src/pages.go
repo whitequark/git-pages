@@ -31,19 +31,19 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	w.Header().Set("Access-Control-Max-Age", "86400")
 
 	urlPath, _ = strings.CutPrefix(r.URL.Path, "/")
-	manifest, err = backend.GetManifest(fmt.Sprintf("%s/.index", host))
 	if projectName, projectPath, found := strings.Cut(urlPath, "/"); found {
-		var projectManifest *Manifest
-		projectManifest, err = backend.GetManifest(fmt.Sprintf("%s/%s", host, projectName))
+		projectManifest, err := backend.GetManifest(fmt.Sprintf("%s/%s", host, projectName))
 		if err == nil {
-			urlPath = projectPath
-			manifest = projectManifest
+			urlPath, manifest = projectPath, projectManifest
 		}
 	}
 	if manifest == nil {
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintf(w, "site not found\n")
-		return err
+		manifest, err = backend.GetManifest(fmt.Sprintf("%s/.index", host))
+		if manifest == nil {
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprintf(w, "site not found\n")
+			return err
+		}
 	}
 
 	entryPath := urlPath
