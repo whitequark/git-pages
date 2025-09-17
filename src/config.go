@@ -6,19 +6,17 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-type ListenConfig struct {
-	Protocol string `toml:"protocol"`
-	Address  string `toml:"address"`
-}
-
 type CacheConfig struct {
 	MaxSize uint64 `toml:"max-size"` // in bytes
 	MaxAge  string `toml:"max-age"`
 }
 
 type Config struct {
-	Pages    ListenConfig `toml:"pages"`
-	Caddy    ListenConfig `toml:"caddy"`
+	Listen struct {
+		Pages  string `toml:"pages"`
+		Caddy  string `toml:"caddy"`
+		Health string `toml:"health"`
+	} `toml:"listen"`
 	Wildcard struct {
 		Domain    string `toml:"domain"`
 		CloneURL  string `toml:"clone-url"`

@@ -6,12 +6,18 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 )
 
 var backend Backend
 
-func serveHandler(name string, listen ListenConfig, serve func(http.ResponseWriter, *http.Request)) {
-	listener, err := net.Listen(listen.Protocol, listen.Address)
+func serveHandler(name string, listen string, serve func(http.ResponseWriter, *http.Request)) {
+	protocol, address, ok := strings.Cut(listen, "/")
+	if !ok {
+		log.Fatalf("%s: %s: malformed endpoint", name, listen)
+	}
+
+	listener, err := net.Listen(protocol, address)
 	if err != nil {
 		log.Fatalf("%s: %s\n", name, err)
 	}
@@ -73,9 +79,15 @@ func main() {
 
 	log.Println("ready")
 
-	if config.Caddy != (ListenConfig{}) {
-		go serveHandler("caddy", config.Caddy, ServeCaddy)
+	go serveHandler("pages", config.Listen.Pages, ServePages)
+
+	if config.Listen.Caddy != "" {
+		go serveHandler("caddy", config.Listen.Caddy, ServeCaddy)
 	}
 
-	serveHandler("pages", config.Pages, ServePages)
+	if config.Listen.Health != "" {
+		go serveHandler("health", config.Listen.Health, ServeHealth)
+	}
+
+	select {}
 }

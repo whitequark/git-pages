@@ -1,10 +1,7 @@
-[pages]
-protocol = "tcp"
-address = ":3333"
-
-[caddy]
-protocol = "tcp"
-address = ":3334"
+[listen]
+pages = "tcp/:3000"
+caddy = "tcp/:3001"
+health = "tcp/:3002"
 
 [wildcard]
 domain = "codeberg.page"
