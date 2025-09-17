@@ -70,7 +70,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		} else if entry.Type == Type_InlineFile {
 			reader = bytes.NewReader(entry.Data)
 		} else if entry.Type == Type_ExternalFile {
-			etag := fmt.Sprintf(`"%x"`, entry.Data)
+			etag := fmt.Sprintf(`"%s"`, entry.Data)
 			if r.Header.Get("If-None-Match") == etag {
 				w.WriteHeader(http.StatusNotModified)
 				return nil
