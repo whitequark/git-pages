@@ -72,7 +72,7 @@ func Authorize(w http.ResponseWriter, r *http.Request) error {
 	actualChallenges, err := net.LookupTXT(challengeHostname)
 	if err != nil {
 		http.Error(w, "failed to look up DNS challenge", http.StatusUnauthorized)
-		return fmt.Errorf("failed to look up %s: %s", challengeHostname, err)
+		return fmt.Errorf("failed to look up %s: %w", challengeHostname, err)
 	}
 
 	expectedChallenge := fmt.Sprintf("%x", sha256.Sum256(fmt.Appendf(nil, "%s %s", host, param)))

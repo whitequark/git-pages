@@ -111,7 +111,7 @@ func StoreManifest(backend Backend, name string, manifest *Manifest) (*Manifest,
 	}
 
 	if err := backend.StageManifest(extManifest); err != nil {
-		return nil, fmt.Errorf("stage: %s", err)
+		return nil, fmt.Errorf("stage: %w", err)
 	}
 
 	wg := sync.WaitGroup{}
@@ -121,7 +121,7 @@ func StoreManifest(backend Backend, name string, manifest *Manifest) (*Manifest,
 			wg.Go(func() {
 				err := backend.PutBlob(string(entry.Data), manifest.Tree[name].Data)
 				if err != nil {
-					ch <- fmt.Errorf("put blob %s: %s", name, err)
+					ch <- fmt.Errorf("put blob %s: %w", name, err)
 				}
 			})
 		}
@@ -133,7 +133,7 @@ func StoreManifest(backend Backend, name string, manifest *Manifest) (*Manifest,
 	}
 
 	if err := backend.CommitManifest(name, extManifest); err != nil {
-		return nil, fmt.Errorf("commit: %s", err)
+		return nil, fmt.Errorf("commit: %w", err)
 	}
 
 	return extManifest, nil

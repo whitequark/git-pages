@@ -164,7 +164,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 
 	requestBody, err := io.ReadAll(r.Body)
 	if err != nil {
-		return fmt.Errorf("body read: %s", err)
+		return fmt.Errorf("body read: %w", err)
 	}
 
 	// request body contains git repository URL `https://codeberg.org/...`
@@ -257,7 +257,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 
 	requestBody, err := io.ReadAll(r.Body)
 	if err != nil {
-		return fmt.Errorf("body read: %s", err)
+		return fmt.Errorf("body read: %w", err)
 	}
 
 	var event map[string]any

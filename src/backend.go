@@ -72,12 +72,12 @@ func maybeCreateOpenRoot(dir string, name string) (*os.Root, error) {
 	dirName := filepath.Join(dir, name)
 
 	if err := os.Mkdir(dirName, 0o755); err != nil && !errors.Is(err, os.ErrExist) {
-		return nil, fmt.Errorf("mkdir: %s", err)
+		return nil, fmt.Errorf("mkdir: %w", err)
 	}
 
 	root, err := os.OpenRoot(dirName)
 	if err != nil {
-		return nil, fmt.Errorf("open: %s", err)
+		return nil, fmt.Errorf("open: %w", err)
 	}
 
 	return root, nil
@@ -86,17 +86,17 @@ func maybeCreateOpenRoot(dir string, name string) (*os.Root, error) {
 func createTempInRoot(root *os.Root, name string, data []byte) (string, error) {
 	tempFile, err := os.CreateTemp(root.Name(), name)
 	if err != nil {
-		return "", fmt.Errorf("mktemp: %s", err)
+		return "", fmt.Errorf("mktemp: %w", err)
 	}
 	_, err = tempFile.Write(data)
 	tempFile.Close()
 	if err != nil {
-		return "", fmt.Errorf("write: %s", err)
+		return "", fmt.Errorf("write: %w", err)
 	}
 
 	tempPath, err := filepath.Rel(root.Name(), tempFile.Name())
 	if err != nil {
-		return "", fmt.Errorf("relpath: %s", err)
+		return "", fmt.Errorf("relpath: %w", err)
 	}
 
 	return tempPath, nil
@@ -105,11 +105,11 @@ func createTempInRoot(root *os.Root, name string, data []byte) (string, error) {
 func NewFSBackend(dir string) (*FSBackend, error) {
 	blobRoot, err := maybeCreateOpenRoot(dir, "blob")
 	if err != nil {
-		return nil, fmt.Errorf("blob: %s", err)
+		return nil, fmt.Errorf("blob: %w", err)
 	}
 	siteRoot, err := maybeCreateOpenRoot(dir, "site")
 	if err != nil {
-		return nil, fmt.Errorf("site: %s", err)
+		return nil, fmt.Errorf("site: %w", err)
 	}
 	return &FSBackend{blobRoot, siteRoot}, nil
 }
@@ -122,11 +122,11 @@ func (fs *FSBackend) GetBlob(name string) (io.ReadSeeker, time.Time, error) {
 	blobPath := filepath.Join(splitBlobName(name)...)
 	stat, err := fs.blobRoot.Stat(blobPath)
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("stat: %s", err)
+		return nil, time.Time{}, fmt.Errorf("stat: %w", err)
 	}
 	file, err := fs.blobRoot.Open(blobPath)
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("open: %s", err)
+		return nil, time.Time{}, fmt.Errorf("open: %w", err)
 	}
 	return file, stat.ModTime(), nil
 }
@@ -141,15 +141,15 @@ func (fs *FSBackend) PutBlob(name string, data []byte) error {
 	}
 
 	if err := fs.blobRoot.Chmod(tempPath, 0o444); err != nil {
-		return fmt.Errorf("chmod: %s", err)
+		return fmt.Errorf("chmod: %w", err)
 	}
 
 	if err := fs.blobRoot.MkdirAll(blobDir, 0o755); err != nil {
-		return fmt.Errorf("mkdir: %s", err)
+		return fmt.Errorf("mkdir: %w", err)
 	}
 
 	if err := fs.blobRoot.Rename(tempPath, blobPath); err != nil {
-		return fmt.Errorf("rename: %s", err)
+		return fmt.Errorf("rename: %w", err)
 	}
 
 	return nil
@@ -182,7 +182,7 @@ func (fs *FSBackend) StageManifest(manifest *Manifest) error {
 	}
 
 	if err := fs.siteRoot.Rename(tempPath, stagedManifestName(manifestData)); err != nil {
-		return fmt.Errorf("rename: %s", err)
+		return fmt.Errorf("rename: %w", err)
 	}
 
 	return nil
@@ -197,11 +197,11 @@ func (fs *FSBackend) CommitManifest(name string, manifest *Manifest) error {
 	}
 
 	if err := fs.siteRoot.MkdirAll(filepath.Dir(name), 0o755); err != nil {
-		return fmt.Errorf("mkdir: %s", err)
+		return fmt.Errorf("mkdir: %w", err)
 	}
 
 	if err := fs.siteRoot.Rename(manifestHashName, name); err != nil {
-		return fmt.Errorf("rename: %s", err)
+		return fmt.Errorf("rename: %w", err)
 	}
 
 	return nil
@@ -250,7 +250,7 @@ func defaultCacheConfig[K comparable, V any](
 	if config.MaxAge != "" {
 		maxAge, err = time.ParseDuration(config.MaxAge)
 		if err != nil {
-			return nil, fmt.Errorf("max-age: %s", err)
+			return nil, fmt.Errorf("max-age: %w", err)
 		}
 	}
 	if config.MaxSize != 0 {

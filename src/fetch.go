@@ -23,22 +23,22 @@ func FetchRepository(repoURL string, branch string) (*Manifest, error) {
 		Tags:          git.NoTags,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("git clone: %s", err)
+		return nil, fmt.Errorf("git clone: %w", err)
 	}
 
 	ref, err := repo.Head()
 	if err != nil {
-		return nil, fmt.Errorf("git head: %s", err)
+		return nil, fmt.Errorf("git head: %w", err)
 	}
 
 	commit, err := repo.CommitObject(ref.Hash())
 	if err != nil {
-		return nil, fmt.Errorf("git commit: %s", err)
+		return nil, fmt.Errorf("git commit: %w", err)
 	}
 
 	tree, err := repo.TreeObject(commit.TreeHash)
 	if err != nil {
-		return nil, fmt.Errorf("git tree: %s", err)
+		return nil, fmt.Errorf("git tree: %w", err)
 	}
 
 	walker := object.NewTreeWalker(tree, true, make(map[plumbing.Hash]bool))
@@ -56,23 +56,23 @@ func FetchRepository(repoURL string, branch string) (*Manifest, error) {
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return nil, fmt.Errorf("git walker: %s", err)
+			return nil, fmt.Errorf("git walker: %w", err)
 		} else {
 			manifestEntry := Entry{}
 			if entry.Mode.IsFile() {
 				blob, err := repo.BlobObject(entry.Hash)
 				if err != nil {
-					return nil, fmt.Errorf("git blob %s: %s", name, err)
+					return nil, fmt.Errorf("git blob %s: %w", name, err)
 				}
 
 				reader, err := blob.Reader()
 				if err != nil {
-					return nil, fmt.Errorf("git blob open: %s", err)
+					return nil, fmt.Errorf("git blob open: %w", err)
 				}
 
 				data, err := io.ReadAll(reader)
 				if err != nil {
-					return nil, fmt.Errorf("git blob read: %s", err)
+					return nil, fmt.Errorf("git blob read: %w", err)
 				}
 
 				if entry.Mode == filemode.Symlink {
