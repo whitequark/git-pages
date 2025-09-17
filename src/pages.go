@@ -102,6 +102,10 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		break
 	}
 
+	if closer, ok := reader.(io.Closer); ok {
+		defer closer.Close()
+	}
+
 	// decide on the HTTP status
 	if is404 {
 		w.WriteHeader(http.StatusNotFound)
