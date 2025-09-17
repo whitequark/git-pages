@@ -8,6 +8,7 @@ import (
 )
 
 var config Config
+var backend Backend
 
 func serveHandler(name string, listen Listen, serve func(http.ResponseWriter, *http.Request)) {
 	listener, err := net.Listen(listen.Protocol, listen.Address)
@@ -23,12 +24,38 @@ func serveHandler(name string, listen Listen, serve func(http.ResponseWriter, *h
 }
 
 func main() {
+	var err error
+
 	configPath := flag.String("config", "config.toml", "path to configuration file")
 	flag.Parse()
 
-	if err := readConfig(*configPath, &config); err != nil {
+	if err = readConfig(*configPath, &config); err != nil {
 		log.Fatalln("configuration:", err)
 	}
+
+	switch config.Backend.Type {
+	case "fs":
+		if backend, err = NewFSBackend(config.Backend.FS.Root); err != nil {
+			log.Fatalln("fs backend:", err)
+		}
+
+	case "s3":
+		if backend, err = NewS3Backend(
+			config.Backend.S3.Endpoint,
+			config.Backend.S3.Insecure,
+			config.Backend.S3.AccessKeyID,
+			config.Backend.S3.SecretAccessKey,
+			config.Backend.S3.Region,
+			config.Backend.S3.Bucket,
+		); err != nil {
+			log.Fatalln("s3 backend:", err)
+		}
+
+	default:
+		log.Fatalln("unknown backend:", config.Backend.Type)
+	}
+
+	log.Println("ready")
 
 	if config.Caddy != (Listen{}) {
 		go serveHandler("caddy", config.Caddy, ServeCaddy)

@@ -12,7 +12,6 @@ type Listen struct {
 }
 
 type Config struct {
-	DataDir  string `toml:"data-dir"`
 	Pages    Listen `toml:"pages"`
 	Caddy    Listen `toml:"caddy"`
 	Wildcard struct {
@@ -20,6 +19,20 @@ type Config struct {
 		CloneURL  string `toml:"clone-url"`
 		IndexRepo string `toml:"index-repo"`
 	} `toml:"wildcard"`
+	Backend struct {
+		Type string `toml:"type"`
+		FS   struct {
+			Root string `toml:"root"`
+		} `toml:"fs"`
+		S3 struct {
+			Endpoint        string `toml:"endpoint"`
+			Insecure        bool   `toml:"insecure"`
+			AccessKeyID     string `toml:"access-key-id"`
+			SecretAccessKey string `toml:"secret-access-key"`
+			Region          string `toml:"region"`
+			Bucket          string `toml:"bucket"`
+		}
+	} `toml:"backend"`
 }
 
 func readConfig(path string, config *Config) error {

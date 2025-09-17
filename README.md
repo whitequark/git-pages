@@ -7,7 +7,7 @@ This is a simple Go service implemented as a strawman proposal of how https://co
 Features
 --------
 
-* In response to a `PUT` or `POST` request, performs a shallow in-memory clone of a git repository, checks out a tree to the filesystem, and atomically updates the version of content being served.
+* In response to a `PUT` or `POST` request, performs a shallow in-memory clone of a git repository, checks out a tree to the storage backend, and atomically updates the version of content being served.
     - `PUT` method is a custom REST endpoint, `POST` method is a Forgejo webhook endpoint.
 * In response to a `GET` or `HEAD` request, selects an appropriate tree and serves files from it. Supported URL patterns:
     - `https://domain.tld/project/` (routed to project-specific tree)
@@ -56,19 +56,39 @@ Authorization
 DNS is used for authorization of content updates.
 
 - If a `[wildcard]` configuration section is specified, and if the suffix of a hostname in a `POST` request is equal to `[wildcard].domain`, then the request is authorized when and only when the repository URL in the event body matches the repository URL computed from the configuration file. Otherwise the next rule is used.
-
 - If a `PUT` or `POST` request is received at `<hostname>` with an `Authorization: Pages <token>` header (or, in absence of such, with an `Authorization: Basic <basic>` header, where `<basic>` is equal to `Base64("Pages <token>")`), then the request is authorized when any of the the TXT records at `_git-pages-challenge.<hostname>` are equal to `SHA256("<hostname> <token>")`.
+    - During development, set environment variable `INSECURE=1` to bypass this checks.
 
 
-Architecture
-------------
+Architecture (v2)
+-----------------
+
+An object store (filesystem, S3, ...) is used as the sole mechanism for state storage. The object store is expected to provide atomic operations and where necessary the backend adapter ensures as such.
+
+- Repositories themselves are never stored on disk; they are cloned in-memory and discarded immediately after their contents is extracted.
+- The `blob/` prefix contains file data organized by hash of their contents (indiscriminately of the repository they belong to).
+    - Very small files are stored inline in the manifest.
+- The `site/` prefix contains site manifests organized by domain and project name (e.g. `site/example.org/myproject` or `site/example.org/.index`).
+    - The manifest is a Protobuf object containing a flat mapping of paths to entries. An entry is comprised of type (file, directory, symlink, etc) and data, which may be stored inline or refer to a blob.
+    - A small amount of internal metadata within a manifest allows attributing deployments to their source and computing quotas.
+- Additionally, the object store contains *staged manifests*, representing an in-progress update operation.
+    - An update first creates a staged manifest, then uploads blobs, then replaces the deployed manifest with the staged one. This avoids TOCTTOU race conditions during garbage collection.
+    - Stable marshalling allows addressing staged manifests by the hash of their contents.
+
+This approach, unlike the v1 one, cannot be easily introspected with normal Unix commands, but is very friendly to S3-style object storage services, as it does not rely on operations these services cannot support (subtree rename, directory stat, symlink/readlink).
+
+
+Architecture (v1)
+-----------------
+
+*This was the original architecture and it is no longer used.*
 
 Filesystem is used as the sole mechanism for state storage.
 
 - The `data/tree/` directory contains working trees organized by commit hash (indiscriminately of the repository they belong to). Repositories themselves are never stored on disk; they are cloned in-memory and discarded immediately after their contents is extracted.
     - The presence of a working tree directory under the appropriate commit hash is considered an indicator of its completeness. Checkouts are first done into a temporary directory and then atomically moved into place.
     - Currently a working tree is never removed, but a practical system would need to have a way to discard orphaned ones.
-- The `data/www/` directory contains symlinks to working trees organized by domain and project name (e.g. `data/www/example.org/myproject`, or `data/www/example.org/.index`).
+- The `data/www/` directory contains symlinks to working trees organized by domain and project name (e.g. `data/www/example.org/myproject` or `data/www/example.org/.index`).
     - The presence of a symlink at the appropriate location is considered an indicator of completeness as well. Updating to a new content version is done by creating a new symlink at a temporary location and then atomically moving it into place.
     - This structure is simple enough that it may be served by e.g. Nginx instead of the Go application.
 - `openat2(RESOLVE_IN_ROOT)` is used to confine GET requests strictly under the `data/` directory.

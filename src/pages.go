@@ -2,97 +2,118 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha1"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
+	"path"
 	"slices"
 	"strings"
 	"time"
 
-	securejoin "github.com/cyphar/filepath-securejoin"
-	"golang.org/x/sys/unix"
+	"github.com/minio/minio-go/v7"
 )
 
-const fetchTimeout = 30 * time.Second
+const notFoundPage = "404.html"
+const updateTimeout = 60 * time.Second
 
 func getPage(w http.ResponseWriter, r *http.Request) error {
+	var err error
+	var urlPath string
+	var manifest *Manifest
+
 	host := GetHost(r)
-
-	// if the first directory of the path exists under `www/$host`, use it as the root,
-	// else use `www/$host/.index`
-	path, _ := strings.CutPrefix(r.URL.Path, "/")
-	wwwRoot := filepath.Join("www", host, ".index")
-	requestPath := path
-	if projectName, projectPath, found := strings.Cut(path, "/"); found {
-		projectRoot := filepath.Join("www", host, projectName)
-		if file, _ := securejoin.OpenInRoot(config.DataDir, projectRoot); file != nil {
-			file.Close()
-			wwwRoot, requestPath = projectRoot, projectPath
-		}
-	}
-
-	// try to serve `$root/$path` first
-	file, err := securejoin.OpenInRoot(config.DataDir, filepath.Join(wwwRoot, requestPath))
-	if err == nil {
-		// if it's a directory, serve `$root/$path/index.html`
-		stat, statErr := file.Stat()
-		if statErr == nil && stat.IsDir() {
-			defer file.Close()
-			if !strings.HasSuffix(r.URL.Path, "/") {
-				// redirect from `$root/$dir` to `$root/$dir/` or links in the document won't work
-				// correctly
-				newPath := r.URL.Path + "/"
-				w.Header().Set("Location", newPath)
-				w.WriteHeader(http.StatusFound)
-				fmt.Fprintf(w, "see %s\n", newPath)
-				return nil
-			} else {
-				// serve `$root/$dir/index.html` under `$root/$dir/`
-				file, err = securejoin.OpenInRoot(config.DataDir,
-					filepath.Join(wwwRoot, requestPath, "index.html"))
-			}
-		}
-	}
-
-	// if whatever we were serving doesn't exist, try to serve `$root/404.html`
-	if errors.Is(err, os.ErrNotExist) {
-		file, _ = securejoin.OpenInRoot(config.DataDir, filepath.Join(wwwRoot, "404.html"))
-	}
-
-	// acquire read capability to the file being served (if possible)
-	reader := io.ReadSeeker(nil)
-	if file != nil {
-		defer file.Close()
-		file, err = securejoin.Reopen(file, unix.O_RDONLY)
-		if file != nil {
-			defer file.Close()
-			reader = file
-		}
-	}
 
 	// allow JavaScript code to access responses (including errors) even across origins
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Max-Age", "86400")
 
-	// decide on the HTTP status
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			w.WriteHeader(http.StatusNotFound)
-			if reader == nil {
-				reader = bytes.NewReader([]byte("not found\n"))
-			}
-		} else {
-			w.WriteHeader(http.StatusInternalServerError)
-			reader = bytes.NewReader([]byte("internal server error\n"))
+	urlPath, _ = strings.CutPrefix(r.URL.Path, "/")
+	manifest, err = backend.GetManifest(fmt.Sprintf("%s/.index", host))
+	if projectName, projectPath, found := strings.Cut(urlPath, "/"); found {
+		var projectManifest *Manifest
+		projectManifest, err = backend.GetManifest(fmt.Sprintf("%s/%s", host, projectName))
+		if err == nil {
+			urlPath = projectPath
+			manifest = projectManifest
 		}
-		// serve custom 404 page (if any)
-		io.Copy(w, reader)
+	}
+	if manifest == nil {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, "site not found\n")
+		return err
+	}
+
+	entryPath := urlPath
+	entry := (*Entry)(nil)
+	is404 := false
+	reader := io.ReadSeeker(nil)
+	mtime := time.Time{}
+	for {
+		entryPath, _ = strings.CutSuffix(entryPath, "/")
+		entryPath, err = ExpandSymlinks(manifest, entryPath)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintln(w, err)
+			return err
+		}
+		entry = manifest.Tree[entryPath]
+		if entry == nil || entry.Type == Type_Invalid {
+			is404 = true
+			if entryPath == notFoundPage {
+				break
+			}
+			entryPath = notFoundPage
+			continue
+		} else if entry.Type == Type_InlineFile {
+			reader = bytes.NewReader(entry.Data)
+		} else if entry.Type == Type_ExternalFile {
+			etag := fmt.Sprintf(`"%x"`, entry.Data)
+			if r.Header.Get("If-None-Match") == etag {
+				w.WriteHeader(http.StatusNotModified)
+				return nil
+			} else {
+				var blob io.ReadSeekCloser
+				blob, mtime, err = backend.GetBlob(string(entry.Data))
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					fmt.Fprintf(w, "internal server error\n")
+					return err
+				}
+				defer blob.Close()
+
+				reader = blob
+				w.Header().Set("ETag", etag)
+			}
+		} else if entry.Type == Type_Directory {
+			if strings.HasSuffix(r.URL.Path, "/") {
+				entryPath = path.Join(entryPath, "index.html")
+				continue
+			} else {
+				// redirect from `dir` to `dir/`, otherwise when `dir/index.html` is served,
+				// links in it will have the wrong base URL
+				newPath := r.URL.Path + "/"
+				w.Header().Set("Location", newPath)
+				w.WriteHeader(http.StatusFound)
+				fmt.Fprintf(w, "see %s\n", newPath)
+				return nil
+			}
+		} else if entry.Type == Type_Symlink {
+			return fmt.Errorf("unexpected symlink")
+		}
+		break
+	}
+
+	// decide on the HTTP status
+	if is404 {
+		w.WriteHeader(http.StatusNotFound)
+		if entry == nil {
+			fmt.Fprintf(w, "not found\n")
+		} else {
+			io.Copy(w, reader)
+		}
 	} else {
 		// allow the use of multi-threading in WebAssembly
 		w.Header().Set("Cross-Origin-Embedder-Policy", "credentialless")
@@ -102,19 +123,10 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		// ETag or If-Modified-Since queries and it avoids stale content being served
 		w.Header().Set("Cache-Control", "public, max-age=0, must-revalidate")
 
-		// `www/$host` should be a symlink pointing to an immutable directory under `tree/...`;
-		// if it's not, assume the server administrator did it on purpose and degrade gracefully
-		wwwRootDest, err := os.Readlink(filepath.Join(config.DataDir, wwwRoot))
-		if err == nil {
-			w.Header().Set("ETag", fmt.Sprintf(`"%x"`, sha1.Sum([]byte(wwwRootDest))))
-		}
-
 		// http.ServeContent handles content type and caching
-		stat, _ := file.Stat()
-		http.ServeContent(w, r, path, stat.ModTime(), reader)
+		http.ServeContent(w, r, urlPath, mtime, reader)
 	}
-
-	return err
+	return nil
 }
 
 func getProjectName(w http.ResponseWriter, r *http.Request) (string, error) {
@@ -164,29 +176,31 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		branch = "pages"
 	}
 
-	result := FetchWithTimeout(webRoot, repoURL, branch, fetchTimeout)
-	if result.err == nil {
+	result := UpdateWithTimeout(webRoot, repoURL, branch, updateTimeout)
+	if result.manifest != nil {
 		w.Header().Add("Content-Location", r.URL.String())
 	}
 	switch result.outcome {
-	case FetchError:
+	case UpdateError:
 		w.WriteHeader(http.StatusServiceUnavailable)
-	case FetchTimeout:
+	case UpdateTimeout:
 		w.WriteHeader(http.StatusGatewayTimeout)
 		// HTTP prescribes these response codes to be used
-	case FetchNoChange:
+	case UpdateNoChange:
 		w.WriteHeader(http.StatusNoContent)
-	case FetchCreated:
+	case UpdateCreated:
 		w.WriteHeader(http.StatusCreated)
-	case FetchUpdated:
+	case UpdateReplaced:
 		w.WriteHeader(http.StatusOK)
 	}
-	if result.err != nil {
+	if result.manifest != nil {
+		fmt.Fprintln(w, result.manifest.Commit)
+	} else if result.err != nil {
 		fmt.Fprintln(w, result.err)
 	} else {
-		fmt.Fprintln(w, result.head)
+		fmt.Fprintln(w, "internal error")
 	}
-	return result.err
+	return nil
 }
 
 func postPage(w http.ResponseWriter, r *http.Request) error {
@@ -271,25 +285,25 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("invalid clone URL")
 	}
 
-	result := FetchWithTimeout(webRoot, repoURL, "pages", fetchTimeout)
+	result := UpdateWithTimeout(webRoot, repoURL, "pages", updateTimeout)
 	switch result.outcome {
-	case FetchError:
+	case UpdateError:
 		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, "fetch error: %s\n", result.err)
-	case FetchTimeout:
+		fmt.Fprintf(w, "update error: %s\n", result.err)
+	case UpdateTimeout:
 		w.WriteHeader(http.StatusGatewayTimeout)
-		fmt.Fprintln(w, "fetch timeout")
-	case FetchNoChange:
+		fmt.Fprintln(w, "update timeout")
+	case UpdateNoChange:
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "unchanged")
-	case FetchCreated:
+	case UpdateCreated:
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "created")
-	case FetchUpdated:
+	case UpdateReplaced:
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "updated")
+		fmt.Fprintln(w, "replaced")
 	}
-	return result.err
+	return nil
 }
 
 func ServePages(w http.ResponseWriter, r *http.Request) {
@@ -310,6 +324,9 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if pathErr, ok := err.(*os.PathError); ok {
 			err = fmt.Errorf("not found: %s", pathErr.Path)
+		}
+		if minioErr, ok := err.(minio.ErrorResponse); ok && minioErr.Code == "NoSuchKey" {
+			err = fmt.Errorf("not found: %s", minioErr.Key)
 		}
 		log.Println("pages err:", err)
 	}

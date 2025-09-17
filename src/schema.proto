@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package main;
+
+enum Type {
+	// Invalid entry.
+	Invalid = 0;
+	// Directory.
+	Directory = 1;
+	// Inline file. `Blob.Data` contains file contents.
+	InlineFile = 2;
+	// External file. `Blob.Data` contains object reference.
+	ExternalFile = 3;
+	// Symlink. `Blob.Data` contains relative path.
+	Symlink = 4;
+}
+
+message Entry {
+    Type type = 1;
+    int64 size = 2;
+    bytes data = 3;
+}
+
+message Manifest {
+    string repoURL = 1;
+    string branch = 2;
+    string commit = 3;
+    map<string, Entry> tree = 4;;
+}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 )
@@ -22,6 +23,10 @@ func GetHost(r *http.Request) string {
 
 func Authorize(w http.ResponseWriter, r *http.Request) error {
 	host := GetHost(r)
+
+	if os.Getenv("INSECURE") != "" {
+		return nil // for testing only
+	}
 
 	authorization := r.Header.Get("Authorization")
 	if authorization == "" {

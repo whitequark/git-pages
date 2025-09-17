@@ -1,10 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 )
 
 func ServeCaddy(w http.ResponseWriter, r *http.Request) {
@@ -14,8 +13,7 @@ func ServeCaddy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wwwRoot := filepath.Join(config.DataDir, "www", domain)
-	if stat, err := os.Stat(wwwRoot); err == nil && stat.IsDir() {
+	if manifest, _ := backend.GetManifest(fmt.Sprintf("%s/.index", domain)); manifest != nil {
 		log.Println("caddy:", domain, 200)
 		w.WriteHeader(http.StatusOK)
 	} else {
