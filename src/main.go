@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 )
 
 var backend Backend
@@ -26,6 +27,7 @@ func main() {
 	var err error
 
 	configPath := flag.String("config", "config.toml", "path to configuration file")
+	migrateV1Path := flag.String("migrate-v1", "", "path to v1 data directory to upload")
 	flag.Parse()
 
 	if err := ReadConfig(*configPath); err != nil {
@@ -53,6 +55,20 @@ func main() {
 
 	default:
 		log.Fatalln("unknown backend:", config.Backend.Type)
+	}
+
+	if *migrateV1Path != "" {
+		root, err := os.OpenRoot(*migrateV1Path)
+		if err != nil {
+			log.Fatalln("migrate v1:", err)
+		}
+
+		err = MigrateFromV1(root)
+		if err != nil {
+			log.Fatalln("migrate v1:", err)
+		}
+
+		log.Println("migrate v1 ok")
 	}
 
 	log.Println("ready")

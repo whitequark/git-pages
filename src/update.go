@@ -41,7 +41,7 @@ func Update(
 		err = fmt.Errorf("update timeout")
 	} else if err == nil {
 		oldManifest, _ = backend.GetManifest(webRoot)
-		newManifest, err = StoreManifest(backend, webRoot, fetchManifest)
+		newManifest, err = StoreManifest(webRoot, fetchManifest)
 		if err == nil {
 			if oldManifest == nil {
 				outcome = UpdateCreated

@@ -103,7 +103,7 @@ const ManifestSizeMax int = 1048576
 
 // Accepts a manifest with inline files, returns a manifest with external files after writing
 // file contents and the manifest itself to the storage.
-func StoreManifest(backend Backend, name string, manifest *Manifest) (*Manifest, error) {
+func StoreManifest(name string, manifest *Manifest) (*Manifest, error) {
 	extManifest := ExternalizeFiles(manifest)
 	extManifestData := EncodeManifest(extManifest)
 	if len(extManifestData) > ManifestSizeMax {
