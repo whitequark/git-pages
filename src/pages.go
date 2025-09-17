@@ -75,16 +75,12 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				w.WriteHeader(http.StatusNotModified)
 				return nil
 			} else {
-				var blob io.ReadSeekCloser
-				blob, mtime, err = backend.GetBlob(string(entry.Data))
+				reader, mtime, err = backend.GetBlob(string(entry.Data))
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 					fmt.Fprintf(w, "internal server error\n")
 					return err
 				}
-				defer blob.Close()
-
-				reader = blob
 				w.Header().Set("ETag", etag)
 			}
 		} else if entry.Type == Type_Directory {

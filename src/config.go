@@ -11,6 +11,11 @@ type ListenConfig struct {
 	Address  string `toml:"address"`
 }
 
+type CacheConfig struct {
+	MaxSize uint64 `toml:"max-size"` // in bytes
+	MaxAge  string `toml:"max-age"`
+}
+
 type Config struct {
 	Pages    ListenConfig `toml:"pages"`
 	Caddy    ListenConfig `toml:"caddy"`
@@ -25,16 +30,14 @@ type Config struct {
 			Root string `toml:"root"`
 		} `toml:"fs"`
 		S3 struct {
-			Endpoint        string `toml:"endpoint"`
-			Insecure        bool   `toml:"insecure"`
-			AccessKeyID     string `toml:"access-key-id"`
-			SecretAccessKey string `toml:"secret-access-key"`
-			Region          string `toml:"region"`
-			Bucket          string `toml:"bucket"`
-			Cache           struct {
-				MaxSize uint64 `toml:"max-size"` // in bytes
-				MaxAge  string `toml:"max-age"`
-			} `toml:"cache"`
+			Endpoint        string      `toml:"endpoint"`
+			Insecure        bool        `toml:"insecure"`
+			AccessKeyID     string      `toml:"access-key-id"`
+			SecretAccessKey string      `toml:"secret-access-key"`
+			Region          string      `toml:"region"`
+			Bucket          string      `toml:"bucket"`
+			BlobCache       CacheConfig `toml:"blob-cache"`
+			SiteCache       CacheConfig `toml:"site-cache"`
 		}
 	} `toml:"backend"`
 }

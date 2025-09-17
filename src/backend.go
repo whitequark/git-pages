@@ -24,7 +24,7 @@ import (
 
 type Backend interface {
 	// Retrieve a blob. Returns `reader, mtime, err`.
-	GetBlob(name string) (io.ReadSeekCloser, time.Time, error)
+	GetBlob(name string) (io.ReadSeeker, time.Time, error)
 
 	// Store a blob. If a blob called `name` already exists, this function returns `nil` without
 	// regards to the old or new contents. It is expected that blobs are content-addressed, i.e.
@@ -114,7 +114,7 @@ func splitBlobName(name string) []string {
 	}
 }
 
-func (fs *FSBackend) GetBlob(name string) (io.ReadSeekCloser, time.Time, error) {
+func (fs *FSBackend) GetBlob(name string) (io.ReadSeeker, time.Time, error) {
 	blobPath := filepath.Join(splitBlobName(name)...)
 	stat, err := fs.blobRoot.Stat(blobPath)
 	if err != nil {
@@ -207,16 +207,50 @@ func (fs *FSBackend) DeleteManifest(name string) error {
 	return fs.siteRoot.Remove(name)
 }
 
+type CachedBlob struct {
+	blob  []byte
+	mtime time.Time
+}
+
 type CachedManifest struct {
 	manifest *Manifest
 	weight   uint32
 }
 
 type S3Backend struct {
-	ctx    context.Context
-	client *minio.Client
-	bucket string
-	cache  *otter.Cache[string, *CachedManifest]
+	ctx       context.Context
+	client    *minio.Client
+	bucket    string
+	blobCache *otter.Cache[string, *CachedBlob]
+	siteCache *otter.Cache[string, *CachedManifest]
+}
+
+func defaultCacheConfig[K comparable, V any](
+	config CacheConfig,
+	maxAge time.Duration,
+	maxSize uint64,
+	weigher func(K, V) uint32,
+) (*otter.Options[K, V], error) {
+	var err error
+	if config.MaxAge != "" {
+		maxAge, err = time.ParseDuration(config.MaxAge)
+		if err != nil {
+			return nil, fmt.Errorf("max-age: %s", err)
+		}
+	}
+	if config.MaxSize != 0 {
+		maxSize = config.MaxSize
+	}
+
+	options := &otter.Options[K, V]{}
+	if maxSize != 0 {
+		options.MaximumWeight = maxSize
+		options.Weigher = weigher
+	}
+	if maxAge != 0 {
+		options.ExpiryCalculator = otter.ExpiryCreating[K, V](maxAge)
+	}
+	return options, nil
 }
 
 func NewS3Backend(
@@ -252,27 +286,33 @@ func NewS3Backend(
 		}
 	}
 
-	cacheConfig := config.Backend.S3.Cache
-	var maxWeight uint64 = 134217728
-	if cacheConfig.MaxSize != 0 {
-		maxWeight = cacheConfig.MaxSize
+	blobCacheOptions, err := defaultCacheConfig[string, *CachedBlob](
+		config.Backend.S3.BlobCache,
+		0, 256*1048576,
+		func(key string, value *CachedBlob) uint32 { return uint32(len(value.blob)) })
+	if err != nil {
+		return nil, err
 	}
-	var maxAge time.Duration = 5 * time.Second
-	if cacheConfig.MaxAge != "" {
-		maxAge, err = time.ParseDuration(cacheConfig.MaxAge)
-		if err != nil {
-			return nil, fmt.Errorf("max-age: %s", err)
-		}
-	}
-	cache := otter.Must[string, *CachedManifest](&otter.Options[string, *CachedManifest]{
-		MaximumWeight: maxWeight,
-		Weigher: func(key string, value *CachedManifest) uint32 {
-			return value.weight
-		},
-		ExpiryCalculator: otter.ExpiryCreating[string, *CachedManifest](maxAge),
-	})
 
-	return &S3Backend{ctx, client, bucket, cache}, nil
+	blobCache, err := otter.New(blobCacheOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	siteCacheOptions, err := defaultCacheConfig[string, *CachedManifest](
+		config.Backend.S3.SiteCache,
+		5*time.Second, 16*1048576,
+		func(key string, value *CachedManifest) uint32 { return value.weight })
+	if err != nil {
+		return nil, err
+	}
+
+	siteCache, err := otter.New(siteCacheOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return &S3Backend{ctx, client, bucket, blobCache, siteCache}, nil
 }
 
 func (s3 *S3Backend) Backend() Backend {
@@ -283,21 +323,36 @@ func blobObjectName(name string) string {
 	return fmt.Sprintf("blob/%s", name)
 }
 
-func (s3 *S3Backend) GetBlob(name string) (io.ReadSeekCloser, time.Time, error) {
-	log.Printf("s3: get blob %s\n", name)
+func (s3 *S3Backend) GetBlob(name string) (io.ReadSeeker, time.Time, error) {
+	loader := func(ctx context.Context, name string) (*CachedBlob, error) {
+		log.Printf("s3: get blob %s\n", name)
 
-	object, err := s3.client.GetObject(s3.ctx, s3.bucket, blobObjectName(name),
-		minio.GetObjectOptions{})
+		object, err := s3.client.GetObject(s3.ctx, s3.bucket, blobObjectName(name),
+			minio.GetObjectOptions{})
+		if err != nil {
+			return nil, err
+		}
+		defer object.Close()
+
+		stat, err := object.Stat()
+		if err != nil {
+			return nil, err
+		}
+
+		data, err := io.ReadAll(object)
+		if err != nil {
+			return nil, err
+		}
+
+		return &CachedBlob{data, stat.LastModified}, nil
+	}
+
+	cached, err := s3.blobCache.Get(s3.ctx, name, otter.LoaderFunc[string, *CachedBlob](loader))
 	if err != nil {
 		return nil, time.Time{}, err
 	}
 
-	stat, err := object.Stat()
-	if err != nil {
-		return nil, time.Time{}, err
-	}
-
-	return object, stat.LastModified, nil
+	return bytes.NewReader(cached.blob), cached.mtime, err
 }
 
 func (s3 *S3Backend) PutBlob(name string, data []byte) error {
@@ -312,12 +367,17 @@ func (s3 *S3Backend) PutBlob(name string, data []byte) error {
 				bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{})
 			if err != nil {
 				return err
+			} else {
+				log.Printf("s3: put blob %s (created)\n", name)
+				return nil
 			}
 		} else {
 			return err
 		}
+	} else {
+		log.Printf("s3: put blob %s (exists)\n", name)
+		return nil
 	}
-	return nil // already exists or was created
 }
 
 func (s3 *S3Backend) DeleteBlob(name string) error {
@@ -344,6 +404,7 @@ func (s3 *S3Backend) GetManifest(name string) (*Manifest, error) {
 		if err != nil {
 			return nil, err
 		}
+		defer object.Close()
 
 		data, err := io.ReadAll(object)
 		if err != nil {
@@ -358,7 +419,7 @@ func (s3 *S3Backend) GetManifest(name string) (*Manifest, error) {
 		return &CachedManifest{manifest, uint32(len(data))}, nil
 	}
 
-	cached, err := s3.cache.Get(s3.ctx, name, otter.LoaderFunc[string, *CachedManifest](loader))
+	cached, err := s3.siteCache.Get(s3.ctx, name, otter.LoaderFunc[string, *CachedManifest](loader))
 	if err != nil {
 		return nil, err
 	}

@@ -71,12 +71,13 @@ An object store (filesystem, S3, ...) is used as the sole mechanism for state st
 - The `site/` prefix contains site manifests organized by domain and project name (e.g. `site/example.org/myproject` or `site/example.org/.index`).
     - The manifest is a Protobuf object containing a flat mapping of paths to entries. An entry is comprised of type (file, directory, symlink, etc) and data, which may be stored inline or refer to a blob.
     - A small amount of internal metadata within a manifest allows attributing deployments to their source and computing quotas.
-    - The S3 backend caches manifests in memory. Since a manifest is necessary and sufficient to return `304 Not Modified` responses for a matching `ETag`, this drastically reduces navigation latency.
 - Additionally, the object store contains *staged manifests*, representing an in-progress update operation.
     - An update first creates a staged manifest, then uploads blobs, then replaces the deployed manifest with the staged one. This avoids TOCTTOU race conditions during garbage collection.
     - Stable marshalling allows addressing staged manifests by the hash of their contents.
 
 This approach, unlike the v1 one, cannot be easily introspected with normal Unix commands, but is very friendly to S3-style object storage services, as it does not rely on operations these services cannot support (subtree rename, directory stat, symlink/readlink).
+
+The S3 backend, intended for (relatively) high latency connections, caches both manifests and blobs in memory. Since a manifest is necessary and sufficient to return `304 Not Modified` responses for a matching `ETag`, this drastically reduces navigation latency. Blobs are content-addressed and are an obvious target for a last level cache.
 
 
 Architecture (v1)
