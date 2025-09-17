@@ -42,7 +42,9 @@ type Config struct {
 	} `toml:"backend"`
 }
 
-func ReadConfig(path string, config *Config) error {
+var config Config
+
+func ReadConfig(path string) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -51,5 +53,21 @@ func ReadConfig(path string, config *Config) error {
 
 	decoder := toml.NewDecoder(file)
 	decoder.DisallowUnknownFields()
-	return decoder.Decode(config)
+	return decoder.Decode(&config)
+}
+
+func updateFromEnv(dest *string, key string) {
+	if value, found := os.LookupEnv(key); found {
+		*dest = value
+	}
+}
+
+func UpdateConfigEnv() {
+	updateFromEnv(&config.Backend.Type, "BACKEND")
+	updateFromEnv(&config.Backend.FS.Root, "FS_ROOT")
+	updateFromEnv(&config.Backend.S3.Endpoint, "S3_ENDPOINT_URL")
+	updateFromEnv(&config.Backend.S3.AccessKeyID, "S3_ACCESS_KEY_ID")
+	updateFromEnv(&config.Backend.S3.SecretAccessKey, "S3_SECRET_ACCESS_KEY")
+	updateFromEnv(&config.Backend.S3.Region, "S3_REGION")
+	updateFromEnv(&config.Backend.S3.Bucket, "S3_BUCKET")
 }

@@ -7,7 +7,6 @@ import (
 	"net/http"
 )
 
-var config Config
 var backend Backend
 
 func serveHandler(name string, listen ListenConfig, serve func(http.ResponseWriter, *http.Request)) {
@@ -29,9 +28,10 @@ func main() {
 	configPath := flag.String("config", "config.toml", "path to configuration file")
 	flag.Parse()
 
-	if err = ReadConfig(*configPath, &config); err != nil {
-		log.Fatalln("configuration:", err)
+	if err := ReadConfig(*configPath); err != nil {
+		log.Fatalln("config:", err)
 	}
+	UpdateConfigEnv() // environment takes priority
 
 	switch config.Backend.Type {
 	case "fs":
