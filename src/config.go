@@ -63,7 +63,7 @@ func updateFromEnv(dest *string, key string) {
 func UpdateConfigEnv() {
 	updateFromEnv(&config.Backend.Type, "BACKEND")
 	updateFromEnv(&config.Backend.FS.Root, "FS_ROOT")
-	updateFromEnv(&config.Backend.S3.Endpoint, "S3_ENDPOINT_URL")
+	updateFromEnv(&config.Backend.S3.Endpoint, "S3_ENDPOINT")
 	updateFromEnv(&config.Backend.S3.AccessKeyID, "S3_ACCESS_KEY_ID")
 	updateFromEnv(&config.Backend.S3.SecretAccessKey, "S3_SECRET_ACCESS_KEY")
 	updateFromEnv(&config.Backend.S3.Region, "S3_REGION")
