@@ -49,6 +49,9 @@ type Backend interface {
 
 	// Delete a manifest.
 	DeleteManifest(name string) error
+
+	// Check whether a domain has any deployments.
+	CheckDomain(domain string) (bool, error)
 }
 
 func splitBlobName(name string) []string {
@@ -206,6 +209,17 @@ func (fs *FSBackend) CommitManifest(name string, manifest *Manifest) error {
 
 func (fs *FSBackend) DeleteManifest(name string) error {
 	return fs.siteRoot.Remove(name)
+}
+
+func (fs *FSBackend) CheckDomain(domain string) (bool, error) {
+	_, err := fs.siteRoot.Stat(domain)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	} else if err == nil {
+		return true, nil
+	} else {
+		return false, err
+	}
 }
 
 type CachedBlob struct {
@@ -461,4 +475,21 @@ func (s3 *S3Backend) DeleteManifest(name string) error {
 
 	return s3.client.RemoveObject(s3.ctx, s3.bucket, manifestObjectName(name),
 		minio.RemoveObjectOptions{})
+}
+
+func (s3 *S3Backend) CheckDomain(domain string) (bool, error) {
+	log.Printf("s3: check domain %s\n", domain)
+
+	ctx, cancel := context.WithCancel(s3.ctx)
+	defer cancel()
+
+	for object := range s3.client.ListObjectsIter(ctx, s3.bucket, minio.ListObjectsOptions{
+		Prefix: manifestObjectName(fmt.Sprintf("%s/", domain)),
+	}) {
+		if object.Err != nil {
+			return false, object.Err
+		}
+		return true, nil
+	}
+	return false, nil
 }

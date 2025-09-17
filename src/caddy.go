@@ -13,11 +13,16 @@ func ServeCaddy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if manifest, _ := backend.GetManifest(fmt.Sprintf("%s/.index", domain)); manifest != nil {
+	found, err := backend.CheckDomain(domain)
+	if found {
 		log.Println("caddy:", domain, 200)
 		w.WriteHeader(http.StatusOK)
-	} else {
+	} else if err == nil {
 		log.Println("caddy:", domain, 404)
 		w.WriteHeader(http.StatusNotFound)
+	} else {
+		log.Println("caddy:", domain, 500)
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintln(w, err)
 	}
 }
