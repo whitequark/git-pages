@@ -10,7 +10,7 @@ import (
 var config Config
 var backend Backend
 
-func serveHandler(name string, listen Listen, serve func(http.ResponseWriter, *http.Request)) {
+func serveHandler(name string, listen ListenConfig, serve func(http.ResponseWriter, *http.Request)) {
 	listener, err := net.Listen(listen.Protocol, listen.Address)
 	if err != nil {
 		log.Fatalf("%s: %s\n", name, err)
@@ -29,7 +29,7 @@ func main() {
 	configPath := flag.String("config", "config.toml", "path to configuration file")
 	flag.Parse()
 
-	if err = readConfig(*configPath, &config); err != nil {
+	if err = ReadConfig(*configPath, &config); err != nil {
 		log.Fatalln("configuration:", err)
 	}
 
@@ -57,7 +57,7 @@ func main() {
 
 	log.Println("ready")
 
-	if config.Caddy != (Listen{}) {
+	if config.Caddy != (ListenConfig{}) {
 		go serveHandler("caddy", config.Caddy, ServeCaddy)
 	}
 

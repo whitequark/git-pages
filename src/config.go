@@ -6,14 +6,14 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-type Listen struct {
+type ListenConfig struct {
 	Protocol string `toml:"protocol"`
 	Address  string `toml:"address"`
 }
 
 type Config struct {
-	Pages    Listen `toml:"pages"`
-	Caddy    Listen `toml:"caddy"`
+	Pages    ListenConfig `toml:"pages"`
+	Caddy    ListenConfig `toml:"caddy"`
 	Wildcard struct {
 		Domain    string `toml:"domain"`
 		CloneURL  string `toml:"clone-url"`
@@ -31,11 +31,15 @@ type Config struct {
 			SecretAccessKey string `toml:"secret-access-key"`
 			Region          string `toml:"region"`
 			Bucket          string `toml:"bucket"`
+			Cache           struct {
+				MaxSize uint64 `toml:"max-size"` // in bytes
+				MaxAge  string `toml:"max-age"`
+			} `toml:"cache"`
 		}
 	} `toml:"backend"`
 }
 
-func readConfig(path string, config *Config) error {
+func ReadConfig(path string, config *Config) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err

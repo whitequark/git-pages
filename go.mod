@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/go-git/go-git/v6 v6.0.0-20250910120214-3a68d0404116
+	github.com/maypok86/otter/v2 v2.2.1
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/pelletier/go-toml/v2 v2.2.4
 	google.golang.org/protobuf v1.36.9

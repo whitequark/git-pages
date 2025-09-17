@@ -18,6 +18,8 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+
+	"github.com/maypok86/otter/v2"
 )
 
 type Backend interface {
@@ -205,10 +207,16 @@ func (fs *FSBackend) DeleteManifest(name string) error {
 	return fs.siteRoot.Remove(name)
 }
 
+type CachedManifest struct {
+	manifest *Manifest
+	weight   uint32
+}
+
 type S3Backend struct {
 	ctx    context.Context
 	client *minio.Client
 	bucket string
+	cache  *otter.Cache[string, *CachedManifest]
 }
 
 func NewS3Backend(
@@ -244,7 +252,27 @@ func NewS3Backend(
 		}
 	}
 
-	return &S3Backend{ctx, client, bucket}, nil
+	cacheConfig := config.Backend.S3.Cache
+	var maxWeight uint64 = 134217728
+	if cacheConfig.MaxSize != 0 {
+		maxWeight = cacheConfig.MaxSize
+	}
+	var maxAge time.Duration = 5 * time.Second
+	if cacheConfig.MaxAge != "" {
+		maxAge, err = time.ParseDuration(cacheConfig.MaxAge)
+		if err != nil {
+			return nil, fmt.Errorf("max-age: %s", err)
+		}
+	}
+	cache := otter.Must[string, *CachedManifest](&otter.Options[string, *CachedManifest]{
+		MaximumWeight: maxWeight,
+		Weigher: func(key string, value *CachedManifest) uint32 {
+			return value.weight
+		},
+		ExpiryCalculator: otter.ExpiryCreating[string, *CachedManifest](maxAge),
+	})
+
+	return &S3Backend{ctx, client, bucket, cache}, nil
 }
 
 func (s3 *S3Backend) Backend() Backend {
@@ -308,20 +336,34 @@ func stagedManifestObjectName(manifestData []byte) string {
 }
 
 func (s3 *S3Backend) GetManifest(name string) (*Manifest, error) {
-	log.Printf("s3: get manifest %s\n", name)
+	loader := func(ctx context.Context, name string) (*CachedManifest, error) {
+		log.Printf("s3: get manifest %s\n", name)
 
-	object, err := s3.client.GetObject(s3.ctx, s3.bucket, manifestObjectName(name),
-		minio.GetObjectOptions{})
+		object, err := s3.client.GetObject(s3.ctx, s3.bucket, manifestObjectName(name),
+			minio.GetObjectOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		data, err := io.ReadAll(object)
+		if err != nil {
+			return nil, err
+		}
+
+		manifest, err := DecodeManifest(data)
+		if err != nil {
+			return nil, err
+		}
+
+		return &CachedManifest{manifest, uint32(len(data))}, nil
+	}
+
+	cached, err := s3.cache.Get(s3.ctx, name, otter.LoaderFunc[string, *CachedManifest](loader))
 	if err != nil {
 		return nil, err
 	}
 
-	data, err := io.ReadAll(object)
-	if err != nil {
-		return nil, err
-	}
-
-	return DecodeManifest(data)
+	return cached.manifest, err
 }
 
 func (s3 *S3Backend) StageManifest(manifest *Manifest) error {
