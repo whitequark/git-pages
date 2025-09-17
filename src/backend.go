@@ -144,8 +144,18 @@ func (fs *FSBackend) PutBlob(name string, data []byte) error {
 		return fmt.Errorf("chmod: %w", err)
 	}
 
-	if err := fs.blobRoot.MkdirAll(blobDir, 0o755); err != nil {
-		return fmt.Errorf("mkdir: %w", err)
+again:
+	for {
+		if err := fs.blobRoot.MkdirAll(blobDir, 0o755); err != nil {
+			if errors.Is(err, os.ErrExist) {
+				// Handle the case where two `PutBlob()` calls race creating a common prefix
+				// of a blob directory. The `MkdirAll()` call that loses the TOCTTOU condition
+				// bails out, so we have to repeat it.
+				continue again
+			}
+			return fmt.Errorf("mkdir: %w", err)
+		}
+		break
 	}
 
 	if err := fs.blobRoot.Rename(tempPath, blobPath); err != nil {
