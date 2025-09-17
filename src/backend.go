@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"slices"
@@ -255,6 +256,8 @@ func blobObjectName(name string) string {
 }
 
 func (s3 *S3Backend) GetBlob(name string) (io.ReadSeekCloser, time.Time, error) {
+	log.Printf("s3: get blob %s\n", name)
+
 	object, err := s3.client.GetObject(s3.ctx, s3.bucket, blobObjectName(name),
 		minio.GetObjectOptions{})
 	if err != nil {
@@ -270,6 +273,8 @@ func (s3 *S3Backend) GetBlob(name string) (io.ReadSeekCloser, time.Time, error) 
 }
 
 func (s3 *S3Backend) PutBlob(name string, data []byte) error {
+	log.Printf("s3: put blob %s (%d bytes)\n", name, len(data))
+
 	_, err := s3.client.StatObject(s3.ctx, s3.bucket, blobObjectName(name),
 		minio.GetObjectOptions{})
 	if err != nil {
@@ -288,6 +293,8 @@ func (s3 *S3Backend) PutBlob(name string, data []byte) error {
 }
 
 func (s3 *S3Backend) DeleteBlob(name string) error {
+	log.Printf("s3: delete blob %s\n", name)
+
 	return s3.client.RemoveObject(s3.ctx, s3.bucket, blobObjectName(name),
 		minio.RemoveObjectOptions{})
 }
@@ -301,6 +308,8 @@ func stagedManifestObjectName(manifestData []byte) string {
 }
 
 func (s3 *S3Backend) GetManifest(name string) (*Manifest, error) {
+	log.Printf("s3: get manifest %s\n", name)
+
 	object, err := s3.client.GetObject(s3.ctx, s3.bucket, manifestObjectName(name),
 		minio.GetObjectOptions{})
 	if err != nil {
@@ -317,6 +326,7 @@ func (s3 *S3Backend) GetManifest(name string) (*Manifest, error) {
 
 func (s3 *S3Backend) StageManifest(manifest *Manifest) error {
 	data := EncodeManifest(manifest)
+	log.Printf("s3: stage manifest %x\n", sha256.Sum256(data))
 
 	_, err := s3.client.PutObject(s3.ctx, s3.bucket, stagedManifestObjectName(data),
 		bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{})
@@ -325,6 +335,7 @@ func (s3 *S3Backend) StageManifest(manifest *Manifest) error {
 
 func (s3 *S3Backend) CommitManifest(name string, manifest *Manifest) error {
 	data := EncodeManifest(manifest)
+	log.Printf("s3: commit manifest %x -> %s", sha256.Sum256(data), name)
 
 	// Remove staged object unconditionally (whether commit succeeded or failed), since
 	// the upper layer has to retry the complete operation anyway.
@@ -342,6 +353,8 @@ func (s3 *S3Backend) CommitManifest(name string, manifest *Manifest) error {
 }
 
 func (s3 *S3Backend) DeleteManifest(name string) error {
+	log.Printf("s3: delete manifest %s\n", name)
+
 	return s3.client.RemoveObject(s3.ctx, s3.bucket, manifestObjectName(name),
 		minio.RemoveObjectOptions{})
 }
