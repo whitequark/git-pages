@@ -28,12 +28,8 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	host := GetHost(r)
 
 	if _, onBunnyNet := os.LookupEnv("BUNNYNET_MC_APPID"); onBunnyNet {
-		w.Header().Set("X-Bunnynet-MC", fmt.Sprintf(
-			"%s, %s, %s",
-			os.Getenv("BUNNYNET_MC_REGION"),
-			os.Getenv("BUNNYNET_MC_ZONE"),
-			os.Getenv("BUNNYNET_MC_PODID"),
-		))
+		w.Header().Set("X-Bunnynet-MC",
+			fmt.Sprintf("%s, %s", os.Getenv("BUNNYNET_MC_ZONE"), os.Getenv("BUNNYNET_MC_PODID")))
 	}
 
 	// allow JavaScript code to access responses (including errors) even across origins
