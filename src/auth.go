@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"slices"
 	"strings"
@@ -98,13 +99,13 @@ func authorizeDNSChallenge(r *http.Request) ([]string, error) {
 	actualChallenges, err := net.LookupTXT(challengeHostname)
 	if err != nil {
 		return nil, AuthError{http.StatusUnauthorized,
-			fmt.Sprintf("failed to look up DNS challenge: TXT %s", challengeHostname)}
+			fmt.Sprintf("failed to look up DNS challenge: %s TXT", challengeHostname)}
 	}
 
 	expectedChallenge := fmt.Sprintf("%x", sha256.Sum256(fmt.Appendf(nil, "%s %s", host, param)))
 	if !slices.Contains(actualChallenges, expectedChallenge) {
 		return nil, AuthError{http.StatusUnauthorized, fmt.Sprintf(
-			"defeated by DNS challenge: TXT %s %v does not include %s",
+			"defeated by DNS challenge: %s TXT %v does not include %s",
 			challengeHostname,
 			actualChallenges,
 			expectedChallenge,
@@ -114,7 +115,30 @@ func authorizeDNSChallenge(r *http.Request) ([]string, error) {
 	return nil, nil
 }
 
-func authorizeWildcardDomain(r *http.Request) ([]string, error) {
+func authorizeDNSAllowlist(r *http.Request) ([]string, error) {
+	host := GetHost(r)
+
+	allowlistHostname := fmt.Sprintf("_git-pages-repository.%s", host)
+	repoURLs, err := net.LookupTXT(allowlistHostname)
+	if err != nil {
+		return nil, AuthError{http.StatusUnauthorized,
+			fmt.Sprintf("failed to look up DNS repository allowlist: %s TXT", allowlistHostname)}
+	}
+
+	for _, repoURL := range repoURLs {
+		if parsedURL, err := url.Parse(repoURL); err != nil {
+			return nil, AuthError{http.StatusBadRequest,
+				fmt.Sprintf("failed to parse URL: %s TXT %q", allowlistHostname, repoURL)}
+		} else if !parsedURL.IsAbs() {
+			return nil, AuthError{http.StatusBadRequest,
+				fmt.Sprintf("repository URL is not absolute: %s TXT %q", allowlistHostname, repoURL)}
+		}
+	}
+
+	return repoURLs, err
+}
+
+func authorizeWildcardMatch(r *http.Request) ([]string, error) {
 	host := GetHost(r)
 	hostParts := strings.Split(host, ".")
 
@@ -139,12 +163,13 @@ func authorizeWildcardDomain(r *http.Request) ([]string, error) {
 }
 
 // Returns `repoURLs, err` where if `err == nil` then the request is authorized to clone from
-// any repository URL exactly included in `repoURLs`, or any URL at all if `repoURLs == nil`.
+// any repository URL included in `repoURLs` (by case-insensitive comparison), or any URL at all
+// if `repoURLs == nil`.
 func authorizeRequest(r *http.Request, allowWildcard bool) ([]string, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
-	if os.Getenv("INSECURE") != "" {
-		log.Println("auth ok: INSECURE mode")
+	if os.Getenv("INSECURE") == "very" {
+		log.Println("auth: INSECURE mode: allow any")
 		return nil, nil // for testing only
 	}
 
@@ -154,18 +179,28 @@ func authorizeRequest(r *http.Request, allowWildcard bool) ([]string, error) {
 	} else if err != nil { // bad request
 		return nil, err
 	} else {
-		log.Println("auth ok: DNS challenge")
+		log.Println("auth: DNS challenge: allow any")
+		return repoURLs, nil
+	}
+
+	repoURLs, err = authorizeDNSAllowlist(r)
+	if err != nil && IsUnauthorized(err) {
+		causes = append(causes, err)
+	} else if err != nil { // bad request
+		return nil, err
+	} else {
+		log.Printf("auth: DNS allowlist: allow %v\n", repoURLs)
 		return repoURLs, nil
 	}
 
 	if allowWildcard {
-		repoURLs, err = authorizeWildcardDomain(r)
+		repoURLs, err = authorizeWildcardMatch(r)
 		if err != nil && IsUnauthorized(err) {
 			causes = append(causes, err)
 		} else if err != nil { // bad request
 			return nil, err
 		} else {
-			log.Println("auth ok: wildcard *.%s: allow %v", config.Wildcard.Domain, repoURLs)
+			log.Printf("auth: wildcard *.%s: allow %v\n", config.Wildcard.Domain, repoURLs)
 			return repoURLs, nil
 		}
 	}

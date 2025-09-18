@@ -53,11 +53,17 @@ $ curl http://127.0.0.1:3333/ -H 'Host: codeberg.page'
 Authorization
 -------------
 
-DNS is used for authorization of content updates.
+DNS is used for authorization of content updates, either via TXT records or by pattern matching. The authorization flow proceeds sequentially in the following order, with the first of multiple applicable rule taking precedence:
 
-- If a `[wildcard]` configuration section is specified, and if the suffix of a hostname in a `POST` request is equal to `[wildcard].domain`, then the request is authorized when and only when the repository URL in the event body matches the repository URL computed from the configuration file. Otherwise the next rule is used.
-- If a `PUT` or `POST` request is received at `<hostname>` with an `Authorization: Pages <token>` header (or, in absence of such, with an `Authorization: Basic <basic>` header, where `<basic>` is equal to `Base64("Pages <token>")`), then the request is authorized when any of the the TXT records at `_git-pages-challenge.<hostname>` are equal to `SHA256("<hostname> <token>")`.
-    - During development, set environment variable `INSECURE=1` to bypass this checks.
+1. **Development Mode:** If the environment variable `INSECURE` is set to the value `very`, the request is authorized to update from any clone URL.
+2. **DNS Challenge:** If the method is `PUT` or `POST`, and a well-formed `Authorization:` header is provided containing a `<token>`, and a TXT record lookup at `_git-pages-challenge.<hostname>` returns a record whose concatenated value equals `SHA256("<hostname> <token>")`, the request is authorized to update from any clone URL.
+    - **<code>Pages</code> scheme:** Request includes an `Authorization: Pages <token>` header.
+    - **<code>Basic</code> scheme:** Request includes an `Authorization: Basic <basic>` header, where `<basic>` is equal to `Base64("Pages:<token>")`. (Useful for non-Forgejo forges.)
+3. **DNS Allowlist:** If the method is `PUT` or `POST`, and a TXT record lookup at `_git-pages-repository.<hostname>` returns a set of well-formed absolute URLs, the request is authorized to update from clone URLs in the set.
+4. **Wildcard Match:** If the method is `POST`, and a `[wildcard]` configuration section is present, and the suffix of a hostname (compared label-wise) is equal to `[wildcard].domain`, the request is authorized to update from a *matching* clone URL.
+    - **Index repository:** If the request URL is `scheme://<hostname>/`, a *matching* clone URL is computed as `sprintf([wildcard].clone-url, <hostname>, [wildcard].index-repo)`.
+    - **Project repository:** If the request URL is `scheme://<hostname>/<projectName>/`, a *matching* clone URL is computed as `sprintf([wildcard].clone-url, <hostname>, <projectName>)`.
+5. **Default Deny:** Otherwise, the request is not authorized.
 
 
 Architecture (v2)
