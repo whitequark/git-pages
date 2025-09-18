@@ -217,12 +217,15 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 
 	allowRepoURL := ""
 	if slices.Equal(hostParts[1:], strings.Split(config.Wildcard.Domain, ".")) {
-		userName := hostParts[0]
-		repoName := projectName
-		if repoName == ".index" {
-			repoName = fmt.Sprintf(config.Wildcard.IndexRepo, userName)
+		// explicit authorization bypasses wildcard domain restrictions
+		if err := Authorize(w, r); err != nil {
+			userName := hostParts[0]
+			repoName := projectName
+			if repoName == ".index" {
+				repoName = fmt.Sprintf(config.Wildcard.IndexRepo, userName)
+			}
+			allowRepoURL = fmt.Sprintf(config.Wildcard.CloneURL, userName, repoName)
 		}
-		allowRepoURL = fmt.Sprintf(config.Wildcard.CloneURL, userName, repoName)
 	} else {
 		if err := Authorize(w, r); err != nil {
 			return err
