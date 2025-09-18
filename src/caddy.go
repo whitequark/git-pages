@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 )
 
 func ServeCaddy(w http.ResponseWriter, r *http.Request) {
@@ -13,7 +14,7 @@ func ServeCaddy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	found, err := backend.CheckDomain(domain)
+	found, err := backend.CheckDomain(strings.ToLower(domain))
 	if found {
 		log.Println("caddy:", domain, 200)
 		w.WriteHeader(http.StatusOK)

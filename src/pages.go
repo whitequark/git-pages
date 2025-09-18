@@ -20,6 +20,10 @@ import (
 const notFoundPage = "404.html"
 const updateTimeout = 60 * time.Second
 
+func makeWebRoot(host string, projectName string) string {
+	return fmt.Sprintf("%s/%s", strings.ToLower(host), projectName)
+}
+
 func getPage(w http.ResponseWriter, r *http.Request) error {
 	var err error
 	var urlPath string
@@ -33,13 +37,13 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 
 	urlPath, _ = strings.CutPrefix(r.URL.Path, "/")
 	if projectName, projectPath, found := strings.Cut(urlPath, "/"); found {
-		projectManifest, err := backend.GetManifest(fmt.Sprintf("%s/%s", host, projectName))
+		projectManifest, err := backend.GetManifest(makeWebRoot(host, projectName))
 		if err == nil {
 			urlPath, manifest = projectPath, projectManifest
 		}
 	}
 	if manifest == nil {
-		manifest, err = backend.GetManifest(fmt.Sprintf("%s/.index", host))
+		manifest, err = backend.GetManifest(makeWebRoot(host, ".index"))
 		if manifest == nil {
 			w.WriteHeader(http.StatusNotFound)
 			fmt.Fprintf(w, "site not found\n")
@@ -169,7 +173,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("body read: %w", err)
 	}
 
-	webRoot := fmt.Sprintf("%s/%s", host, projectName)
+	webRoot := makeWebRoot(host, projectName)
 
 	// request body contains git repository URL
 	repoURL := string(requestBody)
@@ -273,7 +277,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 
-	webRoot := fmt.Sprintf("%s/%s", host, projectName)
+	webRoot := makeWebRoot(host, projectName)
 
 	repoURL := event["repository"].(map[string]any)["clone_url"].(string)
 	if err := AuthorizeRepository(repoURL, allowedRepoURLs); err != nil {
