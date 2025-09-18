@@ -12,7 +12,7 @@ swap_size_mb = 512
 dockerfile = "Dockerfile"
 
 [experimental]
-cmd = ["hivemind"]
+cmd = ["supervisord"]
 
 [[vm]]
 cpu-type = "shared"
