@@ -12,7 +12,8 @@ type CacheConfig struct {
 }
 
 type Config struct {
-	Listen struct {
+	LogFormat string `toml:"log-format"`
+	Listen    struct {
 		Pages  string `toml:"pages"`
 		Caddy  string `toml:"caddy"`
 		Health string `toml:"health"`

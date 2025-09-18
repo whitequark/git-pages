@@ -41,6 +41,13 @@ func main() {
 	}
 	UpdateConfigEnv() // environment takes priority
 
+	switch config.LogFormat {
+	case "short":
+		log.SetFlags(0)
+	default:
+		log.SetFlags(log.Ldate | log.Ltime | log.LUTC)
+	}
+
 	switch config.Backend.Type {
 	case "fs":
 		if backend, err = NewFSBackend(config.Backend.FS.Root); err != nil {
