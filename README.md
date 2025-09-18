@@ -5,7 +5,7 @@ _git-pages_ is a static site server for use with Git forges (i.e. a GitHub Pages
 
 It is implemented in Go and has no other mandatory dependencies, although it is designed to be used together with the [Caddy server](https://caddyserver.com/) (for TLS termination) and an [Amazon S3](https://aws.amazon.com/s3/) compatible object store (for horizontal scalability of storage).
 
-The included Docker container provides everything needed to deploy a Pages service, including zero-configuration on-demand provisioning of TLS certificates from [Let's Encrypt](https://letsencrypt.org/), and runs on any commodity cloud infrastructure.
+The included Docker container provides everything needed to deploy a Pages service, including zero-configuration on-demand provisioning of TLS certificates from [Let's Encrypt](https://letsencrypt.org/), and runs on any commodity cloud infrastructure. There is also a first-party deployment of _git-pages_ at [grebedoc.dev](https://grebedoc.dev).
 
 
 Quickstart
