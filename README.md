@@ -1,53 +1,48 @@
 git-pages
 =========
 
-This is a simple Go service implemented as a strawman proposal of how https://codeberg.page could work.
+_git-pages_ is a static site server for use with Git forges (i.e. a GitHub Pages replacement). It is written with efficiency in mind, scaling horizontally to any number of deployed sites and concurrent requests and serving sites up to hundreds of megabytes in size, while being equally suitable for single-user deployments.
+
+It is implemented in Go and has no other mandatory dependencies, although it is designed to be used together with the [Caddy server](https://caddyserver.com/) (for TLS termination) and an [Amazon S3](https://aws.amazon.com/s3/) compatible object store (for horizontal scalability of storage).
+
+The included Docker container provides everything needed to deploy a Pages service, including zero-configuration on-demand provisioning of TLS certificates from [Let's Encrypt](https://letsencrypt.org/), and runs on any commodity cloud infrastructure.
+
+
+Quickstart
+----------
+
+You will need [Go](https://go.dev/) 1.25 or newer. Run:
+
+```console
+$ mkdir -p data
+$ cp config.toml.example config.toml
+$ INSECURE=very go run ./src
+```
+
+These commands starts an HTTP server on `0.0.0.0:3000` and use the `data` directory for persistence. **Authentication is disabled via `INSECURE=very`** to avoid the need to set up a DNS server as well; never set `INSECURE=very` in production.
+
+To publish a site, run the following commands:
+
+```console
+$ curl http://localhost:3000/ -X PUT --data https://codeberg.org/whitequark/git-pages.git
+b70644b523c4aaf4efd206a588087a1d406cb047
+```
+
+The `pages` branch of the repository is now available at http://localhost:3000/!
+
+To get inspiration for deployment strategies, take a look at the included [Dockerfile](Dockerfile) or the [configuration](fly.toml) for [Fly.io](https://fly.io).
 
 
 Features
 --------
 
-* In response to a `PUT` or `POST` request, performs a shallow in-memory clone of a git repository, checks out a tree to the storage backend, and atomically updates the version of content being served.
-    - `PUT` method is a custom REST endpoint, `POST` method is a Forgejo webhook endpoint.
-* In response to a `GET` or `HEAD` request, selects an appropriate tree and serves files from it. Supported URL patterns:
-    - `https://domain.tld/project/` (routed to project-specific tree)
-    - `https://domain.tld/` (routed to domain-specific tree by exclusion)
-
-
-Usage
------
-
-You will need [Go](https://go.dev/) 1.24 or newer. Run:
-
-```console
-$ mkdir -p data
-$ cp config.toml.example config.toml
-$ go run ./src
-```
-
-This starts an HTTP server on `0.0.0.0:3333` whose behavior is fully determined by the `data` directory. It will accept requests to any virtual host, but must first be provisioned. For example:
-
-```console
-$ curl -v http://127.0.0.1:3333/ -X PUT -H 'Host: codeberg.page' --data https://codeberg.org/Codeberg/pages-server
-*   Trying 127.0.0.1:3333...
-* [snip]
-< HTTP/1.1 201 Created
-< Content-Location: /
-< Date: Fri, 05 Sep 2025 07:19:34 GMT
-< Content-Length: 41
-< Content-Type: text/plain; charset=utf-8
-<
-915c874f8029dcb2056237440116e170de0b9489
-* Connection #0 to host 127.0.0.1 left intact
-```
-
-The server will now respond to requests for this host:
-
-```console
-$ curl http://127.0.0.1:3333/ -H 'Host: codeberg.page'
-<!DOCTYPE html>
-[snip]
-```
+* In response to a `GET` or `HEAD` request, selects an appropriate site and serves files from it. A site is a combination of the hostname and (optionally) the project name. The site is selected as follows:
+    - If the URL matches `https://<hostname>/<project-name>/...` and a site was published at `<project-name>`, this project-specific site is selected.
+    - If the URL matches `https://<hostname>/...` and the previous rule did not apply, the index site is selected.
+* In response to a `PUT` or `POST` request, the server performs a shallow clone of the indicated git repository into a temporary location, checks out the `HEAD` commit, and atomically updates the content being served. The URL of the request must be the root URL of the site that is being published.
+    - The `PUT` method requires an `application/x-www-form-urlencoded` body. The body contains the repository URL to be cloned.
+    - The `POST` method requires an `application/json` body containing a Forgejo/Gitea/Gogs/GitHub webhook event payload. Requests where the `ref` key contains anything other than `refs/heads/pages` are ignored. The `repository.clone_url` key contains the repository URL to be cloned.
+* All updates to site content are atomic (subject to consistency guarantees of the storage backend). That is, there is an instantaneous moment during an update before which the server will return the old content and after which it will return the new content.
 
 
 Authorization
@@ -62,7 +57,7 @@ DNS is used for authorization of content updates, either via TXT records or by p
 3. **DNS Allowlist:** If the method is `PUT` or `POST`, and a TXT record lookup at `_git-pages-repository.<hostname>` returns a set of well-formed absolute URLs, the request is authorized to update from clone URLs in the set.
 4. **Wildcard Match:** If the method is `POST`, and a `[wildcard]` configuration section is present, and the suffix of a hostname (compared label-wise) is equal to `[wildcard].domain`, the request is authorized to update from a *matching* clone URL.
     - **Index repository:** If the request URL is `scheme://<hostname>/`, a *matching* clone URL is computed as `sprintf([wildcard].clone-url, <hostname>, [wildcard].index-repo)`.
-    - **Project repository:** If the request URL is `scheme://<hostname>/<projectName>/`, a *matching* clone URL is computed as `sprintf([wildcard].clone-url, <hostname>, <projectName>)`.
+    - **Project repository:** If the request URL is `scheme://<hostname>/<project-name>/`, a *matching* clone URL is computed as `sprintf([wildcard].clone-url, <hostname>, <project-name>)`.
 5. **Default Deny:** Otherwise, the request is not authorized.
 
 
