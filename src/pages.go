@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"path"
-	"slices"
 	"strings"
 	"time"
 
@@ -153,25 +153,30 @@ func getProjectName(w http.ResponseWriter, r *http.Request) (string, error) {
 func putPage(w http.ResponseWriter, r *http.Request) error {
 	host := GetHost(r)
 
-	err := Authorize(w, r)
+	projectName, err := GetProjectName(r)
 	if err != nil {
 		return err
 	}
 
-	projectName, err := getProjectName(w, r)
+	allowedRepoURLs, err := AuthorizeRequestWithoutWildcard(r)
 	if err != nil {
 		return err
 	}
 
-	requestBody, err := io.ReadAll(r.Body)
+	// URLs have no length limit, but 64K seems enough for a repository URL
+	requestBody, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 65536))
 	if err != nil {
 		return fmt.Errorf("body read: %w", err)
 	}
 
-	// request body contains git repository URL `https://codeberg.org/...`
-	// request header X-Pages-Branch contains git branch, `pages` by default
 	webRoot := fmt.Sprintf("%s/%s", host, projectName)
+
+	// request body contains git repository URL
 	repoURL := string(requestBody)
+	if err := AuthorizeRepository(repoURL, allowedRepoURLs); err != nil {
+		return err
+	}
+
 	branch := r.Header.Get("X-Pages-Branch")
 	if branch == "" {
 		branch = "pages"
@@ -208,28 +213,15 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 
 func postPage(w http.ResponseWriter, r *http.Request) error {
 	host := GetHost(r)
-	hostParts := strings.Split(host, ".")
 
-	projectName, err := getProjectName(w, r)
+	projectName, err := GetProjectName(r)
 	if err != nil {
 		return err
 	}
 
-	allowRepoURL := ""
-	if slices.Equal(hostParts[1:], strings.Split(config.Wildcard.Domain, ".")) {
-		// explicit authorization bypasses wildcard domain restrictions
-		if err := Authorize(w, r); err != nil {
-			userName := hostParts[0]
-			repoName := projectName
-			if repoName == ".index" {
-				repoName = fmt.Sprintf(config.Wildcard.IndexRepo, userName)
-			}
-			allowRepoURL = fmt.Sprintf(config.Wildcard.CloneURL, userName, repoName)
-		}
-	} else {
-		if err := Authorize(w, r); err != nil {
-			return err
-		}
+	allowedRepoURLs, err := AuthorizeRequestWithWildcard(r)
+	if err != nil {
+		return err
 	}
 
 	eventName := ""
@@ -261,7 +253,8 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("invalid content type")
 	}
 
-	requestBody, err := io.ReadAll(r.Body)
+	// Event payloads have no length limit, but events bigger than 16M seem excessive.
+	requestBody, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 16*1048576))
 	if err != nil {
 		return fmt.Errorf("body read: %w", err)
 	}
@@ -276,19 +269,15 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 	eventRef := event["ref"].(string)
 	if eventRef != "refs/heads/pages" {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "ref %s ignored\n", eventRef)
+		fmt.Fprintf(w, "ignored %s\n", eventRef)
 		return nil
 	}
 
 	webRoot := fmt.Sprintf("%s/%s", host, projectName)
 
 	repoURL := event["repository"].(map[string]any)["clone_url"].(string)
-	if allowRepoURL != "" && !strings.EqualFold(repoURL, allowRepoURL) {
-		http.Error(w,
-			fmt.Sprintf("wildcard domain requires repository to be %s", allowRepoURL),
-			http.StatusUnauthorized,
-		)
-		return fmt.Errorf("invalid clone URL")
+	if err := AuthorizeRepository(repoURL, allowedRepoURLs); err != nil {
+		return err
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), updateTimeout)
@@ -330,10 +319,14 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 		err = fmt.Errorf("method %s not allowed", r.Method)
 	}
 	if err != nil {
-		if pathErr, ok := err.(*os.PathError); ok {
+		var authErr AuthError
+		if errors.As(err, &authErr) {
+			message := fmt.Sprint(err)
+			http.Error(w, strings.ReplaceAll(message, "\n", "\n- "), authErr.code)
+			err = errors.New(strings.ReplaceAll(message, "\n", "; "))
+		} else if pathErr, ok := err.(*os.PathError); ok {
 			err = fmt.Errorf("not found: %s", pathErr.Path)
-		}
-		if minioErr, ok := err.(minio.ErrorResponse); ok && minioErr.Code == "NoSuchKey" {
+		} else if minioErr, ok := err.(minio.ErrorResponse); ok && minioErr.Code == "NoSuchKey" {
 			err = fmt.Errorf("not found: %s", minioErr.Key)
 		}
 		log.Println("pages err:", err)
