@@ -5,8 +5,8 @@ health = "tcp/:3002"
 
 # [wildcard]
 # domain = "codeberg.page"
-# clone-url = "https://codeberg.org/%s/%s.git"
-# index-repo = "%s.codeberg.page"
+# clone-url = "https://codeberg.org/<user>/<project>.git"
+# index-repos = ["<user>.codeberg.page", "pages"]
 
 [backend]
 type = "fs"

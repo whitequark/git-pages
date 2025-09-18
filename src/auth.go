@@ -147,18 +147,30 @@ func authorizeWildcardMatch(r *http.Request) ([]string, error) {
 		return nil, err
 	}
 
-	if slices.Equal(hostParts[1:], strings.Split(config.Wildcard.Domain, ".")) {
+	if slices.Equal(hostParts[1:], wildcardPattern.Domain) {
 		userName := hostParts[0]
-		repoName := projectName
-		if repoName == ".index" {
-			repoName = fmt.Sprintf(config.Wildcard.IndexRepo, userName)
+		var repoURLs []string
+		repoURLTemplate := wildcardPattern.CloneURL
+		if projectName == ".index" {
+			for _, indexRepoTemplate := range wildcardPattern.IndexRepos {
+				indexRepo := indexRepoTemplate.ExecuteString(map[string]any{"user": userName})
+				repoURLs = append(repoURLs, repoURLTemplate.ExecuteString(map[string]interface{}{
+					"user":    userName,
+					"project": indexRepo,
+				}))
+			}
+		} else {
+			repoURLs = append(repoURLs, repoURLTemplate.ExecuteString(map[string]interface{}{
+				"user":    userName,
+				"project": projectName,
+			}))
 		}
-		return []string{fmt.Sprintf(config.Wildcard.CloneURL, userName, repoName)}, nil
-	}
-
-	return nil, AuthError{
-		http.StatusUnauthorized,
-		fmt.Sprintf("domain %s does not match wildcard *.%s", host, config.Wildcard.Domain),
+		return repoURLs, nil
+	} else {
+		return nil, AuthError{
+			http.StatusUnauthorized,
+			fmt.Sprintf("domain %s does not match wildcard *.%s", host, config.Wildcard.Domain),
+		}
 	}
 }
 

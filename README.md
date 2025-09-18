@@ -51,13 +51,13 @@ Authorization
 DNS is used for authorization of content updates, either via TXT records or by pattern matching. The authorization flow proceeds sequentially in the following order, with the first of multiple applicable rule taking precedence:
 
 1. **Development Mode:** If the environment variable `INSECURE` is set to the value `very`, the request is authorized to update from any clone URL.
-2. **DNS Challenge:** If the method is `PUT` or `POST`, and a well-formed `Authorization:` header is provided containing a `<token>`, and a TXT record lookup at `_git-pages-challenge.<hostname>` returns a record whose concatenated value equals `SHA256("<hostname> <token>")`, the request is authorized to update from any clone URL.
+2. **DNS Challenge:** If the method is `PUT` or `POST`, and a well-formed `Authorization:` header is provided containing a `<token>`, and a TXT record lookup at `_git-pages-challenge.<host>` returns a record whose concatenated value equals `SHA256("<host> <token>")`, the request is authorized to update from any clone URL.
     - **<code>Pages</code> scheme:** Request includes an `Authorization: Pages <token>` header.
     - **<code>Basic</code> scheme:** Request includes an `Authorization: Basic <basic>` header, where `<basic>` is equal to `Base64("Pages:<token>")`. (Useful for non-Forgejo forges.)
-3. **DNS Allowlist:** If the method is `PUT` or `POST`, and a TXT record lookup at `_git-pages-repository.<hostname>` returns a set of well-formed absolute URLs, the request is authorized to update from clone URLs in the set.
+3. **DNS Allowlist:** If the method is `PUT` or `POST`, and a TXT record lookup at `_git-pages-repository.<host>` returns a set of well-formed absolute URLs, the request is authorized to update from clone URLs in the set.
 4. **Wildcard Match:** If the method is `POST`, and a `[wildcard]` configuration section is present, and the suffix of a hostname (compared label-wise) is equal to `[wildcard].domain`, the request is authorized to update from a *matching* clone URL.
-    - **Index repository:** If the request URL is `scheme://<hostname>/`, a *matching* clone URL is computed as `sprintf([wildcard].clone-url, <hostname>, [wildcard].index-repo)`.
-    - **Project repository:** If the request URL is `scheme://<hostname>/<project-name>/`, a *matching* clone URL is computed as `sprintf([wildcard].clone-url, <hostname>, <project-name>)`.
+    - **Index repository:** If the request URL is `scheme://<user>.<host>/`, a *matching* clone URL is computed by templating `[wildcard.clone-url]` with `<user>` and `<project>`, where `<project>` is computed by templating each element of `[wildcard].index-repos` with `<user>`.
+    - **Project repository:** If the request URL is `scheme://<user>.<host>/<project>/`, a *matching* clone URL is computed by templating `[wildcard.clone-url]` with `<user>` and `<project>`.
 5. **Default Deny:** Otherwise, the request is not authorized.
 
 

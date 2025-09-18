@@ -9,6 +9,7 @@ require (
 	github.com/maypok86/otter/v2 v2.2.1
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/pelletier/go-toml/v2 v2.2.4
+	github.com/valyala/fasttemplate v1.2.2
 	google.golang.org/protobuf v1.36.9
 )
 
@@ -36,6 +37,7 @@ require (
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/tinylib/msgp v1.3.0 // indirect
+	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	golang.org/x/crypto v0.41.0 // indirect
 	golang.org/x/exp v0.0.0-20250531010427-b6e5de432a8b // indirect
 	golang.org/x/net v0.43.0 // indirect

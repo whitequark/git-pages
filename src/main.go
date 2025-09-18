@@ -43,6 +43,7 @@ func main() {
 		log.Fatalln("config:", err)
 	}
 	UpdateConfigEnv() // environment takes priority
+	CompileWildcardPattern()
 
 	switch config.LogFormat {
 	case "short":
