@@ -1,0 +1,62 @@
+{
+	persist_config off
+
+	log {
+		output stderr
+		exclude admin.api
+		format console {
+			time_key ""
+		}
+	}
+
+	metrics {
+		per_host
+	}
+
+	storage s3 {
+		host "{$S3_ENDPOINT}"
+		access_id "{$S3_ACCESS_KEY_ID}"
+		secret_key "{$S3_SECRET_ACCESS_KEY}"
+		bucket "{$S3_BUCKET}"
+		prefix "ssl"
+	}
+
+	email {env.ACME_EMAIL}
+
+	auto_https disable_redirects
+
+	on_demand_tls {
+		permission http http://{$GIT_PAGES_ADDRESS:localhost}:3001
+	}
+
+	servers :80 {
+		name http
+		protocols h1 h2c
+	}
+
+	servers :443 {
+		name https
+		protocols h1 h2
+	}
+}
+
+http:// {
+	@get method GET
+	redir @get https://{host}{uri} 301
+
+	# initial PUT/POST for a new domain has to happen over HTTP
+	reverse_proxy http://{$GIT_PAGES_ADDRESS:localhost}:3000
+}
+
+https:// {
+	tls {
+		on_demand
+	}
+
+	encode
+	reverse_proxy http://{$GIT_PAGES_ADDRESS:localhost}:3000
+}
+
+http://localhost:2020 {
+	respond "ok"
+}
