@@ -40,19 +40,10 @@ ports = [{ port = 443 }]
 auto_stop_machines = "stop"
 auto_start_machines = true
 
-[checks.git-pages]
+[checks.health]
 type = "http"
 method = "get"
-port = 3002
-path = "/"
-grace_period = "10s"
-interval = "10s"
-timeout = "1s"
-
-[checks.caddy]
-type = "http"
-method = "get"
-port = 2020
+port = 2002
 path = "/"
 grace_period = "10s"
 interval = "10s"

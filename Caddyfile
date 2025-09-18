@@ -57,6 +57,6 @@ https:// {
 	reverse_proxy http://{$GIT_PAGES_ADDRESS:localhost}:3000
 }
 
-http://localhost:2020 {
-	respond "ok"
+http://localhost:2002 {
+	reverse_proxy http://{$GIT_PAGES_ADDRESS:localhost}:3002
 }
