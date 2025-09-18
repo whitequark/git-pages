@@ -6,7 +6,6 @@
 #  - GIT_PAGES_CONFIG
 
 app = "git-pages"
-swap_size_mb = 512
 
 [build]
 dockerfile = "Dockerfile"
