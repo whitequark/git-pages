@@ -57,6 +57,7 @@ autorestart = true
 command = git-pages
 [program:caddy]
 command = caddy run
+depends_on = pages
 EOF
 
 # In a standalone configuration (the default) use port 3000 (http) to connect to git-caddy.
