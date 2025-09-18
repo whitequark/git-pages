@@ -3,10 +3,13 @@ package main
 import (
 	"flag"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/KimMachineGun/automemlimit/memlimit"
 )
 
 var backend Backend
@@ -83,6 +86,18 @@ func main() {
 
 		log.Println("migrate v1 ok")
 	}
+
+	// Avoid being OOM killed by not garbage collecting early enough.
+	memlimit.SetGoMemLimitWithOpts(
+		memlimit.WithLogger(slog.Default()),
+		memlimit.WithProvider(
+			memlimit.ApplyFallback(
+				memlimit.FromCgroup,
+				memlimit.FromSystem,
+			),
+		),
+		memlimit.WithRatio(0.9),
+	)
 
 	log.Println("ready")
 
