@@ -4,17 +4,32 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
+	"github.com/go-git/go-billy/v6/osfs"
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/cache"
 	"github.com/go-git/go-git/v6/plumbing/filemode"
 	"github.com/go-git/go-git/v6/plumbing/object"
-	"github.com/go-git/go-git/v6/storage/memory"
+	"github.com/go-git/go-git/v6/storage/filesystem"
 )
 
-func FetchRepository(ctx context.Context, repoURL string, branch string) (*Manifest, error) {
-	storer := memory.NewStorage()
+const largeObjectThreshold int64 = 1048576
 
+func FetchRepository(ctx context.Context, repoURL string, branch string) (*Manifest, error) {
+	baseDir, err := os.MkdirTemp("", "fetchRepo")
+	if err != nil {
+		return nil, fmt.Errorf("mkdtemp: %w", err)
+	}
+	defer os.RemoveAll(baseDir)
+
+	fs := osfs.New(baseDir, osfs.WithBoundOS())
+	cache := cache.NewObjectLRUDefault()
+	storer := filesystem.NewStorageWithOptions(fs, cache, filesystem.Options{
+		ExclusiveAccess:      true,
+		LargeObjectThreshold: largeObjectThreshold,
+	})
 	repo, err := git.CloneContext(ctx, storer, nil, &git.CloneOptions{
 		Bare:          true,
 		URL:           repoURL,
