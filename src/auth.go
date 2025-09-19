@@ -185,7 +185,7 @@ func authorizeRequest(r *http.Request, allowWildcard bool) ([]string, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
 	if InsecureMode() {
-		log.Println("auth: INSECURE mode: allow any")
+		log.Println("auth: INSECURE mode: allow *")
 		return nil, nil // for testing only
 	}
 
@@ -195,7 +195,7 @@ func authorizeRequest(r *http.Request, allowWildcard bool) ([]string, error) {
 	} else if err != nil { // bad request
 		return nil, err
 	} else {
-		log.Println("auth: DNS challenge: allow any")
+		log.Println("auth: DNS challenge: allow *")
 		return repoURLs, nil
 	}
 
@@ -251,6 +251,25 @@ func AuthorizeRepository(repoURL string, allowRepoURLs []string) error {
 		return AuthError{
 			http.StatusUnauthorized,
 			fmt.Sprintf("clone URL not in allowlist %v", allowRepoURLs),
+		}
+	}
+}
+
+// The purpose of `allowRepoURLs` is to make sure that only authorized content is deployed
+// to the site despite the fact that the non-shared-secret authorization methods allow anyone
+// to impersonate the legitimate webhook sender. (If switching to another repository URL would
+// be catastrophic, then so would be switching to a different branch.)
+func AuthorizeBranch(branch string, allowRepoURLs []string) error {
+	if allowRepoURLs == nil {
+		return nil // any
+	}
+
+	if branch == "pages" {
+		return nil
+	} else {
+		return AuthError{
+			http.StatusUnauthorized,
+			fmt.Sprintf("branch %s: password authorization required", branch),
 		}
 	}
 }

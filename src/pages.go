@@ -181,9 +181,12 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	branch := r.Header.Get("X-Pages-Branch")
-	if branch == "" {
-		branch = "pages"
+	branch := "pages"
+	if customBranch := r.Header.Get("X-Pages-Branch"); customBranch != "" {
+		branch = customBranch
+	}
+	if err := AuthorizeBranch(branch, allowedRepoURLs); err != nil {
+		return err
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), updateTimeout)
