@@ -206,7 +206,7 @@ func AuthorizeRequest(r *http.Request) (*Authorization, error) {
 	}
 
 	// DNS allowlist gives authority to update but not delete.
-	if r.Method == http.MethodPut || r.Method == http.MethodPut {
+	if r.Method == http.MethodPut || r.Method == http.MethodPost {
 		auth, err = authorizeDNSAllowlist(r)
 		if err != nil && IsUnauthorized(err) {
 			causes = append(causes, err)
