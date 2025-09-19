@@ -5,10 +5,9 @@
 #  - S3_BUCKET
 #  - GIT_PAGES_CONFIG
 
-app = "git-pages"
-
 [build]
 dockerfile = "Dockerfile"
+# image = "registry.fly.io/git-pages-dev:latest"
 
 [experimental]
 cmd = ["supervisord"]

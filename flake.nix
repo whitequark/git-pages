@@ -32,13 +32,15 @@
             ];
           };
 
-          vendorHash = "sha256-WVnxNtCCk6T+EsT6Wvd+yR2mxU03SNnSwpeYlYLOCGU=";
+          vendorHash = "sha256-f2+NDRrgqlyRn7kiBYbuUhDsQPF3Yf/3v24lqBUja6s=";
 
           fixupPhase = ''
             # Apparently `go install` doesn't support renaming the binary, so country girls make do.
             mv $out/bin/{src,git-pages}
           '';
         };
+
+        image = pkgs.callPackage ./nix/pkgs/image.nix { inherit git-pages self; };
       in
       {
         formatter = pkgs.nixfmt-tree;
@@ -49,7 +51,10 @@
           ];
         };
 
-        packages.default = git-pages;
+        packages = {
+          inherit git-pages image;
+          default = git-pages;
+        };
       }
     );
 }

@@ -38,6 +38,11 @@
 		name https
 		protocols h1 h2
 	}
+
+	servers :2002 {
+		name health
+		protocols h1
+	}
 }
 
 http:// {
