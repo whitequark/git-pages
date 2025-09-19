@@ -364,7 +364,11 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 
 func ServePages(w http.ResponseWriter, r *http.Request) {
 	log.Println("pages:", r.Method, r.Host, r.URL)
-	w.Header().Add("Server", "git-pages")
+	if region := os.Getenv("FLY_REGION"); region != "" {
+		w.Header().Add("Server", fmt.Sprintf("git-pages (fly.io; %s)", region))
+	} else {
+		w.Header().Add("Server", "git-pages")
+	}
 	err := error(nil)
 	switch r.Method {
 	// REST API
