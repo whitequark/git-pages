@@ -66,7 +66,7 @@ Architecture (v2)
 
 An object store (filesystem, S3, ...) is used as the sole mechanism for state storage. The object store is expected to provide atomic operations and where necessary the backend adapter ensures as such.
 
-- Repositories themselves are never stored on disk; they are cloned in-memory and discarded immediately after their contents is extracted.
+- Repositories themselves never reach the object store; they are cloned to an ephemeral location and discarded immediately after their contents is extracted.
 - The `blob/` prefix contains file data organized by hash of their contents (indiscriminately of the repository they belong to).
     - Very small files are stored inline in the manifest.
 - The `site/` prefix contains site manifests organized by domain and project name (e.g. `site/example.org/myproject` or `site/example.org/.index`).
