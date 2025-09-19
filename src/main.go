@@ -14,7 +14,11 @@ import (
 
 var backend Backend
 
-func serveHandler(name string, listen string, serve func(http.ResponseWriter, *http.Request)) {
+func listen(name string, listen string) net.Listener {
+	if listen == "" {
+		return nil
+	}
+
 	protocol, address, ok := strings.Cut(listen, "/")
 	if !ok {
 		log.Fatalf("%s: %s: malformed endpoint", name, listen)
@@ -25,10 +29,14 @@ func serveHandler(name string, listen string, serve func(http.ResponseWriter, *h
 		log.Fatalf("%s: %s\n", name, err)
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", serve)
-	if err := http.Serve(listener, mux); err != nil {
-		log.Fatalf("%s: %s\n", name, err)
+	return listener
+}
+
+func serve(listener net.Listener, serve func(http.ResponseWriter, *http.Request)) {
+	if listener != nil {
+		if err := http.Serve(listener, http.HandlerFunc(serve)); err != nil {
+			log.Fatalln(err)
+		}
 	}
 }
 
@@ -51,6 +59,26 @@ func main() {
 	default:
 		log.SetFlags(log.Ldate | log.Ltime | log.LUTC)
 	}
+
+	// Avoid being OOM killed by not garbage collecting early enough.
+	memlimit.SetGoMemLimitWithOpts(
+		memlimit.WithLogger(slog.Default()),
+		memlimit.WithProvider(
+			memlimit.ApplyFallback(
+				memlimit.FromCgroup,
+				memlimit.FromSystem,
+			),
+		),
+		memlimit.WithRatio(0.9),
+	)
+
+	// Start listening on all ports before initializing the backend, otherwise if the backend
+	// spends some time initializing (which the S3 backend does) a proxy like Caddy can race
+	// with git-pages on startup and return errors for requests that would have been served
+	// just 0.5s later.
+	pagesListener := listen("pages", config.Listen.Pages)
+	caddyListener := listen("caddy", config.Listen.Caddy)
+	healthListener := listen("health", config.Listen.Health)
 
 	switch config.Backend.Type {
 	case "fs":
@@ -88,33 +116,14 @@ func main() {
 		log.Println("migrate v1 ok")
 	}
 
-	// Avoid being OOM killed by not garbage collecting early enough.
-	memlimit.SetGoMemLimitWithOpts(
-		memlimit.WithLogger(slog.Default()),
-		memlimit.WithProvider(
-			memlimit.ApplyFallback(
-				memlimit.FromCgroup,
-				memlimit.FromSystem,
-			),
-		),
-		memlimit.WithRatio(0.9),
-	)
+	go serve(pagesListener, ServePages)
+	go serve(caddyListener, ServeCaddy)
+	go serve(healthListener, ServeHealth)
 
 	if InsecureMode() {
 		log.Println("ready (INSECURE)")
 	} else {
 		log.Println("ready")
 	}
-
-	go serveHandler("pages", config.Listen.Pages, ServePages)
-
-	if config.Listen.Caddy != "" {
-		go serveHandler("caddy", config.Listen.Caddy, ServeCaddy)
-	}
-
-	if config.Listen.Health != "" {
-		go serveHandler("health", config.Listen.Health, ServeHealth)
-	}
-
 	select {}
 }
