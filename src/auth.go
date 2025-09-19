@@ -62,7 +62,12 @@ func GetProjectName(r *http.Request) (string, error) {
 	}
 }
 
-func authorizeDNSChallenge(r *http.Request) ([]string, error) {
+type Authorization struct {
+	// If `nil`, any URL is allowed. If not, only those in the set are allowed.
+	repoURLs []string
+}
+
+func authorizeDNSChallenge(r *http.Request) (*Authorization, error) {
 	host := GetHost(r)
 
 	authorization := r.Header.Get("Authorization")
@@ -116,10 +121,10 @@ func authorizeDNSChallenge(r *http.Request) ([]string, error) {
 		)}
 	}
 
-	return nil, nil
+	return &Authorization{}, nil
 }
 
-func authorizeDNSAllowlist(r *http.Request) ([]string, error) {
+func authorizeDNSAllowlist(r *http.Request) (*Authorization, error) {
 	host := GetHost(r)
 
 	allowlistHostname := fmt.Sprintf("_git-pages-repository.%s", host)
@@ -139,10 +144,10 @@ func authorizeDNSAllowlist(r *http.Request) ([]string, error) {
 		}
 	}
 
-	return repoURLs, err
+	return &Authorization{repoURLs}, err
 }
 
-func authorizeWildcardMatch(r *http.Request) ([]string, error) {
+func authorizeWildcardMatch(r *http.Request) (*Authorization, error) {
 	host := GetHost(r)
 	hostParts := strings.Split(host, ".")
 
@@ -169,7 +174,7 @@ func authorizeWildcardMatch(r *http.Request) ([]string, error) {
 				"project": projectName,
 			}))
 		}
-		return repoURLs, nil
+		return &Authorization{repoURLs}, nil
 	} else {
 		return nil, AuthError{
 			http.StatusUnauthorized,
@@ -181,65 +186,63 @@ func authorizeWildcardMatch(r *http.Request) ([]string, error) {
 // Returns `repoURLs, err` where if `err == nil` then the request is authorized to clone from
 // any repository URL included in `repoURLs` (by case-insensitive comparison), or any URL at all
 // if `repoURLs == nil`.
-func authorizeRequest(r *http.Request, allowWildcard bool) ([]string, error) {
+func AuthorizeRequest(r *http.Request) (*Authorization, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
 	if InsecureMode() {
 		log.Println("auth: INSECURE mode: allow *")
-		return nil, nil // for testing only
+		return &Authorization{}, nil // for testing only
 	}
 
-	repoURLs, err := authorizeDNSChallenge(r)
+	// DNS challenge gives absolute authority.
+	auth, err := authorizeDNSChallenge(r)
 	if err != nil && IsUnauthorized(err) {
 		causes = append(causes, err)
 	} else if err != nil { // bad request
 		return nil, err
 	} else {
 		log.Println("auth: DNS challenge: allow *")
-		return repoURLs, nil
+		return auth, nil
 	}
 
-	repoURLs, err = authorizeDNSAllowlist(r)
-	if err != nil && IsUnauthorized(err) {
-		causes = append(causes, err)
-	} else if err != nil { // bad request
-		return nil, err
-	} else {
-		log.Printf("auth: DNS allowlist: allow %v\n", repoURLs)
-		return repoURLs, nil
-	}
-
-	if allowWildcard {
-		repoURLs, err = authorizeWildcardMatch(r)
+	// DNS allowlist gives authority to update but not delete.
+	if r.Method == http.MethodPut || r.Method == http.MethodPut {
+		auth, err = authorizeDNSAllowlist(r)
 		if err != nil && IsUnauthorized(err) {
 			causes = append(causes, err)
 		} else if err != nil { // bad request
 			return nil, err
 		} else {
-			log.Printf("auth: wildcard *.%s: allow %v\n", config.Wildcard.Domain, repoURLs)
-			return repoURLs, nil
+			log.Printf("auth: DNS allowlist: allow %v\n", auth.repoURLs)
+			return auth, nil
+		}
+	}
+
+	// Wildcard match is only available for webhooks, not the REST API.
+	if r.Method == http.MethodPost {
+		auth, err = authorizeWildcardMatch(r)
+		if err != nil && IsUnauthorized(err) {
+			causes = append(causes, err)
+		} else if err != nil { // bad request
+			return nil, err
+		} else {
+			log.Printf("auth: wildcard *.%s: allow %v\n",
+				config.Wildcard.Domain, auth.repoURLs)
+			return auth, nil
 		}
 	}
 
 	return nil, errors.Join(causes...)
 }
 
-func AuthorizeRequestWithWildcard(r *http.Request) ([]string, error) {
-	return authorizeRequest(r, true)
-}
-
-func AuthorizeRequestWithoutWildcard(r *http.Request) ([]string, error) {
-	return authorizeRequest(r, false)
-}
-
-func AuthorizeRepository(repoURL string, allowRepoURLs []string) error {
-	if allowRepoURLs == nil {
+func AuthorizeRepository(repoURL string, auth *Authorization) error {
+	if auth.repoURLs == nil {
 		return nil // any
 	}
 
 	allowed := false
-	for _, allowRepoURL := range allowRepoURLs {
-		if strings.EqualFold(repoURL, allowRepoURL) {
+	for _, allowedRepoURL := range auth.repoURLs {
+		if strings.EqualFold(repoURL, allowedRepoURL) {
 			allowed = true
 			break
 		}
@@ -250,7 +253,7 @@ func AuthorizeRepository(repoURL string, allowRepoURLs []string) error {
 	} else {
 		return AuthError{
 			http.StatusUnauthorized,
-			fmt.Sprintf("clone URL not in allowlist %v", allowRepoURLs),
+			fmt.Sprintf("clone URL not in allowlist %v", auth.repoURLs),
 		}
 	}
 }
@@ -259,8 +262,8 @@ func AuthorizeRepository(repoURL string, allowRepoURLs []string) error {
 // to the site despite the fact that the non-shared-secret authorization methods allow anyone
 // to impersonate the legitimate webhook sender. (If switching to another repository URL would
 // be catastrophic, then so would be switching to a different branch.)
-func AuthorizeBranch(branch string, allowRepoURLs []string) error {
-	if allowRepoURLs == nil {
+func AuthorizeBranch(branch string, auth *Authorization) error {
+	if auth.repoURLs == nil {
 		return nil // any
 	}
 

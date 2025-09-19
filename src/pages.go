@@ -155,14 +155,14 @@ func getProjectName(w http.ResponseWriter, r *http.Request) (string, error) {
 }
 
 func putPage(w http.ResponseWriter, r *http.Request) error {
-	host := GetHost(r)
-
-	projectName, err := GetProjectName(r)
+	auth, err := AuthorizeRequest(r)
 	if err != nil {
 		return err
 	}
 
-	allowedRepoURLs, err := AuthorizeRequestWithoutWildcard(r)
+	host := GetHost(r)
+
+	projectName, err := GetProjectName(r)
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 
 	// request body contains git repository URL
 	repoURL := string(requestBody)
-	if err := AuthorizeRepository(repoURL, allowedRepoURLs); err != nil {
+	if err := AuthorizeRepository(repoURL, auth); err != nil {
 		return err
 	}
 
@@ -185,7 +185,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 	if customBranch := r.Header.Get("X-Pages-Branch"); customBranch != "" {
 		branch = customBranch
 	}
-	if err := AuthorizeBranch(branch, allowedRepoURLs); err != nil {
+	if err := AuthorizeBranch(branch, auth); err != nil {
 		return err
 	}
 
@@ -219,14 +219,14 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 }
 
 func postPage(w http.ResponseWriter, r *http.Request) error {
-	host := GetHost(r)
-
-	projectName, err := GetProjectName(r)
+	auth, err := AuthorizeRequest(r)
 	if err != nil {
 		return err
 	}
 
-	allowedRepoURLs, err := AuthorizeRequestWithWildcard(r)
+	host := GetHost(r)
+
+	projectName, err := GetProjectName(r)
 	if err != nil {
 		return err
 	}
@@ -283,7 +283,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 	webRoot := makeWebRoot(host, projectName)
 
 	repoURL := event["repository"].(map[string]any)["clone_url"].(string)
-	if err := AuthorizeRepository(repoURL, allowedRepoURLs); err != nil {
+	if err := AuthorizeRepository(repoURL, auth); err != nil {
 		return err
 	}
 
@@ -315,10 +315,12 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Server", "git-pages")
 	err := error(nil)
 	switch r.Method {
+	// REST API
 	case http.MethodGet, http.MethodHead:
 		err = getPage(w, r)
 	case http.MethodPut:
 		err = putPage(w, r)
+	// webhook API
 	case http.MethodPost:
 		err = postPage(w, r)
 	default:
