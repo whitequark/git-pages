@@ -6,11 +6,13 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+
+	"google.golang.org/protobuf/proto"
 )
 
 func readToManifest(root *os.Root) (*Manifest, error) {
 	manifest := Manifest{}
-	manifest.Tree = make(map[string]*Entry)
+	manifest.Files = make(map[string]*Entry)
 	err := fs.WalkDir(root.FS(), ".", func(path string, dirEntry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -18,30 +20,30 @@ func readToManifest(root *os.Root) (*Manifest, error) {
 
 		manifestEntry := Entry{}
 		if dirEntry.IsDir() {
-			manifestEntry.Type = Type_Directory
+			manifestEntry.Type = Type_Directory.Enum()
 		} else if dirEntry.Type().IsRegular() {
 			data, err := root.ReadFile(path)
 			if err != nil {
 				return err
 			}
-			manifestEntry.Type = Type_InlineFile
-			manifestEntry.Size = int64(len(data))
+			manifestEntry.Type = Type_InlineFile.Enum()
+			manifestEntry.Size = proto.Uint64(uint64(len(data)))
 			manifestEntry.Data = data
 		} else if dirEntry.Type().Type() == fs.ModeSymlink {
 			target, err := root.Readlink(path)
 			if err != nil {
 				return err
 			}
-			manifestEntry.Type = Type_Symlink
-			manifestEntry.Size = int64(len(target))
+			manifestEntry.Type = Type_Symlink.Enum()
+			manifestEntry.Size = proto.Uint64(uint64(len(target)))
 			manifestEntry.Data = []byte(target)
 		} else {
-			log.Println("migrate v1: illegal %s/%s", root.Name(), path)
+			log.Printf("migrate v1: illegal %s/%s\n", root.Name(), path)
 		}
 		if path == "." {
 			path = ""
 		}
-		manifest.Tree[path] = &manifestEntry
+		manifest.Files[path] = &manifestEntry
 		return nil
 	})
 	return &manifest, err

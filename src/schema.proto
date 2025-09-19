@@ -1,6 +1,6 @@
-syntax = "proto3";
+edition = "2023";
 
-package main;
+option go_package = "whitequark.org/git-pages/main";
 
 enum Type {
 	// Invalid entry.
@@ -17,13 +17,13 @@ enum Type {
 
 message Entry {
     Type type = 1;
-    int64 size = 2;
+    uint64 size = 2;
     bytes data = 3;
 }
 
 message Manifest {
-    string repoURL = 1;
+    string repo_url = 1;
     string branch = 2;
     string commit = 3;
-    map<string, Entry> tree = 4;;
+    map<string, Entry> files = 4;
 }

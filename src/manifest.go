@@ -1,3 +1,5 @@
+//go:generate protoc --go_out=. --go_opt=paths=source_relative schema.proto
+
 package main
 
 import (
@@ -13,11 +15,11 @@ import (
 )
 
 func IsManifestEmpty(manifest *Manifest) bool {
-	if len(manifest.Tree) > 1 {
+	if len(manifest.Files) > 1 {
 		return false
 	}
-	for name, entry := range manifest.Tree {
-		if name == "" && entry.Type == Type_Directory {
+	for name, entry := range manifest.Files {
+		if name == "" && entry.GetType() == Type_Directory {
 			return true
 		}
 	}
@@ -26,15 +28,15 @@ func IsManifestEmpty(manifest *Manifest) bool {
 
 // Returns `true` if `left` and `right` contain the same files with the same types and data.
 func CompareManifest(left *Manifest, right *Manifest) bool {
-	if len(left.Tree) != len(right.Tree) {
+	if len(left.Files) != len(right.Files) {
 		return false
 	}
-	for name, leftEntry := range left.Tree {
-		rightEntry := right.Tree[name]
+	for name, leftEntry := range left.Files {
+		rightEntry := right.Files[name]
 		if rightEntry == nil {
 			return false
 		}
-		if leftEntry.Type != rightEntry.Type {
+		if leftEntry.GetType() != rightEntry.GetType() {
 			return false
 		}
 		if bytes.Compare(leftEntry.Data, rightEntry.Data) != 0 {
@@ -69,8 +71,8 @@ again:
 		parts := strings.Split(inPath, "/")
 		for i := 1; i <= len(parts); i++ {
 			linkPath := path.Join(parts[:i]...)
-			entry := manifest.Tree[linkPath]
-			if entry != nil && entry.Type == Type_Symlink {
+			entry := manifest.Files[linkPath]
+			if entry != nil && entry.GetType() == Type_Symlink {
 				inPath = path.Join(
 					path.Dir(linkPath),
 					string(entry.Data),
@@ -88,24 +90,24 @@ again:
 	}
 }
 
-const ExternalSizeMin int64 = 256
+const ExternalSizeMin uint64 = 256
 
 func ExternalizeFiles(manifest *Manifest) *Manifest {
 	newManifest := Manifest{
-		RepoURL: manifest.RepoURL,
+		RepoUrl: manifest.RepoUrl,
 		Branch:  manifest.Branch,
 		Commit:  manifest.Commit,
-		Tree:    make(map[string]*Entry),
+		Files:   make(map[string]*Entry),
 	}
-	for name, entry := range manifest.Tree {
-		if entry.Type == Type_InlineFile && entry.Size > ExternalSizeMin {
-			newManifest.Tree[name] = &Entry{
-				Type: Type_ExternalFile,
+	for name, entry := range manifest.Files {
+		if entry.GetType() == Type_InlineFile && entry.GetSize() > ExternalSizeMin {
+			newManifest.Files[name] = &Entry{
+				Type: Type_ExternalFile.Enum(),
 				Size: entry.Size,
 				Data: fmt.Appendf(nil, "sha256-%x", sha256.Sum256(entry.Data)),
 			}
 		} else {
-			newManifest.Tree[name] = entry
+			newManifest.Files[name] = entry
 		}
 	}
 	return &newManifest
@@ -127,11 +129,11 @@ func StoreManifest(name string, manifest *Manifest) (*Manifest, error) {
 	}
 
 	wg := sync.WaitGroup{}
-	ch := make(chan error, len(extManifest.Tree))
-	for name, entry := range extManifest.Tree {
-		if entry.Type == Type_ExternalFile {
+	ch := make(chan error, len(extManifest.Files))
+	for name, entry := range extManifest.Files {
+		if entry.GetType() == Type_ExternalFile {
 			wg.Go(func() {
-				err := backend.PutBlob(string(entry.Data), manifest.Tree[name].Data)
+				err := backend.PutBlob(string(entry.Data), manifest.Files[name].Data)
 				if err != nil {
 					ch <- fmt.Errorf("put blob %s: %w", name, err)
 				}

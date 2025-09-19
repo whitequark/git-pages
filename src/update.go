@@ -77,7 +77,7 @@ func Update(
 		case UpdateNoChange:
 			status = "unchanged"
 		}
-		log.Printf("update ok: %s %s %s", webRoot, newManifest.Commit, status)
+		log.Printf("update ok: %s %s %s", webRoot, *newManifest.Commit, status)
 	} else {
 		log.Printf("update err: %s %s", webRoot, err)
 	}

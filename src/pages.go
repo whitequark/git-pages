@@ -64,17 +64,17 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			fmt.Fprintln(w, err)
 			return err
 		}
-		entry = manifest.Tree[entryPath]
-		if entry == nil || entry.Type == Type_Invalid {
+		entry = manifest.Files[entryPath]
+		if entry == nil || entry.GetType() == Type_Invalid {
 			is404 = true
 			if entryPath == notFoundPage {
 				break
 			}
 			entryPath = notFoundPage
 			continue
-		} else if entry.Type == Type_InlineFile {
+		} else if entry.GetType() == Type_InlineFile {
 			reader = bytes.NewReader(entry.Data)
-		} else if entry.Type == Type_ExternalFile {
+		} else if entry.GetType() == Type_ExternalFile {
 			etag := fmt.Sprintf(`"%s"`, entry.Data)
 			if r.Header.Get("If-None-Match") == etag {
 				w.WriteHeader(http.StatusNotModified)
@@ -88,7 +88,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				}
 				w.Header().Set("ETag", etag)
 			}
-		} else if entry.Type == Type_Directory {
+		} else if entry.GetType() == Type_Directory {
 			if strings.HasSuffix(r.URL.Path, "/") {
 				entryPath = path.Join(entryPath, "index.html")
 				continue
@@ -101,7 +101,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				fmt.Fprintf(w, "see %s\n", newPath)
 				return nil
 			}
-		} else if entry.Type == Type_Symlink {
+		} else if entry.GetType() == Type_Symlink {
 			return fmt.Errorf("unexpected symlink")
 		}
 		break
@@ -207,7 +207,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Add("X-Pages-Outcome", "deleted")
 	}
 	if result.manifest != nil {
-		fmt.Fprintln(w, result.manifest.Commit)
+		fmt.Fprintln(w, *result.manifest.Commit)
 	} else if result.err != nil {
 		fmt.Fprintln(w, result.err)
 	} else {

@@ -13,6 +13,7 @@ import (
 	"github.com/go-git/go-git/v6/plumbing/filemode"
 	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/go-git/go-git/v6/storage/filesystem"
+	"google.golang.org/protobuf/proto"
 )
 
 const largeObjectThreshold int64 = 1048576
@@ -61,12 +62,16 @@ func FetchRepository(ctx context.Context, repoURL string, branch string) (*Manif
 	defer walker.Close()
 
 	manifest := Manifest{
-		RepoURL: repoURL,
-		Branch:  branch,
-		Commit:  ref.Hash().String(),
-		Tree:    make(map[string]*Entry),
+		RepoUrl: proto.String(repoURL),
+		Branch:  proto.String(branch),
+		Commit:  proto.String(ref.Hash().String()),
+		Files:   make(map[string]*Entry),
 	}
-	manifest.Tree[""] = &Entry{Type: Type_Directory, Size: 0, Data: []byte{}}
+	manifest.Files[""] = &Entry{
+		Type: Type_Directory.Enum(),
+		Size: proto.Uint64(0),
+		Data: []byte{},
+	}
 	for {
 		name, entry, err := walker.Next()
 		if err == io.EOF {
@@ -92,18 +97,18 @@ func FetchRepository(ctx context.Context, repoURL string, branch string) (*Manif
 				}
 
 				if entry.Mode == filemode.Symlink {
-					manifestEntry.Type = Type_Symlink
+					manifestEntry.Type = Type_Symlink.Enum()
 				} else {
-					manifestEntry.Type = Type_InlineFile
+					manifestEntry.Type = Type_InlineFile.Enum()
 				}
-				manifestEntry.Size = blob.Size
+				manifestEntry.Size = proto.Uint64(uint64(blob.Size))
 				manifestEntry.Data = data
 			} else if entry.Mode == filemode.Dir {
-				manifestEntry.Type = Type_Directory
+				manifestEntry.Type = Type_Directory.Enum()
 			} else {
-				manifestEntry.Type = Type_Invalid
+				manifestEntry.Type = Type_Invalid.Enum()
 			}
-			manifest.Tree[name] = &manifestEntry
+			manifest.Files[name] = &manifestEntry
 		}
 	}
 	return &manifest, nil
