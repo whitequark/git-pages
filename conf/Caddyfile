@@ -3,7 +3,8 @@
 
 	log {
 		output stderr
-		exclude admin.api
+		level WARN
+		exclude http.auto_https
 		format console {
 			time_key ""
 		}

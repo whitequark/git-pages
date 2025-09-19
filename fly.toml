@@ -18,7 +18,6 @@ memory = 512
 
 [env]
 AUTOMEMLIMIT = "0.25"
-CADDY_ADMIN = ":2019"
 
 [[files]]
 guest_path = "/app/config.toml"
