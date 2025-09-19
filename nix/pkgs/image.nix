@@ -1,69 +1,63 @@
 {
-  buildEnv,
   caddy,
   callPackage,
   dockerTools,
   git-pages,
+  pkgsStatic,
   runtimeShell,
   self,
+  upx,
   writeTextDir,
   ...
 }:
 
 let
-  caddy' = caddy.withPlugins {
-    plugins = [
-      "github.com/ss098/certmagic-s3@v0.0.0-20250808023250-9788b7231c87"
-    ];
+  caddy' =
+    (caddy.withPlugins {
+      plugins = [
+        "github.com/ss098/certmagic-s3@v0.0.0-20250808023250-9788b7231c87"
+      ];
 
-    hash = "sha256-jZer6cBnE2Vo5/kMG+1vZBwWY8P/V1Lb33TA3Suz4pI=";
-  };
+      hash = "sha256-jZer6cBnE2Vo5/kMG+1vZBwWY8P/V1Lb33TA3Suz4pI=";
+    }).overrideAttrs
+      (oldAttrs: {
+        buildInputs = with pkgsStatic; [
+          musl
+        ];
+
+        ldflags = oldAttrs.ldflags ++ [
+          "-linkmode external"
+          "-extldflags -static"
+          "-s -w"
+        ];
+      });
 
   supervisord = callPackage ./supervisord.nix { };
-
-  supervisord-config = writeTextDir "app/supervisord.conf" ''
-    [program-default]
-    stderr_logfile = /dev/stderr
-    stopsignal = TERM
-    autorestart = true
-
-    [program:pages]
-    command = /bin/git-pages
-
-    [program:caddy]
-    command = /bin/caddy run
-    depends_on = pages
-  '';
 in
 dockerTools.buildImage {
   name = "git-pages";
   tag = "latest";
 
-  copyToRoot = buildEnv {
-    name = "image-root";
-
-    paths = [
-      caddy'
-      git-pages
-      supervisord
-      supervisord-config
-
-      dockerTools.caCertificates
-    ];
-
-    pathsToLink = [
-      "/app"
-      "/bin"
-      "/etc"
-    ];
-  };
+  copyToRoot = with dockerTools; [
+    caCertificates
+  ];
 
   runAsRoot = ''
     #!${runtimeShell}
 
-    cp ${self}/Caddyfile /app/Caddyfile
+    mkdir -p /app/data
+    mkdir /bin
+
     cp ${self}/config.toml.example /app/config.toml
-    mkdir /app/data
+    cp ${self}/conf/Caddyfile /app/Caddyfile
+    cp ${self}/conf/supervisord.conf /app/supervisord.conf
+
+    cp ${caddy'}/bin/caddy /bin/caddy
+    cp ${git-pages}/bin/git-pages /bin/git-pages
+    cp ${supervisord}/bin/supervisord /bin/supervisord
+
+    chmod +w /bin/*
+    ${upx}/bin/upx /bin/*
   '';
 
   config = {

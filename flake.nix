@@ -32,6 +32,16 @@
             ];
           };
 
+          buildInputs = with pkgs; [
+            pkgsStatic.musl
+          ];
+
+          ldflags = [
+            "-linkmode external"
+            "-extldflags -static"
+            "-s -w"
+          ];
+
           vendorHash = "sha256-f2+NDRrgqlyRn7kiBYbuUhDsQPF3Yf/3v24lqBUja6s=";
 
           fixupPhase = ''

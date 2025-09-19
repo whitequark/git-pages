@@ -29,6 +29,7 @@ buildGoModule rec {
   ldflags = [
     "-linkmode external"
     "-extldflags -static"
+    "-s -w"
   ];
 
   subPackages = ".";
