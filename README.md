@@ -36,12 +36,13 @@ To get inspiration for deployment strategies, take a look at the included [Docke
 Features
 --------
 
-* In response to a `GET` or `HEAD` request, selects an appropriate site and serves files from it. A site is a combination of the hostname and (optionally) the project name. The site is selected as follows:
+* In response to a `GET` or `HEAD` request, the server selects an appropriate site and responds with files from it. A site is a combination of the hostname and (optionally) the project name. The site is selected as follows:
     - If the URL matches `https://<hostname>/<project-name>/...` and a site was published at `<project-name>`, this project-specific site is selected.
     - If the URL matches `https://<hostname>/...` and the previous rule did not apply, the index site is selected.
-* In response to a `PUT` or `POST` request, the server performs a shallow clone of the indicated git repository into a temporary location, checks out the `HEAD` commit, and atomically updates the content being served. The URL of the request must be the root URL of the site that is being published.
+* In response to a `PUT` or `POST` request, the server performs a shallow clone of the indicated git repository into a temporary location, checks out the `HEAD` commit, and atomically updates a site. The URL of the request must be the root URL of the site that is being published.
     - The `PUT` method requires an `application/x-www-form-urlencoded` body. The body contains the repository URL to be cloned.
     - The `POST` method requires an `application/json` body containing a Forgejo/Gitea/Gogs/GitHub webhook event payload. Requests where the `ref` key contains anything other than `refs/heads/pages` are ignored. The `repository.clone_url` key contains the repository URL to be cloned.
+* In response to a `DELETE` request, the server unpublishes a site. The URL of the request must be the root URL of the site that is being unpublished. Site data remains stored for an indeterminate period of time, but becomes completely inaccessible.
 * All updates to site content are atomic (subject to consistency guarantees of the storage backend). That is, there is an instantaneous moment during an update before which the server will return the old content and after which it will return the new content.
 
 
@@ -51,7 +52,7 @@ Authorization
 DNS is used for authorization of content updates, either via TXT records or by pattern matching. The authorization flow proceeds sequentially in the following order, with the first of multiple applicable rule taking precedence:
 
 1. **Development Mode:** If the environment variable `INSECURE` is set to the value `very`, the request is authorized to update from any clone URL.
-2. **DNS Challenge:** If the method is `PUT` or `POST`, and a well-formed `Authorization:` header is provided containing a `<token>`, and a TXT record lookup at `_git-pages-challenge.<host>` returns a record whose concatenated value equals `SHA256("<host> <token>")`, the request is authorized to update from any clone URL.
+2. **DNS Challenge:** If the method is `PUT`, `DELETE`, or `POST`, and a well-formed `Authorization:` header is provided containing a `<token>`, and a TXT record lookup at `_git-pages-challenge.<host>` returns a record whose concatenated value equals `SHA256("<host> <token>")`, the request is authorized to update from any clone URL.
     - **<code>Pages</code> scheme:** Request includes an `Authorization: Pages <token>` header.
     - **<code>Basic</code> scheme:** Request includes an `Authorization: Basic <basic>` header, where `<basic>` is equal to `Base64("Pages:<token>")`. (Useful for non-Forgejo forges.)
 3. **DNS Allowlist:** If the method is `PUT` or `POST`, and a TXT record lookup at `_git-pages-repository.<host>` returns a set of well-formed absolute URLs, the request is authorized to update from clone URLs in the set.

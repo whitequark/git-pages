@@ -218,6 +218,31 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+func deletePage(w http.ResponseWriter, r *http.Request) error {
+	_, err := AuthorizeRequest(r)
+	if err != nil {
+		return err
+	}
+
+	host := GetHost(r)
+
+	projectName, err := GetProjectName(r)
+	if err != nil {
+		return err
+	}
+
+	err = backend.DeleteManifest(makeWebRoot(host, projectName))
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+	if err != nil {
+		fmt.Fprintln(w, err)
+	}
+	return err
+}
+
 func postPage(w http.ResponseWriter, r *http.Request) error {
 	auth, err := AuthorizeRequest(r)
 	if err != nil {
@@ -320,6 +345,8 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 		err = getPage(w, r)
 	case http.MethodPut:
 		err = putPage(w, r)
+	case http.MethodDelete:
+		err = deletePage(w, r)
 	// webhook API
 	case http.MethodPost:
 		err = postPage(w, r)

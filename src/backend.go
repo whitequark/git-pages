@@ -218,7 +218,12 @@ func (fs *FSBackend) CommitManifest(name string, manifest *Manifest) error {
 }
 
 func (fs *FSBackend) DeleteManifest(name string) error {
-	return fs.siteRoot.Remove(name)
+	err := fs.siteRoot.Remove(name)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	} else {
+		return err
+	}
 }
 
 func (fs *FSBackend) CheckDomain(domain string) (bool, error) {
