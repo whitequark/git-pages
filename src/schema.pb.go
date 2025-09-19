@@ -147,6 +147,7 @@ type Manifest struct {
 	Branch        *string                `protobuf:"bytes,2,opt,name=branch" json:"branch,omitempty"`
 	Commit        *string                `protobuf:"bytes,3,opt,name=commit" json:"commit,omitempty"`
 	Contents      map[string]*Entry      `protobuf:"bytes,4,rep,name=contents" json:"contents,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	TotalSize     *uint32                `protobuf:"varint,5,opt,name=total_size,json=totalSize" json:"total_size,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -209,6 +210,13 @@ func (x *Manifest) GetContents() map[string]*Entry {
 	return nil
 }
 
+func (x *Manifest) GetTotalSize() uint32 {
+	if x != nil && x.TotalSize != nil {
+		return *x.TotalSize
+	}
+	return 0
+}
+
 var File_schema_proto protoreflect.FileDescriptor
 
 const file_schema_proto_rawDesc = "" +
@@ -217,12 +225,14 @@ const file_schema_proto_rawDesc = "" +
 	"\x05Entry\x12\x19\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x05.TypeR\x04type\x12\x12\n" +
 	"\x04size\x18\x02 \x01(\rR\x04size\x12\x12\n" +
-	"\x04data\x18\x03 \x01(\fR\x04data\"\xcf\x01\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\"\xee\x01\n" +
 	"\bManifest\x12\x19\n" +
 	"\brepo_url\x18\x01 \x01(\tR\arepoUrl\x12\x16\n" +
 	"\x06branch\x18\x02 \x01(\tR\x06branch\x12\x16\n" +
 	"\x06commit\x18\x03 \x01(\tR\x06commit\x123\n" +
-	"\bcontents\x18\x04 \x03(\v2\x17.Manifest.ContentsEntryR\bcontents\x1aC\n" +
+	"\bcontents\x18\x04 \x03(\v2\x17.Manifest.ContentsEntryR\bcontents\x12\x1d\n" +
+	"\n" +
+	"total_size\x18\x05 \x01(\rR\ttotalSize\x1aC\n" +
 	"\rContentsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x1c\n" +
 	"\x05value\x18\x02 \x01(\v2\x06.EntryR\x05value:\x028\x01*Q\n" +

@@ -111,6 +111,7 @@ func ExternalizeFiles(manifest *Manifest) *Manifest {
 		Commit:   manifest.Commit,
 		Contents: make(map[string]*Entry),
 	}
+	var totalSize uint32
 	for name, entry := range manifest.Contents {
 		if entry.GetType() == Type_InlineFile && entry.GetSize() > ExternalSizeMin {
 			newManifest.Contents[name] = &Entry{
@@ -121,7 +122,9 @@ func ExternalizeFiles(manifest *Manifest) *Manifest {
 		} else {
 			newManifest.Contents[name] = entry
 		}
+		totalSize += entry.GetSize()
 	}
+	newManifest.TotalSize = proto.Uint32(totalSize)
 	return &newManifest
 }
 
