@@ -31,6 +31,10 @@ func IsUnauthorized(err error) bool {
 	return false
 }
 
+func InsecureMode() bool {
+	return os.Getenv("INSECURE") == "very"
+}
+
 func GetHost(r *http.Request) string {
 	// FIXME: handle IDNA
 	host, _, err := net.SplitHostPort(r.Host)
@@ -180,7 +184,7 @@ func authorizeWildcardMatch(r *http.Request) ([]string, error) {
 func authorizeRequest(r *http.Request, allowWildcard bool) ([]string, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
-	if os.Getenv("INSECURE") == "very" {
+	if InsecureMode() {
 		log.Println("auth: INSECURE mode: allow any")
 		return nil, nil // for testing only
 	}

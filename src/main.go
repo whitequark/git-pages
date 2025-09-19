@@ -100,7 +100,11 @@ func main() {
 		memlimit.WithRatio(0.9),
 	)
 
-	log.Println("ready")
+	if InsecureMode() {
+		log.Println("ready (INSECURE)")
+	} else {
+		log.Println("ready")
+	}
 
 	go serveHandler("pages", config.Listen.Pages, ServePages)
 
