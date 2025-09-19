@@ -26,7 +26,7 @@ func makeWebRoot(host string, projectName string) string {
 
 func getPage(w http.ResponseWriter, r *http.Request) error {
 	var err error
-	var urlPath string
+	var sitePath string
 	var manifest *Manifest
 
 	host := GetHost(r)
@@ -35,11 +35,11 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Max-Age", "86400")
 
-	urlPath, _ = strings.CutPrefix(r.URL.Path, "/")
-	if projectName, projectPath, found := strings.Cut(urlPath, "/"); found {
+	sitePath, _ = strings.CutPrefix(r.URL.Path, "/")
+	if projectName, projectPath, found := strings.Cut(sitePath, "/"); found {
 		projectManifest, err := backend.GetManifest(makeWebRoot(host, projectName))
 		if err == nil {
-			urlPath, manifest = projectPath, projectManifest
+			sitePath, manifest = projectPath, projectManifest
 		}
 	}
 	if manifest == nil {
@@ -51,7 +51,33 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	entryPath := urlPath
+	if sitePath == ".git-pages" {
+		// metadata directory name shouldn't be served even if present in site manifest
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, "not found\n")
+		return nil
+	}
+	if metadataPath, found := strings.CutPrefix(sitePath, ".git-pages/"); found {
+		// metadata requests require authorization to avoid making pushes from private
+		// repositories enumerable
+		_, err := AuthorizeMetadata(r)
+		if err != nil {
+			return err
+		}
+
+		switch metadataPath {
+		case "manifest.json":
+			w.Header().Add("Content-Type", "application/json; charset=utf-8")
+			w.WriteHeader(http.StatusOK)
+			w.Write(ManifestDebugJSON(manifest))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprintf(w, "not found\n")
+		}
+		return nil
+	}
+
+	entryPath := sitePath
 	entry := (*Entry)(nil)
 	is404 := false
 	reader := io.ReadSeeker(nil)
@@ -129,7 +155,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Cache-Control", "public, max-age=0, must-revalidate")
 
 		// http.ServeContent handles content type and caching
-		http.ServeContent(w, r, urlPath, mtime, reader)
+		http.ServeContent(w, r, sitePath, mtime, reader)
 	}
 	return nil
 }
@@ -155,7 +181,7 @@ func getProjectName(w http.ResponseWriter, r *http.Request) (string, error) {
 }
 
 func putPage(w http.ResponseWriter, r *http.Request) error {
-	auth, err := AuthorizeRequest(r)
+	auth, err := AuthorizeUpdate(r)
 	if err != nil {
 		return err
 	}
@@ -217,7 +243,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 }
 
 func deletePage(w http.ResponseWriter, r *http.Request) error {
-	_, err := AuthorizeRequest(r)
+	_, err := AuthorizeUpdate(r)
 	if err != nil {
 		return err
 	}
@@ -242,7 +268,7 @@ func deletePage(w http.ResponseWriter, r *http.Request) error {
 }
 
 func postPage(w http.ResponseWriter, r *http.Request) error {
-	auth, err := AuthorizeRequest(r)
+	auth, err := AuthorizeUpdate(r)
 	if err != nil {
 		return err
 	}

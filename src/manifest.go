@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -58,6 +59,17 @@ func DecodeManifest(data []byte) (*Manifest, error) {
 	manifest := Manifest{}
 	err := proto.Unmarshal(data, &manifest)
 	return &manifest, err
+}
+
+func ManifestDebugJSON(manifest *Manifest) []byte {
+	result, err := protojson.MarshalOptions{
+		Multiline:         true,
+		EmitDefaultValues: true,
+	}.Marshal(manifest)
+	if err != nil {
+		panic(err)
+	}
+	return result
 }
 
 const maxSymlinkLevels int = 128

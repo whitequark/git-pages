@@ -48,10 +48,12 @@ func GetHost(r *http.Request) string {
 func GetProjectName(r *http.Request) (string, error) {
 	// path must be either `/` or `/foo/` (`/foo` is accepted as an alias)
 	path := strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, "/"), "/")
-	if strings.HasPrefix(path, ".") {
-		return "", AuthError{http.StatusBadRequest, "directory name %s is reserved"}
+	if path == ".index" || strings.HasPrefix(path, ".index/") {
+		return "", AuthError{http.StatusBadRequest,
+			fmt.Sprintf("directory name %q is reserved", ".index")}
 	} else if strings.Contains(path, "/") {
-		return "", AuthError{http.StatusBadRequest, "directories nested too deep"}
+		return "", AuthError{http.StatusBadRequest,
+			"directories nested too deep"}
 	}
 
 	if path == "" {
@@ -72,16 +74,19 @@ func authorizeDNSChallenge(r *http.Request) (*Authorization, error) {
 
 	authorization := r.Header.Get("Authorization")
 	if authorization == "" {
-		return nil, AuthError{http.StatusUnauthorized, "missing Authorization header"}
+		return nil, AuthError{http.StatusUnauthorized,
+			"missing Authorization header"}
 	}
 
 	scheme, param, success := strings.Cut(authorization, " ")
 	if !success {
-		return nil, AuthError{http.StatusBadRequest, "malformed Authorization header"}
+		return nil, AuthError{http.StatusBadRequest,
+			"malformed Authorization header"}
 	}
 
 	if scheme != "Pages" && scheme != "Basic" {
-		return nil, AuthError{http.StatusBadRequest, "unknown Authorization scheme"}
+		return nil, AuthError{http.StatusBadRequest,
+			"unknown Authorization scheme"}
 	}
 
 	// services like GitHub and Gogs cannot send a custom Authorization: header, but supplying
@@ -89,16 +94,19 @@ func authorizeDNSChallenge(r *http.Request) (*Authorization, error) {
 	if scheme == "Basic" {
 		basicParam, err := base64.StdEncoding.DecodeString(param)
 		if err != nil {
-			return nil, AuthError{http.StatusBadRequest, "malformed Authorization: Basic header"}
+			return nil, AuthError{http.StatusBadRequest,
+				"malformed Authorization: Basic header"}
 		}
 
 		username, password, found := strings.Cut(string(basicParam), ":")
 		if !found {
-			return nil, AuthError{http.StatusBadRequest, "malformed Authorization: Basic parameter"}
+			return nil, AuthError{http.StatusBadRequest,
+				"malformed Authorization: Basic parameter"}
 		}
 
 		if username != "Pages" {
-			return nil, AuthError{http.StatusUnauthorized, "unexpected Authorization: Basic username"}
+			return nil, AuthError{http.StatusUnauthorized,
+				"unexpected Authorization: Basic username"}
 		}
 
 		param = password
@@ -147,7 +155,21 @@ func authorizeDNSAllowlist(r *http.Request) (*Authorization, error) {
 	return &Authorization{repoURLs}, err
 }
 
-func authorizeWildcardMatch(r *http.Request) (*Authorization, error) {
+func authorizeWildcardMatchHost(r *http.Request) (*Authorization, error) {
+	host := GetHost(r)
+	hostParts := strings.Split(host, ".")
+
+	if slices.Equal(hostParts[1:], wildcardPattern.Domain) {
+		return &Authorization{}, nil
+	} else {
+		return nil, AuthError{
+			http.StatusUnauthorized,
+			fmt.Sprintf("domain %s does not match wildcard *.%s", host, config.Wildcard.Domain),
+		}
+	}
+}
+
+func authorizeWildcardMatchSite(r *http.Request) (*Authorization, error) {
 	host := GetHost(r)
 	hostParts := strings.Split(host, ".")
 
@@ -183,10 +205,42 @@ func authorizeWildcardMatch(r *http.Request) (*Authorization, error) {
 	}
 }
 
+func AuthorizeMetadata(r *http.Request) (*Authorization, error) {
+	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
+
+	if InsecureMode() {
+		log.Println("auth: INSECURE mode")
+		return &Authorization{}, nil // for testing only
+	}
+
+	auth, err := authorizeDNSChallenge(r)
+	if err != nil && IsUnauthorized(err) {
+		causes = append(causes, err)
+	} else if err != nil { // bad request
+		return nil, err
+	} else {
+		log.Println("auth: DNS challenge")
+		return auth, nil
+	}
+
+	auth, err = authorizeWildcardMatchHost(r)
+	if err != nil && IsUnauthorized(err) {
+		causes = append(causes, err)
+	} else if err != nil { // bad request
+		return nil, err
+	} else {
+		log.Printf("auth: wildcard *.%s\n",
+			config.Wildcard.Domain)
+		return auth, nil
+	}
+
+	return nil, errors.Join(causes...)
+}
+
 // Returns `repoURLs, err` where if `err == nil` then the request is authorized to clone from
 // any repository URL included in `repoURLs` (by case-insensitive comparison), or any URL at all
 // if `repoURLs == nil`.
-func AuthorizeRequest(r *http.Request) (*Authorization, error) {
+func AuthorizeUpdate(r *http.Request) (*Authorization, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
 	if InsecureMode() {
@@ -220,7 +274,7 @@ func AuthorizeRequest(r *http.Request) (*Authorization, error) {
 
 	// Wildcard match is only available for webhooks, not the REST API.
 	if r.Method == http.MethodPost {
-		auth, err = authorizeWildcardMatch(r)
+		auth, err = authorizeWildcardMatchSite(r)
 		if err != nil && IsUnauthorized(err) {
 			causes = append(causes, err)
 		} else if err != nil { // bad request
