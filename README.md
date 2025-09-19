@@ -39,6 +39,8 @@ Features
 * In response to a `GET` or `HEAD` request, the server selects an appropriate site and responds with files from it. A site is a combination of the hostname and (optionally) the project name. The site is selected as follows:
     - If the URL matches `https://<hostname>/<project-name>/...` and a site was published at `<project-name>`, this project-specific site is selected.
     - If the URL matches `https://<hostname>/...` and the previous rule did not apply, the index site is selected.
+    - Site paths starting with `.git-pages/...` are reserved.
+        - The `.git-pages/manifest.json` path returns a [ProtoJSON](https://protobuf.dev/programming-guides/json/) representation of the deployed site manifest.
 * In response to a `PUT` or `POST` request, the server performs a shallow clone of the indicated git repository into a temporary location, checks out the relevant branch, and atomically updates a site. The URL of the request must be the root URL of the site that is being published.
     - The `PUT` method requires an `application/x-www-form-urlencoded` body. The body contains the repository URL to be cloned. The `X-Pages-Branch` header contains the branch to be checked out; the `pages` branch is used if the header is absent.s
     - The `POST` method requires an `application/json` body containing a Forgejo/Gitea/Gogs/GitHub webhook event payload. Requests where the `ref` key contains anything other than `refs/heads/pages` are ignored, and only the `pages` branch is used. The `repository.clone_url` key contains the repository URL to be cloned.
@@ -50,17 +52,26 @@ Features
 Authorization
 -------------
 
-DNS is used for authorization of content updates, either via TXT records or by pattern matching. The authorization flow proceeds sequentially in the following order, with the first of multiple applicable rule taking precedence:
+DNS is used for authorization, either via TXT records or by pattern matching.
 
-1. **Development Mode:** If the environment variable `INSECURE` is set to the value `very`, the request is authorized to update from any clone URL.
-2. **DNS Challenge:** If the method is `PUT`, `DELETE`, or `POST`, and a well-formed `Authorization:` header is provided containing a `<token>`, and a TXT record lookup at `_git-pages-challenge.<host>` returns a record whose concatenated value equals `SHA256("<host> <token>")`, the request is authorized to update from any clone URL.
+The authorization flow for content updates (`PUT`, `DELETE`, `POST` requests) proceeds sequentially in the following order, with the first of multiple applicable rule taking precedence:
+
+1. **Development Mode:** If the environment variable `INSECURE` is set to the value `very`, the request is authorized.
+2. **DNS Challenge:** If the method is `PUT`, `DELETE`, `POST`, and a well-formed `Authorization:` header is provided containing a `<token>`, and a TXT record lookup at `_git-pages-challenge.<host>` returns a record whose concatenated value equals `SHA256("<host> <token>")`, the request is authorized.
     - **<code>Pages</code> scheme:** Request includes an `Authorization: Pages <token>` header.
     - **<code>Basic</code> scheme:** Request includes an `Authorization: Basic <basic>` header, where `<basic>` is equal to `Base64("Pages:<token>")`. (Useful for non-Forgejo forges.)
-3. **DNS Allowlist:** If the method is `PUT` or `POST`, and a TXT record lookup at `_git-pages-repository.<host>` returns a set of well-formed absolute URLs, the request is authorized to update from clone URLs in the set.
-4. **Wildcard Match:** If the method is `POST`, and a `[wildcard]` configuration section is present, and the suffix of a hostname (compared label-wise) is equal to `[wildcard].domain`, the request is authorized to update from a *matching* clone URL.
+3. **DNS Allowlist:** If the method is `PUT` or `POST`, and a TXT record lookup at `_git-pages-repository.<host>` returns a set of well-formed absolute URLs, and the requested clone URLs is contained in this set of URLs, the request is authorized.
+4. **Wildcard Match (Site):** If the method is `POST`, and a `[wildcard]` configuration section is present, and the suffix of a hostname (compared label-wise) is equal to `[wildcard].domain`, and the requested clone URL is a *matching* clone URL, the request is authorized.
     - **Index repository:** If the request URL is `scheme://<user>.<host>/`, a *matching* clone URL is computed by templating `[wildcard.clone-url]` with `<user>` and `<project>`, where `<project>` is computed by templating each element of `[wildcard].index-repos` with `<user>`.
     - **Project repository:** If the request URL is `scheme://<user>.<host>/<project>/`, a *matching* clone URL is computed by templating `[wildcard.clone-url]` with `<user>` and `<project>`.
 5. **Default Deny:** Otherwise, the request is not authorized.
+
+The authorization flow for metadata retrieval (`GET` requests with site paths starting with `.git-pages/`) in the following order, with the first of multiple applicable rule taking precedence:
+
+1. **Development Mode:** Same as for content updates.
+2. **DNS Challenge:** Same as for content updates.
+3. **Wildcard Match (Domain):** If a `[wildcard]` configuration section is present, and the suffix of a hostname (compared label-wise) is equal to `[wildcard].domain`, the request is authorized.
+4. **Default Deny:** Otherwise, the request is not authorized.
 
 
 Architecture (v2)
