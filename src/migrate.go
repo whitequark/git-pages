@@ -12,7 +12,7 @@ import (
 
 func readToManifest(root *os.Root) (*Manifest, error) {
 	manifest := Manifest{}
-	manifest.Files = make(map[string]*Entry)
+	manifest.Contents = make(map[string]*Entry)
 	err := fs.WalkDir(root.FS(), ".", func(path string, dirEntry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -27,7 +27,7 @@ func readToManifest(root *os.Root) (*Manifest, error) {
 				return err
 			}
 			manifestEntry.Type = Type_InlineFile.Enum()
-			manifestEntry.Size = proto.Uint64(uint64(len(data)))
+			manifestEntry.Size = proto.Uint32(uint32(len(data)))
 			manifestEntry.Data = data
 		} else if dirEntry.Type().Type() == fs.ModeSymlink {
 			target, err := root.Readlink(path)
@@ -35,7 +35,7 @@ func readToManifest(root *os.Root) (*Manifest, error) {
 				return err
 			}
 			manifestEntry.Type = Type_Symlink.Enum()
-			manifestEntry.Size = proto.Uint64(uint64(len(target)))
+			manifestEntry.Size = proto.Uint32(uint32(len(target)))
 			manifestEntry.Data = []byte(target)
 		} else {
 			log.Printf("migrate v1: illegal %s/%s\n", root.Name(), path)
@@ -43,7 +43,7 @@ func readToManifest(root *os.Root) (*Manifest, error) {
 		if path == "." {
 			path = ""
 		}
-		manifest.Files[path] = &manifestEntry
+		manifest.Contents[path] = &manifestEntry
 		return nil
 	})
 	return &manifest, err

@@ -17,7 +17,7 @@ enum Type {
 
 message Entry {
     Type type = 1;
-    uint64 size = 2;
+    uint32 size = 2;
     bytes data = 3;
 }
 
@@ -25,5 +25,5 @@ message Manifest {
     string repo_url = 1;
     string branch = 2;
     string commit = 3;
-    map<string, Entry> files = 4;
+    map<string, Entry> contents = 4;
 }

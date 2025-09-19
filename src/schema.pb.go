@@ -84,7 +84,7 @@ func (Type) EnumDescriptor() ([]byte, []int) {
 type Entry struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Type          *Type                  `protobuf:"varint,1,opt,name=type,enum=Type" json:"type,omitempty"`
-	Size          *uint64                `protobuf:"varint,2,opt,name=size" json:"size,omitempty"`
+	Size          *uint32                `protobuf:"varint,2,opt,name=size" json:"size,omitempty"`
 	Data          []byte                 `protobuf:"bytes,3,opt,name=data" json:"data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -127,7 +127,7 @@ func (x *Entry) GetType() Type {
 	return Type_Invalid
 }
 
-func (x *Entry) GetSize() uint64 {
+func (x *Entry) GetSize() uint32 {
 	if x != nil && x.Size != nil {
 		return *x.Size
 	}
@@ -146,7 +146,7 @@ type Manifest struct {
 	RepoUrl       *string                `protobuf:"bytes,1,opt,name=repo_url,json=repoUrl" json:"repo_url,omitempty"`
 	Branch        *string                `protobuf:"bytes,2,opt,name=branch" json:"branch,omitempty"`
 	Commit        *string                `protobuf:"bytes,3,opt,name=commit" json:"commit,omitempty"`
-	Files         map[string]*Entry      `protobuf:"bytes,4,rep,name=files" json:"files,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Contents      map[string]*Entry      `protobuf:"bytes,4,rep,name=contents" json:"contents,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -202,9 +202,9 @@ func (x *Manifest) GetCommit() string {
 	return ""
 }
 
-func (x *Manifest) GetFiles() map[string]*Entry {
+func (x *Manifest) GetContents() map[string]*Entry {
 	if x != nil {
-		return x.Files
+		return x.Contents
 	}
 	return nil
 }
@@ -216,15 +216,14 @@ const file_schema_proto_rawDesc = "" +
 	"\fschema.proto\"J\n" +
 	"\x05Entry\x12\x19\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x05.TypeR\x04type\x12\x12\n" +
-	"\x04size\x18\x02 \x01(\x04R\x04size\x12\x12\n" +
-	"\x04data\x18\x03 \x01(\fR\x04data\"\xc3\x01\n" +
+	"\x04size\x18\x02 \x01(\rR\x04size\x12\x12\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\"\xcf\x01\n" +
 	"\bManifest\x12\x19\n" +
 	"\brepo_url\x18\x01 \x01(\tR\arepoUrl\x12\x16\n" +
 	"\x06branch\x18\x02 \x01(\tR\x06branch\x12\x16\n" +
-	"\x06commit\x18\x03 \x01(\tR\x06commit\x12*\n" +
-	"\x05files\x18\x04 \x03(\v2\x14.Manifest.FilesEntryR\x05files\x1a@\n" +
-	"\n" +
-	"FilesEntry\x12\x10\n" +
+	"\x06commit\x18\x03 \x01(\tR\x06commit\x123\n" +
+	"\bcontents\x18\x04 \x03(\v2\x17.Manifest.ContentsEntryR\bcontents\x1aC\n" +
+	"\rContentsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x1c\n" +
 	"\x05value\x18\x02 \x01(\v2\x06.EntryR\x05value:\x028\x01*Q\n" +
 	"\x04Type\x12\v\n" +
@@ -253,12 +252,12 @@ var file_schema_proto_goTypes = []any{
 	(Type)(0),        // 0: Type
 	(*Entry)(nil),    // 1: Entry
 	(*Manifest)(nil), // 2: Manifest
-	nil,              // 3: Manifest.FilesEntry
+	nil,              // 3: Manifest.ContentsEntry
 }
 var file_schema_proto_depIdxs = []int32{
 	0, // 0: Entry.type:type_name -> Type
-	3, // 1: Manifest.files:type_name -> Manifest.FilesEntry
-	1, // 2: Manifest.FilesEntry.value:type_name -> Entry
+	3, // 1: Manifest.contents:type_name -> Manifest.ContentsEntry
+	1, // 2: Manifest.ContentsEntry.value:type_name -> Entry
 	3, // [3:3] is the sub-list for method output_type
 	3, // [3:3] is the sub-list for method input_type
 	3, // [3:3] is the sub-list for extension type_name

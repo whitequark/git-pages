@@ -62,16 +62,12 @@ func FetchRepository(ctx context.Context, repoURL string, branch string) (*Manif
 	defer walker.Close()
 
 	manifest := Manifest{
-		RepoUrl: proto.String(repoURL),
-		Branch:  proto.String(branch),
-		Commit:  proto.String(ref.Hash().String()),
-		Files:   make(map[string]*Entry),
+		RepoUrl:  proto.String(repoURL),
+		Branch:   proto.String(branch),
+		Commit:   proto.String(ref.Hash().String()),
+		Contents: make(map[string]*Entry),
 	}
-	manifest.Files[""] = &Entry{
-		Type: Type_Directory.Enum(),
-		Size: proto.Uint64(0),
-		Data: []byte{},
-	}
+	manifest.Contents[""] = &Entry{Type: Type_Directory.Enum()}
 	for {
 		name, entry, err := walker.Next()
 		if err == io.EOF {
@@ -101,14 +97,14 @@ func FetchRepository(ctx context.Context, repoURL string, branch string) (*Manif
 				} else {
 					manifestEntry.Type = Type_InlineFile.Enum()
 				}
-				manifestEntry.Size = proto.Uint64(uint64(blob.Size))
+				manifestEntry.Size = proto.Uint32(uint32(blob.Size))
 				manifestEntry.Data = data
 			} else if entry.Mode == filemode.Dir {
 				manifestEntry.Type = Type_Directory.Enum()
 			} else {
 				manifestEntry.Type = Type_Invalid.Enum()
 			}
-			manifest.Files[name] = &manifestEntry
+			manifest.Contents[name] = &manifestEntry
 		}
 	}
 	return &manifest, nil

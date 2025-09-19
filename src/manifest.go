@@ -15,10 +15,10 @@ import (
 )
 
 func IsManifestEmpty(manifest *Manifest) bool {
-	if len(manifest.Files) > 1 {
+	if len(manifest.Contents) > 1 {
 		return false
 	}
-	for name, entry := range manifest.Files {
+	for name, entry := range manifest.Contents {
 		if name == "" && entry.GetType() == Type_Directory {
 			return true
 		}
@@ -28,11 +28,11 @@ func IsManifestEmpty(manifest *Manifest) bool {
 
 // Returns `true` if `left` and `right` contain the same files with the same types and data.
 func CompareManifest(left *Manifest, right *Manifest) bool {
-	if len(left.Files) != len(right.Files) {
+	if len(left.Contents) != len(right.Contents) {
 		return false
 	}
-	for name, leftEntry := range left.Files {
-		rightEntry := right.Files[name]
+	for name, leftEntry := range left.Contents {
+		rightEntry := right.Contents[name]
 		if rightEntry == nil {
 			return false
 		}
@@ -71,7 +71,7 @@ again:
 		parts := strings.Split(inPath, "/")
 		for i := 1; i <= len(parts); i++ {
 			linkPath := path.Join(parts[:i]...)
-			entry := manifest.Files[linkPath]
+			entry := manifest.Contents[linkPath]
 			if entry != nil && entry.GetType() == Type_Symlink {
 				inPath = path.Join(
 					path.Dir(linkPath),
@@ -90,24 +90,24 @@ again:
 	}
 }
 
-const ExternalSizeMin uint64 = 256
+const ExternalSizeMin uint32 = 256
 
 func ExternalizeFiles(manifest *Manifest) *Manifest {
 	newManifest := Manifest{
-		RepoUrl: manifest.RepoUrl,
-		Branch:  manifest.Branch,
-		Commit:  manifest.Commit,
-		Files:   make(map[string]*Entry),
+		RepoUrl:  manifest.RepoUrl,
+		Branch:   manifest.Branch,
+		Commit:   manifest.Commit,
+		Contents: make(map[string]*Entry),
 	}
-	for name, entry := range manifest.Files {
+	for name, entry := range manifest.Contents {
 		if entry.GetType() == Type_InlineFile && entry.GetSize() > ExternalSizeMin {
-			newManifest.Files[name] = &Entry{
+			newManifest.Contents[name] = &Entry{
 				Type: Type_ExternalFile.Enum(),
 				Size: entry.Size,
 				Data: fmt.Appendf(nil, "sha256-%x", sha256.Sum256(entry.Data)),
 			}
 		} else {
-			newManifest.Files[name] = entry
+			newManifest.Contents[name] = entry
 		}
 	}
 	return &newManifest
@@ -129,11 +129,11 @@ func StoreManifest(name string, manifest *Manifest) (*Manifest, error) {
 	}
 
 	wg := sync.WaitGroup{}
-	ch := make(chan error, len(extManifest.Files))
-	for name, entry := range extManifest.Files {
+	ch := make(chan error, len(extManifest.Contents))
+	for name, entry := range extManifest.Contents {
 		if entry.GetType() == Type_ExternalFile {
 			wg.Go(func() {
-				err := backend.PutBlob(string(entry.Data), manifest.Files[name].Data)
+				err := backend.PutBlob(string(entry.Data), manifest.Contents[name].Data)
 				if err != nil {
 					ch <- fmt.Errorf("put blob %s: %w", name, err)
 				}

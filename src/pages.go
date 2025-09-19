@@ -64,7 +64,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			fmt.Fprintln(w, err)
 			return err
 		}
-		entry = manifest.Files[entryPath]
+		entry = manifest.Contents[entryPath]
 		if entry == nil || entry.GetType() == Type_Invalid {
 			is404 = true
 			if entryPath == notFoundPage {
