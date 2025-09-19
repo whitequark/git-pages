@@ -42,6 +42,7 @@ Features
 * In response to a `PUT` or `POST` request, the server performs a shallow clone of the indicated git repository into a temporary location, checks out the `HEAD` commit, and atomically updates a site. The URL of the request must be the root URL of the site that is being published.
     - The `PUT` method requires an `application/x-www-form-urlencoded` body. The body contains the repository URL to be cloned.
     - The `POST` method requires an `application/json` body containing a Forgejo/Gitea/Gogs/GitHub webhook event payload. Requests where the `ref` key contains anything other than `refs/heads/pages` are ignored. The `repository.clone_url` key contains the repository URL to be cloned.
+    - If the `HEAD` commit is empty, performs the same action as `DELETE`.
 * In response to a `DELETE` request, the server unpublishes a site. The URL of the request must be the root URL of the site that is being unpublished. Site data remains stored for an indeterminate period of time, but becomes completely inaccessible.
 * All updates to site content are atomic (subject to consistency guarantees of the storage backend). That is, there is an instantaneous moment during an update before which the server will return the old content and after which it will return the new content.
 

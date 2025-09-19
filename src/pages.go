@@ -192,21 +192,19 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 	ctx, cancel := context.WithTimeout(r.Context(), updateTimeout)
 	defer cancel()
 	result := Update(ctx, webRoot, repoURL, branch)
-	if result.manifest != nil {
-		w.Header().Add("Content-Location", r.URL.String())
-	}
 	switch result.outcome {
 	case UpdateError:
 		w.WriteHeader(http.StatusServiceUnavailable)
 	case UpdateTimeout:
 		w.WriteHeader(http.StatusGatewayTimeout)
-		// HTTP prescribes these response codes to be used
 	case UpdateNoChange:
-		w.WriteHeader(http.StatusNoContent)
+		w.Header().Add("X-Pages-Outcome", "no-change")
 	case UpdateCreated:
-		w.WriteHeader(http.StatusCreated)
+		w.Header().Add("X-Pages-Outcome", "created")
 	case UpdateReplaced:
-		w.WriteHeader(http.StatusOK)
+		w.Header().Add("X-Pages-Outcome", "replaced")
+	case UpdateDeleted:
+		w.Header().Add("X-Pages-Outcome", "deleted")
 	}
 	if result.manifest != nil {
 		fmt.Fprintln(w, result.manifest.Commit)
@@ -331,6 +329,9 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 	case UpdateReplaced:
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "replaced")
+	case UpdateDeleted:
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, "deleted")
 	}
 	return nil
 }

@@ -12,6 +12,18 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func IsManifestEmpty(manifest *Manifest) bool {
+	if len(manifest.Tree) > 1 {
+		return false
+	}
+	for name, entry := range manifest.Tree {
+		if name == "" && entry.Type == Type_Directory {
+			return true
+		}
+	}
+	panic(fmt.Errorf("malformed manifest %v", manifest))
+}
+
 // Returns `true` if `left` and `right` contain the same files with the same types and data.
 func CompareManifest(left *Manifest, right *Manifest) bool {
 	if len(left.Tree) != len(right.Tree) {

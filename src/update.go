@@ -14,6 +14,7 @@ const (
 	UpdateTimeout
 	UpdateCreated
 	UpdateReplaced
+	UpdateDeleted
 	UpdateNoChange
 )
 
@@ -41,14 +42,25 @@ func Update(
 		err = fmt.Errorf("update timeout")
 	} else if err == nil {
 		oldManifest, _ = backend.GetManifest(webRoot)
-		newManifest, err = StoreManifest(webRoot, fetchManifest)
-		if err == nil {
-			if oldManifest == nil {
-				outcome = UpdateCreated
-			} else if CompareManifest(oldManifest, newManifest) {
-				outcome = UpdateNoChange
-			} else {
-				outcome = UpdateReplaced
+		if IsManifestEmpty(fetchManifest) {
+			newManifest, err = fetchManifest, backend.DeleteManifest(webRoot)
+			if err == nil {
+				if oldManifest == nil {
+					outcome = UpdateNoChange
+				} else {
+					outcome = UpdateDeleted
+				}
+			}
+		} else {
+			newManifest, err = StoreManifest(webRoot, fetchManifest)
+			if err == nil {
+				if oldManifest == nil {
+					outcome = UpdateCreated
+				} else if CompareManifest(oldManifest, newManifest) {
+					outcome = UpdateNoChange
+				} else {
+					outcome = UpdateReplaced
+				}
 			}
 		}
 	}
@@ -60,6 +72,8 @@ func Update(
 			status = "created"
 		case UpdateReplaced:
 			status = "replaced"
+		case UpdateDeleted:
+			status = "deleted"
 		case UpdateNoChange:
 			status = "unchanged"
 		}
