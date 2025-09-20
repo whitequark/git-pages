@@ -3,9 +3,11 @@ git-pages
 
 _git-pages_ is a static site server for use with Git forges (i.e. a GitHub Pages replacement). It is written with efficiency in mind, scaling horizontally to any number of deployed sites and concurrent requests and serving sites up to hundreds of megabytes in size, while being equally suitable for single-user deployments.
 
-It is implemented in Go and has no other mandatory dependencies, although it is designed to be used together with the [Caddy server](https://caddyserver.com/) (for TLS termination) and an [Amazon S3](https://aws.amazon.com/s3/) compatible object store (for horizontal scalability of storage).
+It is implemented in Go and has no other mandatory dependencies, although it is designed to be used together with the [Caddy server][caddy] (for TLS termination) and an [Amazon S3](https://aws.amazon.com/s3/) compatible object store (for horizontal scalability of storage).
 
 The included Docker container provides everything needed to deploy a Pages service, including zero-configuration on-demand provisioning of TLS certificates from [Let's Encrypt](https://letsencrypt.org/), and runs on any commodity cloud infrastructure. There is also a first-party deployment of _git-pages_ at [grebedoc.dev](https://grebedoc.dev).
+
+[caddy]: https://caddyserver.com/
 
 
 Quickstart
@@ -30,7 +32,29 @@ b70644b523c4aaf4efd206a588087a1d406cb047
 
 The `pages` branch of the repository is now available at http://localhost:3000/!
 
-To get inspiration for deployment strategies, take a look at the included [Dockerfile](Dockerfile) or the [configuration](fly.toml) for [Fly.io](https://fly.io).
+
+Deployment
+----------
+
+The first-party container supports running _git-pages_ either standalone or together with [Caddy][].
+
+To run _git-pages_ standalone and use the filesystem to store site data:
+
+```console
+$ docker run -u $(id -u):$(id -g)--mount type=bind,src=$(pwd)/data,dst=/app/data \
+    -p 3000:3000 \
+    codeberg.org/whitequark/git-pages:latest
+```
+
+To run _git-pages_ with Caddy and use an S3-compatible endpoint to store site data and TLS key material:
+
+```console
+$ docker run -e S3_ENDPOINT -e S3_REGION -e S3_ACCESS_KEY_ID -e S3_SECRET_ACCESS_KEY -e S3_BUCKET \
+    -e ACME_EMAIL -p 80:80 -p 443:443 \
+    codeberg.org/whitequark/git-pages:latest supervisord
+```
+
+See also the included [configuration](fly.toml) for [Fly.io](https://fly.io).
 
 
 Features
