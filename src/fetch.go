@@ -62,12 +62,13 @@ func FetchRepository(ctx context.Context, repoURL string, branch string) (*Manif
 	defer walker.Close()
 
 	manifest := Manifest{
-		RepoUrl:  proto.String(repoURL),
-		Branch:   proto.String(branch),
-		Commit:   proto.String(ref.Hash().String()),
-		Contents: make(map[string]*Entry),
+		RepoUrl: proto.String(repoURL),
+		Branch:  proto.String(branch),
+		Commit:  proto.String(ref.Hash().String()),
+		Contents: map[string]*Entry{
+			"": {Type: Type_Directory.Enum()},
+		},
 	}
-	manifest.Contents[""] = &Entry{Type: Type_Directory.Enum()}
 	for {
 		name, entry, err := walker.Next()
 		if err == io.EOF {
@@ -86,6 +87,7 @@ func FetchRepository(ctx context.Context, repoURL string, branch string) (*Manif
 				if err != nil {
 					return nil, fmt.Errorf("git blob open: %w", err)
 				}
+				defer reader.Close()
 
 				data, err := io.ReadAll(reader)
 				if err != nil {

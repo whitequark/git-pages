@@ -62,7 +62,7 @@ func DecodeManifest(data []byte) (*Manifest, error) {
 	return &manifest, err
 }
 
-func ManifestDebugJSON(manifest *Manifest) []byte {
+func ManifestDebugJSON(manifest *Manifest) string {
 	result, err := protojson.MarshalOptions{
 		Multiline:         true,
 		EmitDefaultValues: true,
@@ -70,7 +70,7 @@ func ManifestDebugJSON(manifest *Manifest) []byte {
 	if err != nil {
 		panic(err)
 	}
-	return result
+	return string(result)
 }
 
 const maxSymlinkLevels int = 128
@@ -148,17 +148,20 @@ func ExternalizeFiles(manifest *Manifest) *Manifest {
 
 const ManifestSizeMax int = 1048576
 
+var errManifestTooLarge = errors.New("manifest size limit exceeded")
+
 // Uploads inline file data over certain size to the storage backend. Returns a copy of
 // the manifest updated to refer to an external content-addressable store.
 func StoreManifest(name string, manifest *Manifest) (*Manifest, error) {
 	extManifest := ExternalizeFiles(manifest)
 	extManifestData := EncodeManifest(extManifest)
 	if len(extManifestData) > ManifestSizeMax {
-		return nil, fmt.Errorf("manifest too big: %d > %d bytes", extManifestData, ManifestSizeMax)
+		return nil, fmt.Errorf("%w: %d > %d bytes",
+			errManifestTooLarge, extManifestData, ManifestSizeMax)
 	}
 
 	if err := backend.StageManifest(extManifest); err != nil {
-		return nil, fmt.Errorf("stage: %w", err)
+		return nil, fmt.Errorf("stage manifest: %w", err)
 	}
 
 	wg := sync.WaitGroup{}
@@ -180,7 +183,7 @@ func StoreManifest(name string, manifest *Manifest) (*Manifest, error) {
 	}
 
 	if err := backend.CommitManifest(name, extManifest); err != nil {
-		return nil, fmt.Errorf("commit: %w", err)
+		return nil, fmt.Errorf("commit manifest: %w", err)
 	}
 
 	return extManifest, nil

@@ -205,7 +205,7 @@ func authorizeWildcardMatchSite(r *http.Request) (*Authorization, error) {
 	}
 }
 
-func AuthorizeMetadata(r *http.Request) (*Authorization, error) {
+func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
 	if InsecureMode() {
@@ -240,7 +240,7 @@ func AuthorizeMetadata(r *http.Request) (*Authorization, error) {
 // Returns `repoURLs, err` where if `err == nil` then the request is authorized to clone from
 // any repository URL included in `repoURLs` (by case-insensitive comparison), or any URL at all
 // if `repoURLs == nil`.
-func AuthorizeUpdate(r *http.Request) (*Authorization, error) {
+func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
 	if InsecureMode() {
@@ -329,4 +329,26 @@ func AuthorizeBranch(branch string, auth *Authorization) error {
 			fmt.Sprintf("branch %s: password authorization required", branch),
 		}
 	}
+}
+
+func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
+	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
+
+	if InsecureMode() {
+		log.Println("auth: INSECURE mode")
+		return &Authorization{}, nil // for testing only
+	}
+
+	// DNS challenge gives absolute authority.
+	auth, err := authorizeDNSChallenge(r)
+	if err != nil && IsUnauthorized(err) {
+		causes = append(causes, err)
+	} else if err != nil { // bad request
+		return nil, err
+	} else {
+		log.Println("auth: DNS challenge")
+		return auth, nil
+	}
+
+	return nil, errors.Join(causes...)
 }

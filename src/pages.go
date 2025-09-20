@@ -58,7 +58,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	if metadataPath, found := strings.CutPrefix(sitePath, ".git-pages/"); found {
 		// metadata requests require authorization to avoid making pushes from private
 		// repositories enumerable
-		_, err := AuthorizeMetadata(r)
+		_, err := AuthorizeMetadataRetrieval(r)
 		if err != nil {
 			return err
 		}
@@ -67,7 +67,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		case "manifest.json":
 			w.Header().Add("Content-Type", "application/json; charset=utf-8")
 			w.WriteHeader(http.StatusOK)
-			w.Write(ManifestDebugJSON(manifest))
+			w.Write([]byte(ManifestDebugJSON(manifest)))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 			fmt.Fprintf(w, "not found\n")
@@ -158,11 +158,10 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+const SiteSizeMax = 512 * 1048576
+
 func putPage(w http.ResponseWriter, r *http.Request) error {
-	auth, err := AuthorizeUpdate(r)
-	if err != nil {
-		return err
-	}
+	var result UpdateResult
 
 	host := GetHost(r)
 
@@ -171,34 +170,59 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	// URLs have no length limit, but 64K seems enough for a repository URL
-	requestBody, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 65536))
-	if err != nil {
-		return fmt.Errorf("body read: %w", err)
-	}
-
 	webRoot := makeWebRoot(host, projectName)
 
-	// request body contains git repository URL
-	repoURL := string(requestBody)
-	if err := AuthorizeRepository(repoURL, auth); err != nil {
-		return err
+	contentType := r.Header.Get("Content-Type")
+	if contentType == "application/x-www-form-urlencoded" {
+		auth, err := AuthorizeUpdateFromRepository(r)
+		if err != nil {
+			return err
+		}
+
+		// URLs have no length limit, but 64K seems enough for a repository URL
+		requestBody, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 65536))
+		if err != nil {
+			return fmt.Errorf("body read: %w", err)
+		}
+
+		repoURL := string(requestBody)
+		if err := AuthorizeRepository(repoURL, auth); err != nil {
+			return err
+		}
+
+		branch := "pages"
+		if customBranch := r.Header.Get("X-Pages-Branch"); customBranch != "" {
+			branch = customBranch
+		}
+		if err := AuthorizeBranch(branch, auth); err != nil {
+			return err
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), updateTimeout)
+		defer cancel()
+		result = UpdateFromRepository(ctx, webRoot, repoURL, branch)
+	} else {
+		_, err := AuthorizeUpdateFromArchive(r)
+		if err != nil {
+			return err
+		}
+
+		// request body contains archive
+		reader := http.MaxBytesReader(w, r.Body, SiteSizeMax)
+		result = UpdateFromArchive(webRoot, contentType, reader)
 	}
 
-	branch := "pages"
-	if customBranch := r.Header.Get("X-Pages-Branch"); customBranch != "" {
-		branch = customBranch
-	}
-	if err := AuthorizeBranch(branch, auth); err != nil {
-		return err
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), updateTimeout)
-	defer cancel()
-	result := Update(ctx, webRoot, repoURL, branch)
 	switch result.outcome {
 	case UpdateError:
-		w.WriteHeader(http.StatusServiceUnavailable)
+		if errors.Is(result.err, errManifestTooLarge) {
+			w.WriteHeader(http.StatusRequestEntityTooLarge)
+		} else if errors.Is(result.err, errArchiveFormat) {
+			w.WriteHeader(http.StatusUnsupportedMediaType)
+		} else if errors.Is(result.err, errZipBomb) {
+			w.WriteHeader(http.StatusRequestEntityTooLarge)
+		} else {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
 	case UpdateTimeout:
 		w.WriteHeader(http.StatusGatewayTimeout)
 	case UpdateNoChange:
@@ -211,7 +235,9 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Add("X-Pages-Outcome", "deleted")
 	}
 	if result.manifest != nil {
-		fmt.Fprintln(w, *result.manifest.Commit)
+		if result.manifest.Commit != nil {
+			fmt.Fprintln(w, *result.manifest.Commit)
+		}
 	} else if result.err != nil {
 		fmt.Fprintln(w, result.err)
 	} else {
@@ -221,7 +247,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 }
 
 func deletePage(w http.ResponseWriter, r *http.Request) error {
-	_, err := AuthorizeUpdate(r)
+	_, err := AuthorizeUpdateFromRepository(r)
 	if err != nil {
 		return err
 	}
@@ -246,7 +272,7 @@ func deletePage(w http.ResponseWriter, r *http.Request) error {
 }
 
 func postPage(w http.ResponseWriter, r *http.Request) error {
-	auth, err := AuthorizeUpdate(r)
+	auth, err := AuthorizeUpdateFromRepository(r)
 	if err != nil {
 		return err
 	}
@@ -257,6 +283,8 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+
+	webRoot := makeWebRoot(host, projectName)
 
 	eventName := ""
 	for _, header := range []string{
@@ -307,8 +335,6 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 
-	webRoot := makeWebRoot(host, projectName)
-
 	repoURL := event["repository"].(map[string]any)["clone_url"].(string)
 	if err := AuthorizeRepository(repoURL, auth); err != nil {
 		return err
@@ -316,7 +342,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 
 	ctx, cancel := context.WithTimeout(r.Context(), updateTimeout)
 	defer cancel()
-	result := Update(ctx, webRoot, repoURL, "pages")
+	result := UpdateFromRepository(ctx, webRoot, repoURL, "pages")
 	switch result.outcome {
 	case UpdateError:
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -341,7 +367,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 }
 
 func ServePages(w http.ResponseWriter, r *http.Request) {
-	log.Println("pages:", r.Method, r.Host, r.URL)
+	log.Println("pages:", r.Method, r.Host, r.URL, r.Header.Get("Content-Type"))
 	if region := os.Getenv("FLY_REGION"); region != "" {
 		w.Header().Add("Server", fmt.Sprintf("git-pages (fly.io; %s)", region))
 	} else {
