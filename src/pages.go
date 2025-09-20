@@ -160,26 +160,6 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func getProjectName(w http.ResponseWriter, r *http.Request) (string, error) {
-	// path must be either `/` or `/foo/` (`/foo` is accepted as an alias)
-	path, _ := strings.CutPrefix(r.URL.Path, "/")
-	path, _ = strings.CutSuffix(path, "/")
-	if strings.HasPrefix(path, ".") {
-		http.Error(w, "this directory name is reserved for system use", http.StatusBadRequest)
-		return "", fmt.Errorf("reserved name")
-	} else if strings.Contains(path, "/") {
-		http.Error(w, "only one level of nesting is allowed", http.StatusBadRequest)
-		return "", fmt.Errorf("nesting too deep")
-	}
-
-	if path == "" {
-		// path `/` corresponds to pseudo-project `.index`
-		return ".index", nil
-	} else {
-		return path, nil
-	}
-}
-
 func putPage(w http.ResponseWriter, r *http.Request) error {
 	auth, err := AuthorizeUpdate(r)
 	if err != nil {

@@ -40,7 +40,7 @@ func CompareManifest(left *Manifest, right *Manifest) bool {
 		if leftEntry.GetType() != rightEntry.GetType() {
 			return false
 		}
-		if bytes.Compare(leftEntry.Data, rightEntry.Data) != 0 {
+		if !bytes.Equal(leftEntry.Data, rightEntry.Data) {
 			return false
 		}
 	}
@@ -74,7 +74,7 @@ func ManifestDebugJSON(manifest *Manifest) []byte {
 
 const maxSymlinkLevels int = 128
 
-var symlinkLoop = errors.New("symbolic link loop")
+var errSymlinkLoop = errors.New("symbolic link loop")
 
 func ExpandSymlinks(manifest *Manifest, inPath string) (string, error) {
 	var levels int
@@ -98,7 +98,7 @@ again:
 	if levels < maxSymlinkLevels {
 		return inPath, nil
 	} else {
-		return "", symlinkLoop
+		return "", errSymlinkLoop
 	}
 }
 
