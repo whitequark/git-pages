@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
 	"net/http"
 	"os"
 	"path"
@@ -178,7 +179,11 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 
 	webRoot := makeWebRoot(host, projectName)
 
-	contentType := r.Header.Get("Content-Type")
+	contentType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil {
+		return fmt.Errorf("parsing content type: %w", err)
+	}
+
 	if contentType == "application/x-www-form-urlencoded" {
 		auth, err := AuthorizeUpdateFromRepository(r)
 		if err != nil {
