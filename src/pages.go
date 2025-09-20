@@ -13,8 +13,6 @@ import (
 	"path"
 	"strings"
 	"time"
-
-	"github.com/minio/minio-go/v7"
 )
 
 const notFoundPage = "404.html"
@@ -109,7 +107,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				reader, mtime, err = backend.GetBlob(string(entry.Data))
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
-					fmt.Fprintf(w, "internal server error\n")
+					fmt.Fprintf(w, "internal server error: %s\n", err)
 					return err
 				}
 				w.Header().Set("ETag", etag)
@@ -371,10 +369,6 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 			message := fmt.Sprint(err)
 			http.Error(w, strings.ReplaceAll(message, "\n", "\n- "), authErr.code)
 			err = errors.New(strings.ReplaceAll(message, "\n", "; "))
-		} else if pathErr, ok := err.(*os.PathError); ok {
-			err = fmt.Errorf("not found: %s", pathErr.Path)
-		} else if minioErr, ok := err.(minio.ErrorResponse); ok && minioErr.Code == "NoSuchKey" {
-			err = fmt.Errorf("not found: %s", minioErr.Key)
 		}
 		log.Println("pages err:", err)
 	}

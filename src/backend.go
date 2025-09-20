@@ -23,6 +23,8 @@ import (
 	"github.com/maypok86/otter/v2"
 )
 
+var errNotFound = errors.New("not found")
+
 type Backend interface {
 	// Retrieve a blob. Returns `reader, mtime, err`.
 	GetBlob(name string) (io.ReadSeeker, time.Time, error)
@@ -121,7 +123,9 @@ func (fs *FSBackend) Backend() Backend {
 func (fs *FSBackend) GetBlob(name string) (io.ReadSeeker, time.Time, error) {
 	blobPath := filepath.Join(splitBlobName(name)...)
 	stat, err := fs.blobRoot.Stat(blobPath)
-	if err != nil {
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, time.Time{}, fmt.Errorf("%w: %s", errNotFound, err.(*os.PathError).Path)
+	} else if err != nil {
 		return nil, time.Time{}, fmt.Errorf("stat: %w", err)
 	}
 	file, err := fs.blobRoot.Open(blobPath)
@@ -172,7 +176,9 @@ func (fs *FSBackend) DeleteBlob(name string) error {
 
 func (fs *FSBackend) GetManifest(name string) (*Manifest, error) {
 	data, err := fs.siteRoot.ReadFile(name)
-	if err != nil {
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("%w: %s", errNotFound, err.(*os.PathError).Path)
+	} else if err != nil {
 		return nil, err
 	}
 
@@ -315,6 +321,8 @@ func NewS3Backend(
 	if err != nil {
 		return nil, err
 	} else if !exists {
+		log.Printf("s3: create bucket %s\n", config.Backend.S3.Bucket)
+
 		err = client.MakeBucket(ctx, config.Backend.S3.Bucket,
 			minio.MakeBucketOptions{Region: config.Backend.S3.Region})
 		if err != nil {
@@ -322,7 +330,7 @@ func NewS3Backend(
 		}
 	}
 
-	blobCacheOptions, err := defaultCacheConfig[string, *CachedBlob](
+	blobCacheOptions, err := defaultCacheConfig(
 		config.Backend.S3.BlobCache,
 		0, 256*1048576,
 		func(key string, value *CachedBlob) uint32 { return uint32(len(value.blob)) })
@@ -335,7 +343,7 @@ func NewS3Backend(
 		return nil, err
 	}
 
-	siteCacheOptions, err := defaultCacheConfig[string, *CachedManifest](
+	siteCacheOptions, err := defaultCacheConfig(
 		config.Backend.S3.SiteCache,
 		60*time.Second, 16*1048576,
 		func(key string, value *CachedManifest) uint32 { return value.weight })
@@ -365,6 +373,7 @@ func (s3 *S3Backend) GetBlob(name string) (io.ReadSeeker, time.Time, error) {
 
 		object, err := s3.client.GetObject(s3.ctx, s3.bucket, blobObjectName(name),
 			minio.GetObjectOptions{})
+		// Note that many errors (e.g. NoSuchKey) will be reported only after this point.
 		if err != nil {
 			return nil, err
 		}
@@ -385,10 +394,13 @@ func (s3 *S3Backend) GetBlob(name string) (io.ReadSeeker, time.Time, error) {
 
 	cached, err := s3.blobCache.Get(s3.ctx, name, otter.LoaderFunc[string, *CachedBlob](loader))
 	if err != nil {
+		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
+			err = fmt.Errorf("%w: %s", errNotFound, errResp.Key)
+		}
 		return nil, time.Time{}, err
+	} else {
+		return bytes.NewReader(cached.blob), cached.mtime, err
 	}
-
-	return bytes.NewReader(cached.blob), cached.mtime, err
 }
 
 func (s3 *S3Backend) PutBlob(name string, data []byte) error {
@@ -397,8 +409,7 @@ func (s3 *S3Backend) PutBlob(name string, data []byte) error {
 	_, err := s3.client.StatObject(s3.ctx, s3.bucket, blobObjectName(name),
 		minio.GetObjectOptions{})
 	if err != nil {
-		errResp := minio.ToErrorResponse(err)
-		if errResp.Code == "NoSuchKey" {
+		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
 			_, err := s3.client.PutObject(s3.ctx, s3.bucket, blobObjectName(name),
 				bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{})
 			if err != nil {
@@ -438,6 +449,7 @@ func (s3 *S3Backend) GetManifest(name string) (*Manifest, error) {
 
 			object, err := s3.client.GetObject(s3.ctx, s3.bucket, manifestObjectName(name),
 				minio.GetObjectOptions{})
+			// Note that many errors (e.g. NoSuchKey) will be reported only after this point.
 			if err != nil {
 				return nil, 0, err
 			}
@@ -457,6 +469,9 @@ func (s3 *S3Backend) GetManifest(name string) (*Manifest, error) {
 		}()
 
 		if err != nil {
+			if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
+				err = fmt.Errorf("%w: %s", errNotFound, errResp.Key)
+			}
 			return &CachedManifest{nil, 1, err}, nil
 		} else {
 			return &CachedManifest{manifest, size, err}, nil
