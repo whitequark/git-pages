@@ -141,6 +141,74 @@ func (x *Entry) GetData() []byte {
 	return nil
 }
 
+type Redirect struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	From          *string                `protobuf:"bytes,1,opt,name=from" json:"from,omitempty"`
+	To            *string                `protobuf:"bytes,2,opt,name=to" json:"to,omitempty"`
+	Status        *uint32                `protobuf:"varint,3,opt,name=status" json:"status,omitempty"`
+	Force         *bool                  `protobuf:"varint,4,opt,name=force" json:"force,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Redirect) Reset() {
+	*x = Redirect{}
+	mi := &file_schema_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Redirect) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Redirect) ProtoMessage() {}
+
+func (x *Redirect) ProtoReflect() protoreflect.Message {
+	mi := &file_schema_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Redirect.ProtoReflect.Descriptor instead.
+func (*Redirect) Descriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *Redirect) GetFrom() string {
+	if x != nil && x.From != nil {
+		return *x.From
+	}
+	return ""
+}
+
+func (x *Redirect) GetTo() string {
+	if x != nil && x.To != nil {
+		return *x.To
+	}
+	return ""
+}
+
+func (x *Redirect) GetStatus() uint32 {
+	if x != nil && x.Status != nil {
+		return *x.Status
+	}
+	return 0
+}
+
+func (x *Redirect) GetForce() bool {
+	if x != nil && x.Force != nil {
+		return *x.Force
+	}
+	return false
+}
+
 type Manifest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RepoUrl       *string                `protobuf:"bytes,1,opt,name=repo_url,json=repoUrl" json:"repo_url,omitempty"`
@@ -148,13 +216,14 @@ type Manifest struct {
 	Commit        *string                `protobuf:"bytes,3,opt,name=commit" json:"commit,omitempty"`
 	Contents      map[string]*Entry      `protobuf:"bytes,4,rep,name=contents" json:"contents,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	TotalSize     *uint32                `protobuf:"varint,5,opt,name=total_size,json=totalSize" json:"total_size,omitempty"`
+	Redirects     []*Redirect            `protobuf:"bytes,6,rep,name=redirects" json:"redirects,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Manifest) Reset() {
 	*x = Manifest{}
-	mi := &file_schema_proto_msgTypes[1]
+	mi := &file_schema_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -166,7 +235,7 @@ func (x *Manifest) String() string {
 func (*Manifest) ProtoMessage() {}
 
 func (x *Manifest) ProtoReflect() protoreflect.Message {
-	mi := &file_schema_proto_msgTypes[1]
+	mi := &file_schema_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -179,7 +248,7 @@ func (x *Manifest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Manifest.ProtoReflect.Descriptor instead.
 func (*Manifest) Descriptor() ([]byte, []int) {
-	return file_schema_proto_rawDescGZIP(), []int{1}
+	return file_schema_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Manifest) GetRepoUrl() string {
@@ -217,6 +286,13 @@ func (x *Manifest) GetTotalSize() uint32 {
 	return 0
 }
 
+func (x *Manifest) GetRedirects() []*Redirect {
+	if x != nil {
+		return x.Redirects
+	}
+	return nil
+}
+
 var File_schema_proto protoreflect.FileDescriptor
 
 const file_schema_proto_rawDesc = "" +
@@ -225,14 +301,20 @@ const file_schema_proto_rawDesc = "" +
 	"\x05Entry\x12\x19\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x05.TypeR\x04type\x12\x12\n" +
 	"\x04size\x18\x02 \x01(\rR\x04size\x12\x12\n" +
-	"\x04data\x18\x03 \x01(\fR\x04data\"\xee\x01\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\"\\\n" +
+	"\bRedirect\x12\x12\n" +
+	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
+	"\x02to\x18\x02 \x01(\tR\x02to\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\rR\x06status\x12\x14\n" +
+	"\x05force\x18\x04 \x01(\bR\x05force\"\x97\x02\n" +
 	"\bManifest\x12\x19\n" +
 	"\brepo_url\x18\x01 \x01(\tR\arepoUrl\x12\x16\n" +
 	"\x06branch\x18\x02 \x01(\tR\x06branch\x12\x16\n" +
 	"\x06commit\x18\x03 \x01(\tR\x06commit\x123\n" +
 	"\bcontents\x18\x04 \x03(\v2\x17.Manifest.ContentsEntryR\bcontents\x12\x1d\n" +
 	"\n" +
-	"total_size\x18\x05 \x01(\rR\ttotalSize\x1aC\n" +
+	"total_size\x18\x05 \x01(\rR\ttotalSize\x12'\n" +
+	"\tredirects\x18\x06 \x03(\v2\t.RedirectR\tredirects\x1aC\n" +
 	"\rContentsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x1c\n" +
 	"\x05value\x18\x02 \x01(\v2\x06.EntryR\x05value:\x028\x01*Q\n" +
@@ -257,22 +339,24 @@ func file_schema_proto_rawDescGZIP() []byte {
 }
 
 var file_schema_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_schema_proto_goTypes = []any{
 	(Type)(0),        // 0: Type
 	(*Entry)(nil),    // 1: Entry
-	(*Manifest)(nil), // 2: Manifest
-	nil,              // 3: Manifest.ContentsEntry
+	(*Redirect)(nil), // 2: Redirect
+	(*Manifest)(nil), // 3: Manifest
+	nil,              // 4: Manifest.ContentsEntry
 }
 var file_schema_proto_depIdxs = []int32{
 	0, // 0: Entry.type:type_name -> Type
-	3, // 1: Manifest.contents:type_name -> Manifest.ContentsEntry
-	1, // 2: Manifest.ContentsEntry.value:type_name -> Entry
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	4, // 1: Manifest.contents:type_name -> Manifest.ContentsEntry
+	2, // 2: Manifest.redirects:type_name -> Redirect
+	1, // 3: Manifest.ContentsEntry.value:type_name -> Entry
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_schema_proto_init() }
@@ -286,7 +370,7 @@ func file_schema_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_schema_proto_rawDesc), len(file_schema_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

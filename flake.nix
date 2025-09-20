@@ -19,7 +19,7 @@
 
         git-pages = pkgs.buildGo125Module {
           pname = "git-pages";
-          version = "1.0.0";
+          version = "0";
 
           src = nix-filter {
             root = self;
@@ -42,7 +42,7 @@
             "-s -w"
           ];
 
-          vendorHash = "sha256-M4tTB0zXwLnehONGrtSl6B92gfpjm83g+qqM1HtNjis=";
+          vendorHash = "sha256-RCuX+z74m+G+Ptg/DF727VxnV0WEQWLaQPdN9+Ma9Do=";
 
           fixupPhase = ''
             # Apparently `go install` doesn't support renaming the binary, so country girls make do.

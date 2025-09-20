@@ -9,6 +9,7 @@ require (
 	github.com/maypok86/otter/v2 v2.2.1
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/pelletier/go-toml/v2 v2.2.4
+	github.com/tj/go-redirects v0.0.0-20200911105812-fd1ba1020b37
 	github.com/valyala/fasttemplate v1.2.2
 	google.golang.org/protobuf v1.36.9
 )
@@ -34,9 +35,11 @@ require (
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/pjbgf/sha1cd v0.5.0 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/tinylib/msgp v1.3.0 // indirect
+	github.com/tj/assert v0.0.3 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	golang.org/x/crypto v0.41.0 // indirect
 	golang.org/x/exp v0.0.0-20250531010427-b6e5de432a8b // indirect

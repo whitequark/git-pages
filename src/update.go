@@ -51,7 +51,7 @@ func Update(
 					outcome = UpdateDeleted
 				}
 			}
-		} else {
+		} else if err = PrepareManifest(fetchManifest); err == nil {
 			newManifest, err = StoreManifest(webRoot, fetchManifest)
 			if err == nil {
 				if oldManifest == nil {

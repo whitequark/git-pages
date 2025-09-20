@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"log"
 	"path"
 	"strings"
 	"sync"
@@ -102,14 +103,31 @@ again:
 	}
 }
 
+// Apply post-processing steps to the manifest.
+// At the moment, there isn't a good way to report errors except to log them on the terminal.
+// (Perhaps in the future they could be exposed at `.git-pages/status.txt`?)
+func PrepareManifest(manifest *Manifest) error {
+	// Parse Netlify-style `_redirects`
+	if err := ProcessRedirects(manifest); err != nil {
+		log.Printf("redirects err: %s\n", err)
+	} else if len(manifest.Redirects) > 0 {
+		log.Printf("redirects ok: %d rules\n", len(manifest.Redirects))
+	}
+
+	return nil
+}
+
 const ExternalSizeMin uint32 = 256
 
+// Replaces inline file data over certain size with references to an external content-addressable
+// store, without performing any I/O. Returns an updated copy of the manifest.
 func ExternalizeFiles(manifest *Manifest) *Manifest {
 	newManifest := Manifest{
-		RepoUrl:  manifest.RepoUrl,
-		Branch:   manifest.Branch,
-		Commit:   manifest.Commit,
-		Contents: make(map[string]*Entry),
+		RepoUrl:   manifest.RepoUrl,
+		Branch:    manifest.Branch,
+		Commit:    manifest.Commit,
+		Contents:  make(map[string]*Entry),
+		Redirects: manifest.Redirects,
 	}
 	var totalSize uint32
 	for name, entry := range manifest.Contents {
@@ -130,8 +148,8 @@ func ExternalizeFiles(manifest *Manifest) *Manifest {
 
 const ManifestSizeMax int = 1048576
 
-// Accepts a manifest with inline files, returns a manifest with external files after writing
-// file contents and the manifest itself to the storage.
+// Uploads inline file data over certain size to the storage backend. Returns a copy of
+// the manifest updated to refer to an external content-addressable store.
 func StoreManifest(name string, manifest *Manifest) (*Manifest, error) {
 	extManifest := ExternalizeFiles(manifest)
 	extManifestData := EncodeManifest(extManifest)
