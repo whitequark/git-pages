@@ -28,7 +28,17 @@ func ExtractTar(reader io.Reader) (*Manifest, error) {
 			return nil, err
 		}
 
-		fileName := strings.TrimSuffix(header.Name, "/")
+		// For some reason, GNU tar includes any leading `.` path segments in archive filenames,
+		// unless there is a `..` path segment anywhere in the input filenames.
+		fileName := header.Name
+		for {
+			if strippedName, found := strings.CutPrefix(fileName, "./"); found {
+				fileName = strippedName
+			} else {
+				break
+			}
+		}
+
 		manifestEntry := Entry{}
 		switch header.Typeflag {
 		case tar.TypeReg:
@@ -48,6 +58,7 @@ func ExtractTar(reader io.Reader) (*Manifest, error) {
 
 		case tar.TypeDir:
 			manifestEntry.Type = Type_Directory.Enum()
+			fileName = strings.TrimSuffix(fileName, "/")
 
 		default:
 			AddProblem(&manifest, fileName, "unsupported type '%c'", header.Typeflag)
