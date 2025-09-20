@@ -35,14 +35,18 @@ func InsecureMode() bool {
 	return os.Getenv("INSECURE") == "very"
 }
 
-func GetHost(r *http.Request) string {
+func GetHost(r *http.Request) (string, error) {
 	// FIXME: handle IDNA
 	host, _, err := net.SplitHostPort(r.Host)
 	if err != nil {
 		// dirty but the go stdlib doesn't have a "split port if present" function
 		host = r.Host
 	}
-	return host
+	if strings.HasPrefix(host, ".") {
+		return "", AuthError{http.StatusBadRequest,
+			fmt.Sprintf("host name %q is reserved", host)}
+	}
+	return host, nil
 }
 
 func GetProjectName(r *http.Request) (string, error) {
@@ -70,7 +74,10 @@ type Authorization struct {
 }
 
 func authorizeDNSChallenge(r *http.Request) (*Authorization, error) {
-	host := GetHost(r)
+	host, err := GetHost(r)
+	if err != nil {
+		return nil, err
+	}
 
 	authorization := r.Header.Get("Authorization")
 	if authorization == "" {
@@ -133,7 +140,10 @@ func authorizeDNSChallenge(r *http.Request) (*Authorization, error) {
 }
 
 func authorizeDNSAllowlist(r *http.Request) (*Authorization, error) {
-	host := GetHost(r)
+	host, err := GetHost(r)
+	if err != nil {
+		return nil, err
+	}
 
 	allowlistHostname := fmt.Sprintf("_git-pages-repository.%s", host)
 	repoURLs, err := net.LookupTXT(allowlistHostname)
@@ -156,9 +166,12 @@ func authorizeDNSAllowlist(r *http.Request) (*Authorization, error) {
 }
 
 func authorizeWildcardMatchHost(r *http.Request) (*Authorization, error) {
-	host := GetHost(r)
-	hostParts := strings.Split(host, ".")
+	host, err := GetHost(r)
+	if err != nil {
+		return nil, err
+	}
 
+	hostParts := strings.Split(host, ".")
 	if slices.Equal(hostParts[1:], wildcardPattern.Domain) {
 		return &Authorization{}, nil
 	} else {
@@ -170,14 +183,17 @@ func authorizeWildcardMatchHost(r *http.Request) (*Authorization, error) {
 }
 
 func authorizeWildcardMatchSite(r *http.Request) (*Authorization, error) {
-	host := GetHost(r)
-	hostParts := strings.Split(host, ".")
+	host, err := GetHost(r)
+	if err != nil {
+		return nil, err
+	}
 
 	projectName, err := GetProjectName(r)
 	if err != nil {
 		return nil, err
 	}
 
+	hostParts := strings.Split(host, ".")
 	if slices.Equal(hostParts[1:], wildcardPattern.Domain) {
 		userName := hostParts[0]
 		var repoURLs []string

@@ -27,7 +27,10 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	var sitePath string
 	var manifest *Manifest
 
-	host := GetHost(r)
+	host, err := GetHost(r)
+	if err != nil {
+		return err
+	}
 
 	// allow JavaScript code to access responses (including errors) even across origins
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -163,7 +166,10 @@ const SiteSizeMax = 512 * 1048576
 func putPage(w http.ResponseWriter, r *http.Request) error {
 	var result UpdateResult
 
-	host := GetHost(r)
+	host, err := GetHost(r)
+	if err != nil {
+		return err
+	}
 
 	projectName, err := GetProjectName(r)
 	if err != nil {
@@ -252,7 +258,10 @@ func deletePage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	host := GetHost(r)
+	host, err := GetHost(r)
+	if err != nil {
+		return err
+	}
 
 	projectName, err := GetProjectName(r)
 	if err != nil {
@@ -277,7 +286,10 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	host := GetHost(r)
+	host, err := GetHost(r)
+	if err != nil {
+		return err
+	}
 
 	projectName, err := GetProjectName(r)
 	if err != nil {
