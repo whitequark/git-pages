@@ -1,9 +1,0 @@
-  git-pages:
-    build:
-      context: https://codeberg.org/whitequark/git-pages.git
-      dockerfile: ./Dockerfile
-    restart: always
-    user: "1000:1000"
-    volumes:
-      - ./git-pages/config.toml:/app/config.toml
-      - ./git-pages/data:/data

@@ -6,7 +6,7 @@
 #  - GIT_PAGES_CONFIG
 
 [build]
-image = "registry.fly.io/git-pages:latest"
+dockerfile = "Dockerfile"
 
 [experimental]
 cmd = ["supervisord"]

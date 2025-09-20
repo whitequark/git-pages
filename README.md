@@ -15,7 +15,7 @@ You will need [Go](https://go.dev/) 1.25 or newer. Run:
 
 ```console
 $ mkdir -p data
-$ cp config.toml.example config.toml
+$ cp conf/config.toml.example config.toml
 $ INSECURE=very go run ./src
 ```
 
