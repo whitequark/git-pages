@@ -42,7 +42,7 @@
             "-s -w"
           ];
 
-          vendorHash = "sha256-RCuX+z74m+G+Ptg/DF727VxnV0WEQWLaQPdN9+Ma9Do=";
+          vendorHash = "sha256-8hT8TC7I1jdfve9WOdwN3C51sjbLSRvwIj7a/1qCmVA=";
 
           fixupPhase = ''
             # Apparently `go install` doesn't support renaming the binary, so country girls make do.

@@ -2,11 +2,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"github.com/KimMachineGun/automemlimit/memlimit"
@@ -32,16 +34,36 @@ func listen(name string, listen string) net.Listener {
 	return listener
 }
 
+func panicHandler(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Printf("panic: %s %s %s: %s\n%s",
+					r.Method, r.Host, r.URL.Path, err, string(debug.Stack()))
+				http.Error(w,
+					fmt.Sprintf("internal server error: %s", err),
+					http.StatusInternalServerError,
+				)
+			}
+		}()
+		handler.ServeHTTP(w, r)
+	})
+}
+
 func serve(listener net.Listener, serve func(http.ResponseWriter, *http.Request)) {
 	if listener != nil {
-		if err := http.Serve(listener, http.HandlerFunc(serve)); err != nil {
-			log.Fatalln(err)
-		}
+		var handler http.Handler
+		handler = http.HandlerFunc(serve)
+		handler = ObserveHTTPHandler(handler)
+		handler = panicHandler(handler)
+		log.Fatalln(http.Serve(listener, handler))
 	}
 }
 
 func main() {
 	var err error
+
+	InitObservability()
 
 	configPath := flag.String("config", "config.toml", "path to configuration file")
 	migrateV1Path := flag.String("migrate-v1", "", "path to v1 data directory to upload")
