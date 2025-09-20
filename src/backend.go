@@ -1,5 +1,3 @@
-// Abstract interface for storage backends; filesystem backend.
-
 package main
 
 import (
