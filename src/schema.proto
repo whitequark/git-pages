@@ -17,10 +17,19 @@ enum Type {
 
 message Entry {
 	Type type = 1;
+	// Only present for `type == InlineFile` and `type == ExternalFile`
 	uint32 size = 2;
+	// Meaning depends on `type`:
+	//  * If `type == InlineFile`, contains file data.
+	//  * If `type == ExternalFile`, contains blob name (an otherwise unspecified
+	//    cryptographically secure content hash).
+	//  * If `type == Symlink`, contains link target.
+	//  * Otherwise not present.
 	bytes data = 3;
 }
 
+// See https://docs.netlify.com/manage/routing/redirects/overview/ for details.
+// Only a subset of the Netlify specification is representable here.
 message Redirect {
 	string from = 1;
 	string to = 2;
@@ -28,11 +37,24 @@ message Redirect {
 	bool force = 4;
 }
 
+message Problem {
+	string path = 1;
+	string cause = 2;
+}
+
 message Manifest {
+	// Source metadata
 	string repo_url = 1;
 	string branch = 2;
 	string commit = 3;
+
+	// Contents
 	map<string, Entry> contents = 4;
 	uint32 total_size = 5;
+
+	// Netlify-style `_redirects`
 	repeated Redirect redirects = 6;
+
+	// Diagnostics for non-fatal errors
+	repeated Problem problems = 7;
 }

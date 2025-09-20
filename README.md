@@ -64,7 +64,7 @@ Features
     - If the URL matches `https://<hostname>/<project-name>/...` and a site was published at `<project-name>`, this project-specific site is selected.
     - If the URL matches `https://<hostname>/...` and the previous rule did not apply, the index site is selected.
     - Site paths starting with `.git-pages/...` are reserved.
-        - The `.git-pages/manifest.json` path returns a [ProtoJSON](https://protobuf.dev/programming-guides/json/) representation of the deployed site manifest.
+        - The `.git-pages/manifest.json` path returns a [ProtoJSON](https://protobuf.dev/programming-guides/json/) representation of the deployed site manifest. It enumerates site structure, redirect rules, and errors that were not severe enough to abort publishing.
 * In response to a `PUT` or `POST` request, the server retrieves updates a site with new content. The URL of the request must be the root URL of the site that is being published.
     - If the `PUT` method receives an `application/x-www-form-urlencoded` body, it contains a repository URL to be shallowly cloned. The `X-Pages-Branch` header contains the branch to be checked out; the `pages` branch is used if the header is absent.
     - If the `PUT` method receives an `application/x-tar` or `application/zip` body, it contains an archive to be extracted.

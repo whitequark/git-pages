@@ -62,6 +62,24 @@ func DecodeManifest(data []byte) (*Manifest, error) {
 	return &manifest, err
 }
 
+func AddProblem(manifest *Manifest, path, format string, args ...any) error {
+	cause := fmt.Sprintf(format, args...)
+	manifest.Problems = append(manifest.Problems, &Problem{
+		Path:  proto.String(path),
+		Cause: proto.String(cause),
+	})
+	return fmt.Errorf("%s: %s", path, cause)
+}
+
+func GetProblemReport(manifest *Manifest) []string {
+	var report []string
+	for _, problem := range manifest.Problems {
+		report = append(report,
+			fmt.Sprintf("%s: %s", problem.GetPath(), problem.GetCause()))
+	}
+	return report
+}
+
 func ManifestDebugJSON(manifest *Manifest) string {
 	result, err := protojson.MarshalOptions{
 		Multiline:         true,
@@ -128,6 +146,7 @@ func ExternalizeFiles(manifest *Manifest) *Manifest {
 		Commit:    manifest.Commit,
 		Contents:  make(map[string]*Entry),
 		Redirects: manifest.Redirects,
+		Problems:  manifest.Problems,
 	}
 	var totalSize uint32
 	for name, entry := range manifest.Contents {

@@ -68,17 +68,20 @@ func ProcessRedirects(manifest *Manifest) error {
 	if redirectsEntry == nil {
 		return nil
 	} else if redirectsEntry.GetType() != Type_InlineFile {
-		return fmt.Errorf("%q is not a regular file", redirectsFile)
+		return AddProblem(manifest, redirectsFile,
+			"not a regular file")
 	}
 
 	rules, err := redirects.ParseString(string(redirectsEntry.GetData()))
 	if err != nil {
-		return fmt.Errorf("syntax error: %w", err)
+		return AddProblem(manifest, redirectsFile,
+			"syntax error: %s", err)
 	}
 
 	for index, rule := range rules {
 		if err := validateRule(rule); err != nil {
-			return fmt.Errorf("rule #%d: %w (in %q)", index+1, err, unparseRule(rule))
+			return AddProblem(manifest, redirectsFile,
+				"rule #%d %q: %s", index+1, unparseRule(rule), err)
 		}
 		manifest.Redirects = append(manifest.Redirects, &Redirect{
 			From:   proto.String(rule.From),

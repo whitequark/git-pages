@@ -209,21 +209,78 @@ func (x *Redirect) GetForce() bool {
 	return false
 }
 
-type Manifest struct {
+type Problem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	RepoUrl       *string                `protobuf:"bytes,1,opt,name=repo_url,json=repoUrl" json:"repo_url,omitempty"`
-	Branch        *string                `protobuf:"bytes,2,opt,name=branch" json:"branch,omitempty"`
-	Commit        *string                `protobuf:"bytes,3,opt,name=commit" json:"commit,omitempty"`
-	Contents      map[string]*Entry      `protobuf:"bytes,4,rep,name=contents" json:"contents,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	TotalSize     *uint32                `protobuf:"varint,5,opt,name=total_size,json=totalSize" json:"total_size,omitempty"`
-	Redirects     []*Redirect            `protobuf:"bytes,6,rep,name=redirects" json:"redirects,omitempty"`
+	Path          *string                `protobuf:"bytes,1,opt,name=path" json:"path,omitempty"`
+	Cause         *string                `protobuf:"bytes,2,opt,name=cause" json:"cause,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Problem) Reset() {
+	*x = Problem{}
+	mi := &file_schema_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Problem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Problem) ProtoMessage() {}
+
+func (x *Problem) ProtoReflect() protoreflect.Message {
+	mi := &file_schema_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Problem.ProtoReflect.Descriptor instead.
+func (*Problem) Descriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *Problem) GetPath() string {
+	if x != nil && x.Path != nil {
+		return *x.Path
+	}
+	return ""
+}
+
+func (x *Problem) GetCause() string {
+	if x != nil && x.Cause != nil {
+		return *x.Cause
+	}
+	return ""
+}
+
+type Manifest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Source metadata
+	RepoUrl *string `protobuf:"bytes,1,opt,name=repo_url,json=repoUrl" json:"repo_url,omitempty"`
+	Branch  *string `protobuf:"bytes,2,opt,name=branch" json:"branch,omitempty"`
+	Commit  *string `protobuf:"bytes,3,opt,name=commit" json:"commit,omitempty"`
+	// Contents
+	Contents  map[string]*Entry `protobuf:"bytes,4,rep,name=contents" json:"contents,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	TotalSize *uint32           `protobuf:"varint,5,opt,name=total_size,json=totalSize" json:"total_size,omitempty"`
+	// Netlify-style `_redirects`
+	Redirects []*Redirect `protobuf:"bytes,6,rep,name=redirects" json:"redirects,omitempty"`
+	// Diagnostics for non-fatal errors
+	Problems      []*Problem `protobuf:"bytes,7,rep,name=problems" json:"problems,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Manifest) Reset() {
 	*x = Manifest{}
-	mi := &file_schema_proto_msgTypes[2]
+	mi := &file_schema_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -235,7 +292,7 @@ func (x *Manifest) String() string {
 func (*Manifest) ProtoMessage() {}
 
 func (x *Manifest) ProtoReflect() protoreflect.Message {
-	mi := &file_schema_proto_msgTypes[2]
+	mi := &file_schema_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -248,7 +305,7 @@ func (x *Manifest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Manifest.ProtoReflect.Descriptor instead.
 func (*Manifest) Descriptor() ([]byte, []int) {
-	return file_schema_proto_rawDescGZIP(), []int{2}
+	return file_schema_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Manifest) GetRepoUrl() string {
@@ -293,6 +350,13 @@ func (x *Manifest) GetRedirects() []*Redirect {
 	return nil
 }
 
+func (x *Manifest) GetProblems() []*Problem {
+	if x != nil {
+		return x.Problems
+	}
+	return nil
+}
+
 var File_schema_proto protoreflect.FileDescriptor
 
 const file_schema_proto_rawDesc = "" +
@@ -306,7 +370,10 @@ const file_schema_proto_rawDesc = "" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\tR\x02to\x12\x16\n" +
 	"\x06status\x18\x03 \x01(\rR\x06status\x12\x14\n" +
-	"\x05force\x18\x04 \x01(\bR\x05force\"\x97\x02\n" +
+	"\x05force\x18\x04 \x01(\bR\x05force\"3\n" +
+	"\aProblem\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x14\n" +
+	"\x05cause\x18\x02 \x01(\tR\x05cause\"\xbd\x02\n" +
 	"\bManifest\x12\x19\n" +
 	"\brepo_url\x18\x01 \x01(\tR\arepoUrl\x12\x16\n" +
 	"\x06branch\x18\x02 \x01(\tR\x06branch\x12\x16\n" +
@@ -314,7 +381,8 @@ const file_schema_proto_rawDesc = "" +
 	"\bcontents\x18\x04 \x03(\v2\x17.Manifest.ContentsEntryR\bcontents\x12\x1d\n" +
 	"\n" +
 	"total_size\x18\x05 \x01(\rR\ttotalSize\x12'\n" +
-	"\tredirects\x18\x06 \x03(\v2\t.RedirectR\tredirects\x1aC\n" +
+	"\tredirects\x18\x06 \x03(\v2\t.RedirectR\tredirects\x12$\n" +
+	"\bproblems\x18\a \x03(\v2\b.ProblemR\bproblems\x1aC\n" +
 	"\rContentsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x1c\n" +
 	"\x05value\x18\x02 \x01(\v2\x06.EntryR\x05value:\x028\x01*Q\n" +
@@ -339,24 +407,26 @@ func file_schema_proto_rawDescGZIP() []byte {
 }
 
 var file_schema_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_schema_proto_goTypes = []any{
 	(Type)(0),        // 0: Type
 	(*Entry)(nil),    // 1: Entry
 	(*Redirect)(nil), // 2: Redirect
-	(*Manifest)(nil), // 3: Manifest
-	nil,              // 4: Manifest.ContentsEntry
+	(*Problem)(nil),  // 3: Problem
+	(*Manifest)(nil), // 4: Manifest
+	nil,              // 5: Manifest.ContentsEntry
 }
 var file_schema_proto_depIdxs = []int32{
 	0, // 0: Entry.type:type_name -> Type
-	4, // 1: Manifest.contents:type_name -> Manifest.ContentsEntry
+	5, // 1: Manifest.contents:type_name -> Manifest.ContentsEntry
 	2, // 2: Manifest.redirects:type_name -> Redirect
-	1, // 3: Manifest.ContentsEntry.value:type_name -> Entry
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	3, // 3: Manifest.problems:type_name -> Problem
+	1, // 4: Manifest.ContentsEntry.value:type_name -> Entry
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_schema_proto_init() }
@@ -370,7 +440,7 @@ func file_schema_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_schema_proto_rawDesc), len(file_schema_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

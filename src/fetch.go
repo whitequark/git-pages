@@ -104,7 +104,8 @@ func FetchRepository(ctx context.Context, repoURL string, branch string) (*Manif
 			} else if entry.Mode == filemode.Dir {
 				manifestEntry.Type = Type_Directory.Enum()
 			} else {
-				manifestEntry.Type = Type_Invalid.Enum()
+				AddProblem(&manifest, name, "unsupported mode %#o", entry.Mode)
+				continue
 			}
 			manifest.Contents[name] = &manifestEntry
 		}

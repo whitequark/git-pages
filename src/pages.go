@@ -243,6 +243,11 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 	if result.manifest != nil {
 		if result.manifest.Commit != nil {
 			fmt.Fprintln(w, *result.manifest.Commit)
+		} else {
+			fmt.Fprintln(w, "(archive)")
+		}
+		for _, problem := range GetProblemReport(result.manifest) {
+			fmt.Fprintln(w, problem)
 		}
 	} else if result.err != nil {
 		fmt.Fprintln(w, result.err)
@@ -374,6 +379,15 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 	case UpdateDeleted:
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "deleted")
+	}
+	if result.manifest != nil {
+		report := GetProblemReport(result.manifest)
+		if len(report) > 0 {
+			fmt.Fprintln(w, "problems:")
+		}
+		for _, problem := range report {
+			fmt.Fprintf(w, "- %s\n", problem)
+		}
 	}
 	return nil
 }

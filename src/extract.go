@@ -28,6 +28,7 @@ func ExtractTar(reader io.Reader) (*Manifest, error) {
 			return nil, err
 		}
 
+		fileName := strings.TrimSuffix(header.Name, "/")
 		manifestEntry := Entry{}
 		switch header.Typeflag {
 		case tar.TypeReg:
@@ -51,9 +52,10 @@ func ExtractTar(reader io.Reader) (*Manifest, error) {
 			manifestEntry.Type = Type_Directory.Enum()
 
 		default:
-			manifestEntry.Type = Type_Invalid.Enum()
+			AddProblem(&manifest, fileName, "unsupported type '%c'", header.Typeflag)
+			continue
 		}
-		manifest.Contents[strings.TrimSuffix(header.Name, "/")] = &manifestEntry
+		manifest.Contents[fileName] = &manifestEntry
 	}
 	return &manifest, nil
 }
