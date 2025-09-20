@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
 	"runtime/debug"
 	"strings"
 
@@ -62,7 +61,6 @@ func main() {
 	InitObservability()
 
 	configPath := flag.String("config", "config.toml", "path to configuration file")
-	migrateV1Path := flag.String("migrate-v1", "", "migrate v1 data directory to storage backend")
 	getManifest := flag.String("get-manifest", "", "retrieve manifest for web root as ProtoJSON")
 	flag.Parse()
 
@@ -70,7 +68,6 @@ func main() {
 		log.Fatalln("config:", err)
 	}
 	UpdateConfigEnv() // environment takes priority
-	CompileWildcardPattern()
 
 	switch config.LogFormat {
 	case "short":
@@ -114,20 +111,7 @@ func main() {
 		healthListener := listen("health", config.Listen.Health)
 
 		ConfigureBackend()
-
-		if *migrateV1Path != "" {
-			root, err := os.OpenRoot(*migrateV1Path)
-			if err != nil {
-				log.Fatalln("migrate v1:", err)
-			}
-
-			err = MigrateFromV1(root)
-			if err != nil {
-				log.Fatalln("migrate v1:", err)
-			}
-
-			log.Println("migrate v1 ok")
-		}
+		CompileWildcardPattern()
 
 		go serve(pagesListener, ServePages)
 		go serve(caddyListener, ServeCaddy)

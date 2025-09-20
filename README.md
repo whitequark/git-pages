@@ -122,7 +122,7 @@ The S3 backend, intended for (relatively) high latency connections, caches both 
 Architecture (v1)
 -----------------
 
-*This was the original architecture and it is no longer used.*
+*This was the original architecture and it is no longer used. Migration to v2 was last available in commit [7e9cd17b](https://codeberg.org/whitequark/git-pages/commit/7e9cd17b70717bea2fe240eb6a784cb206243690).*
 
 Filesystem is used as the sole mechanism for state storage.
 
