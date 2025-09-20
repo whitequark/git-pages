@@ -32,11 +32,9 @@ func ExtractTar(reader io.Reader) (*Manifest, error) {
 		manifestEntry := Entry{}
 		switch header.Typeflag {
 		case tar.TypeReg:
-			fileData := make([]byte, header.Size)
-			length, err := archive.Read(fileData)
-			if !(length == int(header.Size) && err == io.EOF) {
-				return nil, fmt.Errorf("tar: read: %w (expected %d bytes, read %d)",
-					err, header.Size, length)
+			fileData, err := io.ReadAll(archive)
+			if err != nil {
+				return nil, fmt.Errorf("tar: read %s: %w", fileName, err)
 			}
 
 			manifestEntry.Type = Type_InlineFile.Enum()
@@ -98,7 +96,7 @@ func ExtractZip(reader io.Reader) (*Manifest, error) {
 
 			fileData, err := io.ReadAll(fileReader)
 			if err != nil {
-				return nil, fmt.Errorf("zip: read: %w", err)
+				return nil, fmt.Errorf("zip: read %s: %w", file.Name, err)
 			}
 
 			manifestEntry.Type = Type_InlineFile.Enum()
