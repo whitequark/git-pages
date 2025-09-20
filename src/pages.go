@@ -232,13 +232,13 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 	case UpdateTimeout:
 		w.WriteHeader(http.StatusGatewayTimeout)
 	case UpdateNoChange:
-		w.Header().Add("X-Pages-Outcome", "no-change")
+		w.Header().Add("X-Pages-Update", "no-change")
 	case UpdateCreated:
-		w.Header().Add("X-Pages-Outcome", "created")
+		w.Header().Add("X-Pages-Update", "created")
 	case UpdateReplaced:
-		w.Header().Add("X-Pages-Outcome", "replaced")
+		w.Header().Add("X-Pages-Update", "replaced")
 	case UpdateDeleted:
-		w.Header().Add("X-Pages-Outcome", "deleted")
+		w.Header().Add("X-Pages-Update", "deleted")
 	}
 	if result.manifest != nil {
 		if result.manifest.Commit != nil {
