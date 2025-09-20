@@ -44,14 +44,7 @@ type Config struct {
 	} `toml:"backend"`
 }
 
-type WildcardPattern struct {
-	Domain     []string
-	CloneURL   *fasttemplate.Template
-	IndexRepos []*fasttemplate.Template
-}
-
 var config Config
-var wildcardPattern WildcardPattern
 
 func ReadConfig(path string) error {
 	file, err := os.Open(path)
@@ -80,6 +73,41 @@ func UpdateConfigEnv() {
 	updateFromEnv(&config.Backend.S3.Region, "S3_REGION")
 	updateFromEnv(&config.Backend.S3.Bucket, "S3_BUCKET")
 }
+
+var backend Backend
+
+func ConfigureBackend() {
+	var err error
+	switch config.Backend.Type {
+	case "fs":
+		if backend, err = NewFSBackend(config.Backend.FS.Root); err != nil {
+			log.Fatalln("fs backend:", err)
+		}
+
+	case "s3":
+		if backend, err = NewS3Backend(
+			config.Backend.S3.Endpoint,
+			config.Backend.S3.Insecure,
+			config.Backend.S3.AccessKeyID,
+			config.Backend.S3.SecretAccessKey,
+			config.Backend.S3.Region,
+			config.Backend.S3.Bucket,
+		); err != nil {
+			log.Fatalln("s3 backend:", err)
+		}
+
+	default:
+		log.Fatalln("unknown backend:", config.Backend.Type)
+	}
+}
+
+type WildcardPattern struct {
+	Domain     []string
+	CloneURL   *fasttemplate.Template
+	IndexRepos []*fasttemplate.Template
+}
+
+var wildcardPattern WildcardPattern
 
 func CompileWildcardPattern() {
 	wildcardPattern = WildcardPattern{

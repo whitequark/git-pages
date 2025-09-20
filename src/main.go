@@ -14,8 +14,6 @@ import (
 	"github.com/KimMachineGun/automemlimit/memlimit"
 )
 
-var backend Backend
-
 func listen(name string, listen string) net.Listener {
 	if listen == "" {
 		return nil
@@ -61,12 +59,11 @@ func serve(listener net.Listener, serve func(http.ResponseWriter, *http.Request)
 }
 
 func main() {
-	var err error
-
 	InitObservability()
 
 	configPath := flag.String("config", "config.toml", "path to configuration file")
-	migrateV1Path := flag.String("migrate-v1", "", "path to v1 data directory to upload")
+	migrateV1Path := flag.String("migrate-v1", "", "migrate v1 data directory to storage backend")
+	getManifest := flag.String("get-manifest", "", "retrieve manifest for web root as ProtoJSON")
 	flag.Parse()
 
 	if err := ReadConfig(*configPath); err != nil {
@@ -94,58 +91,53 @@ func main() {
 		memlimit.WithRatio(0.9),
 	)
 
-	// Start listening on all ports before initializing the backend, otherwise if the backend
-	// spends some time initializing (which the S3 backend does) a proxy like Caddy can race
-	// with git-pages on startup and return errors for requests that would have been served
-	// just 0.5s later.
-	pagesListener := listen("pages", config.Listen.Pages)
-	caddyListener := listen("caddy", config.Listen.Caddy)
-	healthListener := listen("health", config.Listen.Health)
+	if *getManifest != "" {
+		ConfigureBackend()
 
-	switch config.Backend.Type {
-	case "fs":
-		if backend, err = NewFSBackend(config.Backend.FS.Root); err != nil {
-			log.Fatalln("fs backend:", err)
+		webRoot := *getManifest
+		if !strings.Contains(webRoot, "/") {
+			webRoot += "/.index"
 		}
 
-	case "s3":
-		if backend, err = NewS3Backend(
-			config.Backend.S3.Endpoint,
-			config.Backend.S3.Insecure,
-			config.Backend.S3.AccessKeyID,
-			config.Backend.S3.SecretAccessKey,
-			config.Backend.S3.Region,
-			config.Backend.S3.Bucket,
-		); err != nil {
-			log.Fatalln("s3 backend:", err)
-		}
-
-	default:
-		log.Fatalln("unknown backend:", config.Backend.Type)
-	}
-
-	if *migrateV1Path != "" {
-		root, err := os.OpenRoot(*migrateV1Path)
+		manifest, err := backend.GetManifest(webRoot)
 		if err != nil {
-			log.Fatalln("migrate v1:", err)
+			log.Fatalln(err)
 		}
-
-		err = MigrateFromV1(root)
-		if err != nil {
-			log.Fatalln("migrate v1:", err)
-		}
-
-		log.Println("migrate v1 ok")
-	}
-
-	go serve(pagesListener, ServePages)
-	go serve(caddyListener, ServeCaddy)
-	go serve(healthListener, ServeHealth)
-
-	if InsecureMode() {
-		log.Println("ready (INSECURE)")
+		fmt.Println(ManifestDebugJSON(manifest))
 	} else {
-		log.Println("ready")
+		// Start listening on all ports before initializing the backend, otherwise if the backend
+		// spends some time initializing (which the S3 backend does) a proxy like Caddy can race
+		// with git-pages on startup and return errors for requests that would have been served
+		// just 0.5s later.
+		pagesListener := listen("pages", config.Listen.Pages)
+		caddyListener := listen("caddy", config.Listen.Caddy)
+		healthListener := listen("health", config.Listen.Health)
+
+		ConfigureBackend()
+
+		if *migrateV1Path != "" {
+			root, err := os.OpenRoot(*migrateV1Path)
+			if err != nil {
+				log.Fatalln("migrate v1:", err)
+			}
+
+			err = MigrateFromV1(root)
+			if err != nil {
+				log.Fatalln("migrate v1:", err)
+			}
+
+			log.Println("migrate v1 ok")
+		}
+
+		go serve(pagesListener, ServePages)
+		go serve(caddyListener, ServeCaddy)
+		go serve(healthListener, ServeHealth)
+
+		if InsecureMode() {
+			log.Println("ready (INSECURE)")
+		} else {
+			log.Println("ready")
+		}
+		select {}
 	}
-	select {}
 }
