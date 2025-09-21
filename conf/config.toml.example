@@ -3,7 +3,7 @@ pages = "tcp/:3000"
 caddy = "tcp/:3001"
 health = "tcp/:3002"
 
-# [wildcard]
+# [[wildcard]]
 # domain = "codeberg.page"
 # clone-url = "https://codeberg.org/<user>/<project>.git"
 # index-repos = ["<user>.codeberg.page", "pages"]

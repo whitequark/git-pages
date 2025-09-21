@@ -21,7 +21,7 @@ type Config struct {
 		Caddy  string `toml:"caddy"`
 		Health string `toml:"health"`
 	} `toml:"listen"`
-	Wildcard struct {
+	Wildcard []struct {
 		Domain     string   `toml:"domain"`
 		CloneURL   string   `toml:"clone-url"`
 		IndexRepos []string `toml:"index-repos"`
@@ -107,26 +107,36 @@ type WildcardPattern struct {
 	IndexRepos []*fasttemplate.Template
 }
 
-var wildcardPattern WildcardPattern
+func (pattern *WildcardPattern) GetHost() string {
+	parts := []string{"*"}
+	parts = append(parts, pattern.Domain...)
+	return strings.Join(parts, ".")
+}
+
+var wildcardPatterns []*WildcardPattern
 
 func CompileWildcardPattern() {
-	wildcardPattern = WildcardPattern{
-		Domain: strings.Split(config.Wildcard.Domain, "."),
-	}
+	for _, configWildcard := range config.Wildcard {
+		wildcardPattern := WildcardPattern{
+			Domain: strings.Split(configWildcard.Domain, "."),
+		}
 
-	template, err := fasttemplate.NewTemplate(config.Wildcard.CloneURL, "<", ">")
-	if err != nil {
-		log.Fatalf("wildcard pattern: clone URL: %s", err)
-	} else {
-		wildcardPattern.CloneURL = template
-	}
-
-	for _, indexRepo := range config.Wildcard.IndexRepos {
-		template, err := fasttemplate.NewTemplate(indexRepo, "<", ">")
+		template, err := fasttemplate.NewTemplate(configWildcard.CloneURL, "<", ">")
 		if err != nil {
 			log.Fatalf("wildcard pattern: clone URL: %s", err)
 		} else {
-			wildcardPattern.IndexRepos = append(wildcardPattern.IndexRepos, template)
+			wildcardPattern.CloneURL = template
 		}
+
+		for _, indexRepo := range configWildcard.IndexRepos {
+			template, err := fasttemplate.NewTemplate(indexRepo, "<", ">")
+			if err != nil {
+				log.Fatalf("wildcard pattern: clone URL: %s", err)
+			} else {
+				wildcardPattern.IndexRepos = append(wildcardPattern.IndexRepos, template)
+			}
+		}
+
+		wildcardPatterns = append(wildcardPatterns, &wildcardPattern)
 	}
 }

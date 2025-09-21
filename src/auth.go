@@ -165,24 +165,24 @@ func authorizeDNSAllowlist(r *http.Request) (*Authorization, error) {
 	return &Authorization{repoURLs}, err
 }
 
-func authorizeWildcardMatchHost(r *http.Request) (*Authorization, error) {
+func authorizeWildcardMatchHost(r *http.Request, pattern *WildcardPattern) (*Authorization, error) {
 	host, err := GetHost(r)
 	if err != nil {
 		return nil, err
 	}
 
 	hostParts := strings.Split(host, ".")
-	if slices.Equal(hostParts[1:], wildcardPattern.Domain) {
+	if slices.Equal(hostParts[1:], pattern.Domain) {
 		return &Authorization{}, nil
 	} else {
 		return nil, AuthError{
 			http.StatusUnauthorized,
-			fmt.Sprintf("domain %s does not match wildcard *.%s", host, config.Wildcard.Domain),
+			fmt.Sprintf("domain %s does not match wildcard %s", host, pattern.GetHost()),
 		}
 	}
 }
 
-func authorizeWildcardMatchSite(r *http.Request) (*Authorization, error) {
+func authorizeWildcardMatchSite(r *http.Request, pattern *WildcardPattern) (*Authorization, error) {
 	host, err := GetHost(r)
 	if err != nil {
 		return nil, err
@@ -194,12 +194,12 @@ func authorizeWildcardMatchSite(r *http.Request) (*Authorization, error) {
 	}
 
 	hostParts := strings.Split(host, ".")
-	if slices.Equal(hostParts[1:], wildcardPattern.Domain) {
+	if slices.Equal(hostParts[1:], pattern.Domain) {
 		userName := hostParts[0]
 		var repoURLs []string
-		repoURLTemplate := wildcardPattern.CloneURL
+		repoURLTemplate := pattern.CloneURL
 		if projectName == ".index" {
-			for _, indexRepoTemplate := range wildcardPattern.IndexRepos {
+			for _, indexRepoTemplate := range pattern.IndexRepos {
 				indexRepo := indexRepoTemplate.ExecuteString(map[string]any{"user": userName})
 				repoURLs = append(repoURLs, repoURLTemplate.ExecuteString(map[string]interface{}{
 					"user":    userName,
@@ -216,7 +216,7 @@ func authorizeWildcardMatchSite(r *http.Request) (*Authorization, error) {
 	} else {
 		return nil, AuthError{
 			http.StatusUnauthorized,
-			fmt.Sprintf("domain %s does not match wildcard *.%s", host, config.Wildcard.Domain),
+			fmt.Sprintf("domain %s does not match wildcard %s", host, pattern.GetHost()),
 		}
 	}
 }
@@ -239,15 +239,16 @@ func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
 		return auth, nil
 	}
 
-	auth, err = authorizeWildcardMatchHost(r)
-	if err != nil && IsUnauthorized(err) {
-		causes = append(causes, err)
-	} else if err != nil { // bad request
-		return nil, err
-	} else {
-		log.Printf("auth: wildcard *.%s\n",
-			config.Wildcard.Domain)
-		return auth, nil
+	for _, pattern := range wildcardPatterns {
+		auth, err = authorizeWildcardMatchHost(r, pattern)
+		if err != nil && IsUnauthorized(err) {
+			causes = append(causes, err)
+		} else if err != nil { // bad request
+			return nil, err
+		} else {
+			log.Printf("auth: wildcard %s\n", pattern.GetHost())
+			return auth, nil
+		}
 	}
 
 	return nil, errors.Join(causes...)
@@ -290,15 +291,16 @@ func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 
 	// Wildcard match is only available for webhooks, not the REST API.
 	if r.Method == http.MethodPost {
-		auth, err = authorizeWildcardMatchSite(r)
-		if err != nil && IsUnauthorized(err) {
-			causes = append(causes, err)
-		} else if err != nil { // bad request
-			return nil, err
-		} else {
-			log.Printf("auth: wildcard *.%s: allow %v\n",
-				config.Wildcard.Domain, auth.repoURLs)
-			return auth, nil
+		for _, pattern := range wildcardPatterns {
+			auth, err = authorizeWildcardMatchSite(r, pattern)
+			if err != nil && IsUnauthorized(err) {
+				causes = append(causes, err)
+			} else if err != nil { // bad request
+				return nil, err
+			} else {
+				log.Printf("auth: wildcard %s: allow %v\n", pattern.GetHost(), auth.repoURLs)
+				return auth, nil
+			}
 		}
 	}
 
