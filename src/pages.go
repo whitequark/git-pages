@@ -185,7 +185,8 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 
 	contentType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil {
-		return fmt.Errorf("parsing content type: %w", err)
+		http.Error(w, "malformed content type", http.StatusUnsupportedMediaType)
+		return fmt.Errorf("content type: %w", err)
 	}
 
 	if contentType == "application/x-www-form-urlencoded" {
