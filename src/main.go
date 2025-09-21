@@ -53,7 +53,12 @@ func serve(listener net.Listener, serve func(http.ResponseWriter, *http.Request)
 		handler = http.HandlerFunc(serve)
 		handler = ObserveHTTPHandler(handler)
 		handler = panicHandler(handler)
-		log.Fatalln(http.Serve(listener, handler))
+
+		server := http.Server{Handler: handler}
+		server.Protocols = new(http.Protocols)
+		server.Protocols.SetHTTP1(true)
+		server.Protocols.SetUnencryptedHTTP2(true)
+		log.Fatalln(server.Serve(listener))
 	}
 }
 

@@ -51,7 +51,7 @@ http:// {
 	redir @get https://{host}{uri} 301
 
 	# initial PUT/POST for a new domain has to happen over HTTP
-	reverse_proxy http://{$GIT_PAGES_ADDRESS:localhost}:3000
+	reverse_proxy h2c://{$GIT_PAGES_ADDRESS:localhost}:3000
 }
 
 https:// {
@@ -60,9 +60,9 @@ https:// {
 	}
 
 	encode
-	reverse_proxy http://{$GIT_PAGES_ADDRESS:localhost}:3000
+	reverse_proxy h2c://{$GIT_PAGES_ADDRESS:localhost}:3000
 }
 
 http://localhost:2002 {
-	reverse_proxy http://{$GIT_PAGES_ADDRESS:localhost}:3002
+	reverse_proxy h2c://{$GIT_PAGES_ADDRESS:localhost}:3002
 }
