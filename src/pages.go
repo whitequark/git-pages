@@ -156,9 +156,13 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Cross-Origin-Embedder-Policy", "credentialless")
 		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
 
-		// always check whether content has changed with the origin server; it is cheap to handle
-		// ETag or If-Modified-Since queries and it avoids stale content being served
-		w.Header().Set("Cache-Control", "public, max-age=0, must-revalidate")
+		// consider content fresh for 60 seconds (the same as the freshness interval of
+		// manifests in the S3 backend), and use stale content anyway as long as it's not
+		// older than a hour; while it is cheap to handle If-Modified-Since queries
+		// server-side, on the client `max-age=0, must-revalidate` causes every resource
+		// to block the page load every time
+		w.Header().Set("Cache-Control", "max-age=60, stale-while-revalidate=3600")
+		// see https://web.dev/articles/stale-while-revalidate for details
 
 		// http.ServeContent handles content type and caching
 		http.ServeContent(w, r, sitePath, mtime, reader)
