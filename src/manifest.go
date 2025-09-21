@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/c2h5oh/datasize"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -91,14 +92,12 @@ func ManifestDebugJSON(manifest *Manifest) string {
 	return string(result)
 }
 
-const maxSymlinkLevels int = 128
-
-var errSymlinkLoop = errors.New("symbolic link loop")
+var ErrSymlinkLoop = errors.New("symbolic link loop")
 
 func ExpandSymlinks(manifest *Manifest, inPath string) (string, error) {
-	var levels int
+	var levels uint
 again:
-	for levels = 0; levels < maxSymlinkLevels; levels += 1 {
+	for levels = 0; levels < config.Limits.MaxSymlinkDepth; levels += 1 {
 		parts := strings.Split(inPath, "/")
 		for i := 1; i <= len(parts); i++ {
 			linkPath := path.Join(parts[:i]...)
@@ -114,10 +113,10 @@ again:
 		}
 		break
 	}
-	if levels < maxSymlinkLevels {
+	if levels < config.Limits.MaxSymlinkDepth {
 		return inPath, nil
 	} else {
-		return "", errSymlinkLoop
+		return "", ErrSymlinkLoop
 	}
 }
 
@@ -135,8 +134,6 @@ func PrepareManifest(manifest *Manifest) error {
 	return nil
 }
 
-const ExternalSizeMin uint32 = 256
-
 // Replaces inline file data over certain size with references to an external content-addressable
 // store, without performing any I/O. Returns an updated copy of the manifest.
 func ExternalizeFiles(manifest *Manifest) *Manifest {
@@ -150,7 +147,9 @@ func ExternalizeFiles(manifest *Manifest) *Manifest {
 	}
 	var totalSize uint32
 	for name, entry := range manifest.Contents {
-		if entry.GetType() == Type_InlineFile && entry.GetSize() > ExternalSizeMin {
+		canBeInlined := entry.GetType() == Type_InlineFile &&
+			entry.GetSize() > uint32(config.Limits.MaxInlineFileSize.Bytes())
+		if canBeInlined {
 			newManifest.Contents[name] = &Entry{
 				Type: Type_ExternalFile.Enum(),
 				Size: entry.Size,
@@ -165,18 +164,19 @@ func ExternalizeFiles(manifest *Manifest) *Manifest {
 	return &newManifest
 }
 
-const ManifestSizeMax int = 1048576
-
-var errManifestTooLarge = errors.New("manifest size limit exceeded")
+var ErrManifestTooLarge = errors.New("manifest too large")
 
 // Uploads inline file data over certain size to the storage backend. Returns a copy of
 // the manifest updated to refer to an external content-addressable store.
 func StoreManifest(name string, manifest *Manifest) (*Manifest, error) {
 	extManifest := ExternalizeFiles(manifest)
 	extManifestData := EncodeManifest(extManifest)
-	if len(extManifestData) > ManifestSizeMax {
-		return nil, fmt.Errorf("%w: %d > %d bytes",
-			errManifestTooLarge, extManifestData, ManifestSizeMax)
+	if uint64(len(extManifestData)) > config.Limits.MaxManifestSize.Bytes() {
+		return nil, fmt.Errorf("%w: decompressed size %s exceeds %s limit",
+			ErrManifestTooLarge,
+			datasize.ByteSize(len(extManifestData)).HR(),
+			config.Limits.MaxManifestSize,
+		)
 	}
 
 	if err := backend.StageManifest(extManifest); err != nil {

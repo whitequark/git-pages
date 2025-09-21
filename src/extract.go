@@ -10,12 +10,18 @@ import (
 	"io"
 	"strings"
 
+	"github.com/c2h5oh/datasize"
 	"github.com/klauspost/compress/zstd"
 	"google.golang.org/protobuf/proto"
 )
 
+var ErrArchiveTooLarge = errors.New("archive too large")
+
 func ExtractTar(reader io.Reader) (*Manifest, error) {
-	archive := tar.NewReader(reader)
+	boundedReader := ReadAtMost(reader, int64(config.Limits.MaxSiteSize.Bytes()),
+		fmt.Errorf("%w: %s limit exceeded", ErrArchiveTooLarge, config.Limits.MaxSiteSize.HR()))
+
+	archive := tar.NewReader(boundedReader)
 
 	manifest := Manifest{
 		Contents: map[string]*Entry{
@@ -46,7 +52,7 @@ func ExtractTar(reader io.Reader) (*Manifest, error) {
 		case tar.TypeReg:
 			fileData, err := io.ReadAll(archive)
 			if err != nil {
-				return nil, fmt.Errorf("tar: read %s: %w", fileName, err)
+				return nil, fmt.Errorf("tar: %s: %w", fileName, err)
 			}
 
 			manifestEntry.Type = Type_InlineFile.Enum()
@@ -78,6 +84,7 @@ func ExtractTarGzip(reader io.Reader) (*Manifest, error) {
 	}
 	defer stream.Close()
 
+	// stream length is limited in `ExtractTar`
 	return ExtractTar(stream)
 }
 
@@ -88,10 +95,9 @@ func ExtractTarZstd(reader io.Reader) (*Manifest, error) {
 	}
 	defer stream.Close()
 
+	// stream length is limited in `ExtractTar`
 	return ExtractTar(stream)
 }
-
-var errZipBomb = errors.New("zip file size limit exceeded")
 
 func ExtractZip(reader io.Reader) (*Manifest, error) {
 	data, err := io.ReadAll(reader)
@@ -109,8 +115,12 @@ func ExtractZip(reader io.Reader) (*Manifest, error) {
 	for _, file := range archive.File {
 		totalSize += file.UncompressedSize64
 	}
-	if totalSize > SiteSizeMax {
-		return nil, fmt.Errorf("%w: %d > %d bytes", errZipBomb, totalSize, SiteSizeMax)
+	if totalSize > config.Limits.MaxSiteSize.Bytes() {
+		return nil, fmt.Errorf("%w: decompressed size %s exceeds %s limit",
+			ErrArchiveTooLarge,
+			datasize.ByteSize(totalSize).HR(),
+			config.Limits.MaxSiteSize.HR(),
+		)
 	}
 
 	manifest := Manifest{
@@ -129,7 +139,7 @@ func ExtractZip(reader io.Reader) (*Manifest, error) {
 
 			fileData, err := io.ReadAll(fileReader)
 			if err != nil {
-				return nil, fmt.Errorf("zip: read %s: %w", file.Name, err)
+				return nil, fmt.Errorf("zip: %s: %w", file.Name, err)
 			}
 
 			manifestEntry.Type = Type_InlineFile.Enum()

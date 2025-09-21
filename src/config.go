@@ -2,7 +2,10 @@ package main
 
 import (
 	"os"
+	"time"
 
+	"github.com/c2h5oh/datasize"
+	"github.com/creasty/defaults"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -40,6 +43,25 @@ type Config struct {
 			SiteCache       CacheConfig `toml:"site-cache"`
 		}
 	} `toml:"backend"`
+	Limits struct {
+		// Maximum size of a single published site. Also used to limit the size of archive
+		// uploads and other similar overconsumption conditions.
+		MaxSiteSize datasize.ByteSize `toml:"max-site-size" default:"128M"`
+		// Maximum size of a single site manifest, computed over its binary Protobuf
+		// serialization.
+		MaxManifestSize datasize.ByteSize `toml:"max-manifest-size" default:"1M"`
+		// Maximum size of a file that will still be inlined into the site manifest.
+		MaxInlineFileSize datasize.ByteSize `toml:"max-inline-file-size" default:"256B"`
+		// Maximum size of a Git object that will be cached in memory during Git operations.
+		GitLargeObjectThreshold datasize.ByteSize `toml:"git-large-object-threshold" default:"1M"`
+		// Maximum number of symbolic link traversals before the path is considered unreachable.
+		MaxSymlinkDepth uint `toml:"max-symlink-depth" default:"16"`
+		// Maximum time that an update operation (PUT or POST request) could take before being
+		// interrupted.
+		UpdateTimeout time.Duration `toml:"update-timeout" default:"60s"`
+		// Soft limit on Go heap size, expressed as a fraction of total available RAM.
+		MaxHeapSizeRatio float64 `toml:"max-heap-size-ratio" default:"0.5"`
+	} `toml:"limits"`
 }
 
 var config Config
@@ -53,7 +75,13 @@ func ReadConfig(path string) error {
 
 	decoder := toml.NewDecoder(file)
 	decoder.DisallowUnknownFields()
-	return decoder.Decode(&config)
+	if err := decoder.Decode(&config); err != nil {
+		return err
+	}
+
+	defaults.MustSet(&config)
+
+	return nil
 }
 
 func updateFromEnv(dest *string, key string) {

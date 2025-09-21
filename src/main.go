@@ -103,7 +103,7 @@ func main() {
 				memlimit.FromSystem,
 			),
 		),
-		memlimit.WithRatio(0.9),
+		memlimit.WithRatio(float64(config.Limits.MaxHeapSizeRatio)),
 	)
 
 	if *getManifest != "" {

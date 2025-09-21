@@ -17,7 +17,6 @@ import (
 )
 
 const notFoundPage = "404.html"
-const updateTimeout = 60 * time.Second
 
 func makeWebRoot(host string, projectName string) string {
 	return fmt.Sprintf("%s/%s", strings.ToLower(host), projectName)
@@ -171,8 +170,6 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-const SiteSizeMax = 512 * 1048576
-
 func putPage(w http.ResponseWriter, r *http.Request) error {
 	var result UpdateResult
 
@@ -219,7 +216,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 
-		ctx, cancel := context.WithTimeout(r.Context(), updateTimeout)
+		ctx, cancel := context.WithTimeout(r.Context(), config.Limits.UpdateTimeout)
 		defer cancel()
 		result = UpdateFromRepository(ctx, webRoot, repoURL, branch)
 	} else {
@@ -229,17 +226,17 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		// request body contains archive
-		reader := http.MaxBytesReader(w, r.Body, SiteSizeMax)
+		reader := http.MaxBytesReader(w, r.Body, int64(config.Limits.MaxSiteSize.Bytes()))
 		result = UpdateFromArchive(webRoot, contentType, reader)
 	}
 
 	switch result.outcome {
 	case UpdateError:
-		if errors.Is(result.err, errManifestTooLarge) {
+		if errors.Is(result.err, ErrManifestTooLarge) {
 			w.WriteHeader(http.StatusRequestEntityTooLarge)
 		} else if errors.Is(result.err, errArchiveFormat) {
 			w.WriteHeader(http.StatusUnsupportedMediaType)
-		} else if errors.Is(result.err, errZipBomb) {
+		} else if errors.Is(result.err, ErrArchiveTooLarge) {
 			w.WriteHeader(http.StatusRequestEntityTooLarge)
 		} else {
 			w.WriteHeader(http.StatusServiceUnavailable)
@@ -372,7 +369,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), updateTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), config.Limits.UpdateTimeout)
 	defer cancel()
 	result := UpdateFromRepository(ctx, webRoot, repoURL, "pages")
 	switch result.outcome {

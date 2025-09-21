@@ -16,8 +16,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const largeObjectThreshold int64 = 1048576
-
 func FetchRepository(ctx context.Context, repoURL string, branch string) (*Manifest, error) {
 	baseDir, err := os.MkdirTemp("", "fetchRepo")
 	if err != nil {
@@ -29,7 +27,7 @@ func FetchRepository(ctx context.Context, repoURL string, branch string) (*Manif
 	cache := cache.NewObjectLRUDefault()
 	storer := filesystem.NewStorageWithOptions(fs, cache, filesystem.Options{
 		ExclusiveAccess:      true,
-		LargeObjectThreshold: largeObjectThreshold,
+		LargeObjectThreshold: int64(config.Limits.GitLargeObjectThreshold.Bytes()),
 	})
 	repo, err := git.CloneContext(ctx, storer, nil, &git.CloneOptions{
 		Bare:          true,

@@ -21,3 +21,11 @@ root = "data"
 # secret-access-key = "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"
 # region = "us-east-1"
 # bucket = "git-pages-demo"
+
+# [limits]
+# max-site-size = "128M"
+# max-manifest-size = "1M"
+# max-inline-file-size = "256B"
+# git-large-object-threshold = "1M"
+# max-symlink-depth = 16
+# update-timeout = "60s"
