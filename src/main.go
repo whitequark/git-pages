@@ -7,11 +7,22 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"runtime/debug"
+	"slices"
 	"strings"
 
 	"github.com/KimMachineGun/automemlimit/memlimit"
 )
+
+var features []string
+
+func FeatureActive(feature string) bool {
+	if features == nil {
+		features = strings.Split(strings.ToLower(os.Getenv("FEATURES")), ",")
+	}
+	return slices.Contains(features, strings.ToLower(feature))
+}
 
 func listen(name string, listen string) net.Listener {
 	if listen == "" {
@@ -57,7 +68,9 @@ func serve(listener net.Listener, serve func(http.ResponseWriter, *http.Request)
 		server := http.Server{Handler: handler}
 		server.Protocols = new(http.Protocols)
 		server.Protocols.SetHTTP1(true)
-		server.Protocols.SetUnencryptedHTTP2(true)
+		if FeatureActive("h2c") {
+			server.Protocols.SetUnencryptedHTTP2(true)
+		}
 		log.Fatalln(server.Serve(listener))
 	}
 }

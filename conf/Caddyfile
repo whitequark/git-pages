@@ -27,7 +27,7 @@
 	auto_https disable_redirects
 
 	on_demand_tls {
-		permission http http://{$GIT_PAGES_ADDRESS:localhost}:3001
+		permission http http://localhost:3001
 	}
 
 	servers :80 {
@@ -46,12 +46,18 @@
 	}
 }
 
+(backend_pages) {
+	@h2c `{env.FEATURES}.matches(r"\bh2c\b")`
+	reverse_proxy @h2c h2c://{$GIT_PAGES_ADDRESS:localhost}:3000
+	reverse_proxy http://{$GIT_PAGES_ADDRESS:localhost}:3000
+}
+
 http:// {
 	@get method GET
 	redir @get https://{host}{uri} 301
 
 	# initial PUT/POST for a new domain has to happen over HTTP
-	reverse_proxy h2c://{$GIT_PAGES_ADDRESS:localhost}:3000
+	import backend_pages
 }
 
 https:// {
@@ -60,9 +66,9 @@ https:// {
 	}
 
 	encode
-	reverse_proxy h2c://{$GIT_PAGES_ADDRESS:localhost}:3000
+	import backend_pages
 }
 
 http://localhost:2002 {
-	reverse_proxy h2c://{$GIT_PAGES_ADDRESS:localhost}:3002
+	reverse_proxy http://localhost:3002
 }
