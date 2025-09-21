@@ -18,6 +18,7 @@ memory = 512
 
 [env]
 UDP_BIND_TO = "fly-global-services"
+ALLOW_PROXY = "172.16.0.0/16"
 AUTOMEMLIMIT = "0.25"
 
 [[files]]
@@ -27,14 +28,14 @@ secret_name = "GIT_PAGES_CONFIG"
 [[services]]
 internal_port = 80
 protocol = "tcp"
-ports = [{ port = 80 }]
+ports = [{ port = 80, handlers = ["proxy_proto"], proxy_proto_options = { version = "v2" } }]
 auto_stop_machines = "stop"
 auto_start_machines = true
 
 [[services]]
 internal_port = 443
 protocol = "tcp"
-ports = [{ port = 443 }]
+ports = [{ port = 443, handlers = ["proxy_proto"], proxy_proto_options = { version = "v2" } }]
 auto_stop_machines = "stop"
 auto_start_machines = true
 

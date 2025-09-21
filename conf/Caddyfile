@@ -1,3 +1,13 @@
+(proxy) {
+	listener_wrappers {
+		proxy_protocol {
+			timeout 1s
+			allow {$ALLOW_PROXY}
+		}
+		tls
+	}
+}
+
 {
 	persist_config off
 
@@ -33,11 +43,13 @@
 	servers :80 {
 		name http
 		protocols h1 h2c
+		import proxy
 	}
 
 	servers :443 {
 		name https
 		protocols h1 h2
+		import proxy
 	}
 
 	servers {$UDP_BIND_TO:0.0.0.0}:443 {
