@@ -10,16 +10,16 @@ import (
 )
 
 type CacheConfig struct {
-	MaxSize uint64 `toml:"max-size"` // in bytes
-	MaxAge  string `toml:"max-age"`
+	MaxSize datasize.ByteSize `toml:"max-size"`
+	MaxAge  uint              `toml:"max-age"` // in seconds
 }
 
 type Config struct {
-	LogFormat string `toml:"log-format"`
+	LogFormat string `toml:"log-format" default:"datetime+message"`
 	Listen    struct {
-		Pages  string `toml:"pages"`
-		Caddy  string `toml:"caddy"`
-		Health string `toml:"health"`
+		Pages  string `toml:"pages" default:"tcp/:3000"`
+		Caddy  string `toml:"caddy" default:"tcp/:3001"`
+		Health string `toml:"health" default:"tcp/:3002"`
 	} `toml:"listen"`
 	Wildcard []struct {
 		Domain          string   `toml:"domain"`
@@ -28,9 +28,9 @@ type Config struct {
 		FallbackProxyTo string   `toml:"fallback-proxy-to"`
 	} `toml:"wildcard"`
 	Backend struct {
-		Type string `toml:"type"`
+		Type string `toml:"type" default:"fs"`
 		FS   struct {
-			Root string `toml:"root"`
+			Root string `toml:"root" default:"./data"`
 		} `toml:"fs"`
 		S3 struct {
 			Endpoint        string      `toml:"endpoint"`
@@ -39,8 +39,8 @@ type Config struct {
 			SecretAccessKey string      `toml:"secret-access-key"`
 			Region          string      `toml:"region"`
 			Bucket          string      `toml:"bucket"`
-			BlobCache       CacheConfig `toml:"blob-cache"`
-			SiteCache       CacheConfig `toml:"site-cache"`
+			BlobCache       CacheConfig `toml:"blob-cache" default:"{\"MaxSize\":\"256MB\"}"`
+			SiteCache       CacheConfig `toml:"site-cache" default:"{\"MaxAge\":60,\"MaxSize\":\"16MB\"}"`
 		}
 	} `toml:"backend"`
 	Limits struct {

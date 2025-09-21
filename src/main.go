@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -25,7 +26,7 @@ func FeatureActive(feature string) bool {
 }
 
 func listen(name string, listen string) net.Listener {
-	if listen == "" {
+	if listen == "-" {
 		return nil
 	}
 
@@ -79,6 +80,7 @@ func main() {
 	InitObservability()
 
 	configPath := flag.String("config", "config.toml", "path to configuration file")
+	printConfig := flag.Bool("print-config", false, "print final configuration as JSON")
 	getManifest := flag.String("get-manifest", "", "retrieve manifest for web root as ProtoJSON")
 	flag.Parse()
 
@@ -87,10 +89,16 @@ func main() {
 	}
 	UpdateConfigEnv() // environment takes priority
 
+	if *printConfig {
+		configJSON, _ := json.MarshalIndent(&config, "", "  ")
+		fmt.Println(string(configJSON))
+		return
+	}
+
 	switch config.LogFormat {
-	case "short":
+	case "message":
 		log.SetFlags(0)
-	default:
+	case "datetime+message":
 		log.SetFlags(log.Ldate | log.Ltime | log.LUTC)
 	}
 

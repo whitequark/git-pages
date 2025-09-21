@@ -39,32 +39,19 @@ type S3Backend struct {
 	siteCache *otter.Cache[string, *CachedManifest]
 }
 
-func defaultCacheConfig[K comparable, V any](
+func makeCacheOptions[K comparable, V any](
 	config CacheConfig,
-	maxAge time.Duration,
-	maxSize uint64,
 	weigher func(K, V) uint32,
-) (*otter.Options[K, V], error) {
-	var err error
-	if config.MaxAge != "" {
-		maxAge, err = time.ParseDuration(config.MaxAge)
-		if err != nil {
-			return nil, fmt.Errorf("max-age: %w", err)
-		}
-	}
-	if config.MaxSize != 0 {
-		maxSize = config.MaxSize
-	}
-
+) *otter.Options[K, V] {
 	options := &otter.Options[K, V]{}
-	if maxSize != 0 {
-		options.MaximumWeight = maxSize
+	if config.MaxSize != 0 {
+		options.MaximumWeight = config.MaxSize.Bytes()
 		options.Weigher = weigher
 	}
-	if maxAge != 0 {
-		options.ExpiryCalculator = otter.ExpiryWriting[K, V](maxAge)
+	if config.MaxAge != 0 {
+		options.ExpiryCalculator = otter.ExpiryWriting[K, V](time.Duration(config.MaxAge) * time.Second)
 	}
-	return options, nil
+	return options
 }
 
 func NewS3Backend(
@@ -102,28 +89,14 @@ func NewS3Backend(
 		}
 	}
 
-	blobCacheOptions, err := defaultCacheConfig(
-		config.Backend.S3.BlobCache,
-		0, 256*1048576,
-		func(key string, value *CachedBlob) uint32 { return uint32(len(value.blob)) })
+	blobCache, err := otter.New(makeCacheOptions(config.Backend.S3.BlobCache,
+		func(key string, value *CachedBlob) uint32 { return uint32(len(value.blob)) }))
 	if err != nil {
 		return nil, err
 	}
 
-	blobCache, err := otter.New(blobCacheOptions)
-	if err != nil {
-		return nil, err
-	}
-
-	siteCacheOptions, err := defaultCacheConfig(
-		config.Backend.S3.SiteCache,
-		60*time.Second, 16*1048576,
-		func(key string, value *CachedManifest) uint32 { return value.weight })
-	if err != nil {
-		return nil, err
-	}
-
-	siteCache, err := otter.New(siteCacheOptions)
+	siteCache, err := otter.New(makeCacheOptions(config.Backend.S3.SiteCache,
+		func(key string, value *CachedManifest) uint32 { return value.weight }))
 	if err != nil {
 		return nil, err
 	}
