@@ -55,7 +55,6 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 
 	// allow JavaScript code to access responses (including errors) even across origins
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Max-Age", "86400")
 
 	if sitePath == ".git-pages" {
 		// metadata directory name shouldn't be served even if present in site manifest
