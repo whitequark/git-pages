@@ -7,6 +7,7 @@ health = "tcp/:3002"
 # domain = "codeberg.page"
 # clone-url = "https://codeberg.org/<user>/<project>.git"
 # index-repos = ["<user>.codeberg.page", "pages"]
+# fallback-proxy-to = "https://codeberg.page"
 
 [backend]
 type = "fs"

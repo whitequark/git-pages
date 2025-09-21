@@ -33,10 +33,6 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	// allow JavaScript code to access responses (including errors) even across origins
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Max-Age", "86400")
-
 	sitePath, _ = strings.CutPrefix(r.URL.Path, "/")
 	if projectName, projectPath, found := strings.Cut(sitePath, "/"); found {
 		projectManifest, err := backend.GetManifest(makeWebRoot(host, projectName))
@@ -47,11 +43,19 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	if manifest == nil {
 		manifest, err = backend.GetManifest(makeWebRoot(host, ".index"))
 		if manifest == nil {
-			w.WriteHeader(http.StatusNotFound)
-			fmt.Fprintf(w, "site not found\n")
-			return err
+			if found, fallbackErr := HandleWildcardFallback(w, r); found {
+				return fallbackErr
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+				fmt.Fprintf(w, "site not found\n")
+				return err
+			}
 		}
 	}
+
+	// allow JavaScript code to access responses (including errors) even across origins
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Max-Age", "86400")
 
 	if sitePath == ".git-pages" {
 		// metadata directory name shouldn't be served even if present in site manifest

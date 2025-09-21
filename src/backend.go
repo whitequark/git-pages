@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"slices"
 	"strings"
@@ -9,6 +10,15 @@ import (
 )
 
 var errNotFound = errors.New("not found")
+
+func splitBlobName(name string) []string {
+	algo, hash, found := strings.Cut(name, "-")
+	if found {
+		return slices.Concat([]string{algo}, splitBlobName(hash))
+	} else {
+		return []string{name[0:2], name[2:4], name[4:]}
+	}
+}
 
 type Backend interface {
 	// Retrieve a blob. Returns `reader, mtime, err`.
@@ -41,11 +51,30 @@ type Backend interface {
 	CheckDomain(domain string) (bool, error)
 }
 
-func splitBlobName(name string) []string {
-	algo, hash, found := strings.Cut(name, "-")
-	if found {
-		return slices.Concat([]string{algo}, splitBlobName(hash))
-	} else {
-		return []string{name[0:2], name[2:4], name[4:]}
+var backend Backend
+
+func ConfigureBackend() error {
+	var err error
+	switch config.Backend.Type {
+	case "fs":
+		if backend, err = NewFSBackend(config.Backend.FS.Root); err != nil {
+			return fmt.Errorf("fs backend: %w", err)
+		}
+
+	case "s3":
+		if backend, err = NewS3Backend(
+			config.Backend.S3.Endpoint,
+			config.Backend.S3.Insecure,
+			config.Backend.S3.AccessKeyID,
+			config.Backend.S3.SecretAccessKey,
+			config.Backend.S3.Region,
+			config.Backend.S3.Bucket,
+		); err != nil {
+			return fmt.Errorf("s3 backend: %w", err)
+		}
+
+	default:
+		return fmt.Errorf("unknown backend: %s", config.Backend.Type)
 	}
+	return nil
 }

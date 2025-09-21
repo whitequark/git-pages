@@ -89,7 +89,9 @@ func main() {
 	)
 
 	if *getManifest != "" {
-		ConfigureBackend()
+		if err := ConfigureBackend(); err != nil {
+			log.Fatalln(err)
+		}
 
 		webRoot := *getManifest
 		if !strings.Contains(webRoot, "/") {
@@ -110,8 +112,13 @@ func main() {
 		caddyListener := listen("caddy", config.Listen.Caddy)
 		healthListener := listen("health", config.Listen.Health)
 
-		ConfigureBackend()
-		CompileWildcardPattern()
+		if err := ConfigureBackend(); err != nil {
+			log.Fatalln(err)
+		}
+
+		if err := ConfigureWildcards(); err != nil {
+			log.Fatalln(err)
+		}
 
 		go serve(pagesListener, ServePages)
 		go serve(caddyListener, ServeCaddy)

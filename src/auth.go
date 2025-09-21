@@ -171,8 +171,7 @@ func authorizeWildcardMatchHost(r *http.Request, pattern *WildcardPattern) (*Aut
 		return nil, err
 	}
 
-	hostParts := strings.Split(host, ".")
-	if slices.Equal(hostParts[1:], pattern.Domain) {
+	if _, found := pattern.Matches(host); found {
 		return &Authorization{}, nil
 	} else {
 		return nil, AuthError{
@@ -193,9 +192,7 @@ func authorizeWildcardMatchSite(r *http.Request, pattern *WildcardPattern) (*Aut
 		return nil, err
 	}
 
-	hostParts := strings.Split(host, ".")
-	if slices.Equal(hostParts[1:], pattern.Domain) {
-		userName := hostParts[0]
+	if userName, found := pattern.Matches(host); found {
 		var repoURLs []string
 		repoURLTemplate := pattern.CloneURL
 		if projectName == ".index" {
