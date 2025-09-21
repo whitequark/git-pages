@@ -40,33 +40,47 @@
 		protocols h1 h2
 	}
 
+	servers {$UDP_BIND_TO:0.0.0.0}:443 {
+		name http3
+		protocols h3
+	}
+
 	servers :2002 {
 		name health
 		protocols h1
 	}
 }
 
-(backend_pages) {
-	@h2c `{env.FEATURES}.matches(r"\bh2c\b")`
-	reverse_proxy @h2c h2c://{$GIT_PAGES_ADDRESS:localhost}:3000
-	reverse_proxy http://{$GIT_PAGES_ADDRESS:localhost}:3000
-}
-
-http:// {
-	@get method GET
-	redir @get https://{host}{uri} 301
-
-	# initial PUT/POST for a new domain has to happen over HTTP
-	import backend_pages
-}
-
-https:// {
+(backend) {
 	tls {
 		on_demand
 	}
 
+	@h2c `{env.FEATURES}.matches(r"\bh2c\b")`
+	reverse_proxy @h2c h2c://{$GIT_PAGES_ADDRESS:localhost}:3000
+	reverse_proxy http://{$GIT_PAGES_ADDRESS:localhost}:3000
+
+	header Alt-Svc `h3=":443"; persist=1, h2=":443"; persist=1`
 	encode
-	import backend_pages
+}
+
+http:// {
+	# initial PUT/POST for a new domain has to happen over HTTP
+	@get method GET
+	redir @get https://{host}{uri} 301
+
+	import backend
+}
+
+https:// {
+	import backend
+}
+
+https:// {
+	# Fly.io requires UDP sockets to be bound to a different IP
+	bind {$UDP_BIND_TO:0.0.0.0}
+
+	import backend
 }
 
 http://localhost:2002 {

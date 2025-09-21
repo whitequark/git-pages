@@ -17,6 +17,7 @@ cpus = 2
 memory = 512
 
 [env]
+UDP_BIND_TO = "fly-global-services"
 AUTOMEMLIMIT = "0.25"
 
 [[files]]
@@ -33,6 +34,14 @@ auto_start_machines = true
 [[services]]
 internal_port = 443
 protocol = "tcp"
+ports = [{ port = 443 }]
+auto_stop_machines = "stop"
+auto_start_machines = true
+
+# NB: Fly.io does not support UDP on public IPv6
+[[services]]
+internal_port = 443
+protocol = "udp"
 ports = [{ port = 443 }]
 auto_stop_machines = "stop"
 auto_start_machines = true

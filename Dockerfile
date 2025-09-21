@@ -35,13 +35,12 @@ WORKDIR /app
 RUN mkdir /app/data
 COPY conf/supervisord.conf /app/supervisord.conf
 COPY conf/Caddyfile /app/Caddyfile
-RUN caddy adapt -c Caddyfile -p >/app/caddy.json
 COPY conf/config.toml.example /app/config.toml
 
 # Caddy ports:
-EXPOSE 80 443 2019
+EXPOSE 80/tcp 443/tcp 443/udp 2019/tcp
 # git-pages ports:
-EXPOSE 3000 3001 3002
+EXPOSE 3000/tcp 3001/tcp 3002/tcp
 
 # While the default command is to run git-pages standalone, the intended configuration
 # is to use it with Caddy and store both site data and credentials to an S3-compatible
