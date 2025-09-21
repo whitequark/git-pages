@@ -432,6 +432,12 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, strings.ReplaceAll(message, "\n", "\n- "), authErr.code)
 			err = errors.New(strings.ReplaceAll(message, "\n", "; "))
 		}
+		var tooLargeErr *http.MaxBytesError
+		if errors.As(err, &tooLargeErr) {
+			message := "request body too large"
+			http.Error(w, message, http.StatusRequestEntityTooLarge)
+			err = errors.New(message)
+		}
 		log.Println("pages err:", err)
 	}
 }
