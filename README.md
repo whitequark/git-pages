@@ -67,7 +67,7 @@ Features
         - The `.git-pages/manifest.json` path returns a [ProtoJSON](https://protobuf.dev/programming-guides/json/) representation of the deployed site manifest. It enumerates site structure, redirect rules, and errors that were not severe enough to abort publishing.
 * In response to a `PUT` or `POST` request, the server retrieves updates a site with new content. The URL of the request must be the root URL of the site that is being published.
     - If the `PUT` method receives an `application/x-www-form-urlencoded` body, it contains a repository URL to be shallowly cloned. The `X-Pages-Branch` header contains the branch to be checked out; the `pages` branch is used if the header is absent.
-    - If the `PUT` method receives an `application/x-tar` or `application/zip` body, it contains an archive to be extracted.
+    - If the `PUT` method receives an `application/x-tar`, `application/x-tar+gzip`, `application/x-tar+zstd`, or `application/zip` body, it contains an archive to be extracted.
     - The `POST` method requires an `application/json` body containing a Forgejo/Gitea/Gogs/GitHub webhook event payload. Requests where the `ref` key contains anything other than `refs/heads/pages` are ignored, and only the `pages` branch is used. The `repository.clone_url` key contains a repository URL to be shallowly cloned.
     - If the received contents is empty, performs the same action as `DELETE`.
 * In response to a `DELETE` request, the server unpublishes a site. The URL of the request must be the root URL of the site that is being unpublished. Site data remains stored for an indeterminate period of time, but becomes completely inaccessible.

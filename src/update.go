@@ -114,7 +114,13 @@ func UpdateFromArchive(
 	switch contentType {
 	case "application/x-tar":
 		log.Printf("update %s: (tar)", webRoot)
-		manifest, err = ExtractTar(reader) // yellow? definitely yellow.
+		manifest, err = ExtractTar(reader) // yellow?
+	case "application/x-tar+gzip":
+		log.Printf("update %s: (tar.gz)", webRoot)
+		manifest, err = ExtractTarGzip(reader) // definitely yellow.
+	case "application/x-tar+zstd":
+		log.Printf("update %s: (tar.zst)", webRoot)
+		manifest, err = ExtractTarZstd(reader)
 	case "application/zip":
 		log.Printf("update %s: (zip)", webRoot)
 		manifest, err = ExtractZip(reader)

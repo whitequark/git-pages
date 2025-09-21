@@ -4,11 +4,13 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
 
+	"github.com/klauspost/compress/zstd"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -67,6 +69,26 @@ func ExtractTar(reader io.Reader) (*Manifest, error) {
 		manifest.Contents[fileName] = &manifestEntry
 	}
 	return &manifest, nil
+}
+
+func ExtractTarGzip(reader io.Reader) (*Manifest, error) {
+	stream, err := gzip.NewReader(reader)
+	if err != nil {
+		return nil, err
+	}
+	defer stream.Close()
+
+	return ExtractTar(stream)
+}
+
+func ExtractTarZstd(reader io.Reader) (*Manifest, error) {
+	stream, err := zstd.NewReader(reader)
+	if err != nil {
+		return nil, err
+	}
+	defer stream.Close()
+
+	return ExtractTar(stream)
 }
 
 var errZipBomb = errors.New("zip file size limit exceeded")
