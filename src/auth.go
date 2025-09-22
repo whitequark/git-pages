@@ -379,7 +379,8 @@ func CheckForbiddenDomain(r *http.Request) error {
 
 	host = strings.ToLower(host)
 	for _, reservedDomain := range config.Limits.ForbiddenDomains {
-		if host == strings.ToLower(reservedDomain) {
+		reservedDomain = strings.ToLower(reservedDomain)
+		if host == reservedDomain || strings.HasSuffix(host, fmt.Sprintf(".%s", reservedDomain)) {
 			return AuthError{http.StatusForbidden, "forbidden domain"}
 		}
 	}
