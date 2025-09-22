@@ -26,27 +26,51 @@ AUTOMEMLIMIT = "0.25"
 guest_path = "/app/config.toml"
 local_path = "config.fly.toml"
 
+# [::]:80/TCP; HTTP/1.1 and HTTP/2 (cleartext)
+
 [[services]]
 internal_port = 80
 protocol = "tcp"
-ports = [{ port = 80, handlers = ["proxy_proto"], proxy_proto_options = { version = "v2" } }]
 auto_stop_machines = "stop"
 auto_start_machines = true
+
+[[services.ports]]
+port = 80
+handlers = ["proxy_proto"]
+proxy_proto_options = { version = "v2" }
+
+[services.concurrency]
+type = "connections"
+soft_limit = 250
+
+# [::]:433/TCP; HTTP/1.1 and HTTP/2
 
 [[services]]
 internal_port = 443
 protocol = "tcp"
-ports = [{ port = 443, handlers = ["proxy_proto"], proxy_proto_options = { version = "v2" } }]
 auto_stop_machines = "stop"
 auto_start_machines = true
 
-# NB: Fly.io does not support UDP on public IPv6
+[[services.ports]]
+port = 443
+handlers = ["proxy_proto"]
+proxy_proto_options = { version = "v2" }
+
+[services.concurrency]
+type = "connections"
+soft_limit = 250
+
+# 0.0.0.0:433/UDP; HTTP/3
+# (Fly.io does not support UDP on public IPv6!)
+
 [[services]]
 internal_port = 443
 protocol = "udp"
 ports = [{ port = 443 }]
 auto_stop_machines = "stop"
 auto_start_machines = true
+
+# monitoring
 
 [checks.health]
 type = "http"
