@@ -12,6 +12,7 @@ import (
 
 	automemlimit "github.com/KimMachineGun/automemlimit/memlimit"
 	"github.com/c2h5oh/datasize"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var config *Config
@@ -159,7 +160,7 @@ func main() {
 		go serve(pagesListener, http.HandlerFunc(ServePages))
 		go serve(caddyListener, http.HandlerFunc(ServeCaddy))
 		go serve(healthListener, http.HandlerFunc(ServeHealth))
-		go serve(metricsListener, NewMetricsHTTPHandler())
+		go serve(metricsListener, promhttp.Handler())
 
 		if config.Insecure {
 			log.Println("serve: ready (INSECURE)")

@@ -13,6 +13,7 @@ require (
 	github.com/maypok86/otter/v2 v2.2.1
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/pelletier/go-toml/v2 v2.2.4
+	github.com/prometheus/client_golang v1.23.2
 	github.com/tj/go-redirects v0.0.0-20200911105812-fd1ba1020b37
 	github.com/valyala/fasttemplate v1.2.2
 	google.golang.org/protobuf v1.36.9
@@ -44,7 +45,6 @@ require (
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/pjbgf/sha1cd v0.5.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
