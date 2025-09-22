@@ -49,7 +49,7 @@ func reportSiteUpdate(via string, result *UpdateResult) {
 	case UpdateTimeout:
 		siteUpdateErrorCount.With(prometheus.Labels{"cause": "timeout"}).Inc()
 	case UpdateNoChange:
-		// nothing to report
+		siteUpdateOkCount.With(prometheus.Labels{"outcome": "no-change"}).Inc()
 	case UpdateCreated:
 		siteUpdateOkCount.With(prometheus.Labels{"outcome": "created"}).Inc()
 	case UpdateReplaced:
