@@ -79,9 +79,12 @@ func serve(listener net.Listener, serve func(http.ResponseWriter, *http.Request)
 func main() {
 	InitObservability()
 
-	configPath := flag.String("config", "config.toml", "path to configuration file")
-	printConfig := flag.Bool("print-config", false, "print final configuration as JSON")
-	getManifest := flag.String("get-manifest", "", "retrieve manifest for web root as ProtoJSON")
+	configPath := flag.String("config", "config.toml",
+		"path to configuration file")
+	checkConfig := flag.Bool("check-config", false,
+		"validate configuration, print it as JSON, and exit")
+	getManifest := flag.String("get-manifest", "",
+		"retrieve manifest for web root as ProtoJSON")
 	flag.Parse()
 
 	if err := ReadConfig(*configPath); err != nil {
@@ -89,7 +92,7 @@ func main() {
 	}
 	UpdateConfigEnv() // environment takes priority
 
-	if *printConfig {
+	if *checkConfig {
 		configJSON, _ := json.MarshalIndent(&config, "", "  ")
 		fmt.Println(string(configJSON))
 		return

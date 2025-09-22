@@ -2,4 +2,4 @@
 /result-*
 /bin
 /data
-/config.toml*
+/config*.toml*

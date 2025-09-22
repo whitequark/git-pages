@@ -1,33 +1,45 @@
-# log-format = "datetime+message"
+# Unless otherwise noted, every value in this file is the same
+# as the intrinsic default value.
 
-# [listen]
-# pages = "tcp/:3000"
-# caddy = "tcp/:3001" # or "-" to disable
-# health = "tcp/:3002"
+log-format = "datetime+message"
 
-# [[wildcard]]
-# domain = "codeberg.page"
-# clone-url = "https://codeberg.org/<user>/<project>.git"
-# index-repos = ["<user>.codeberg.page", "pages"]
-# fallback-proxy-to = "https://codeberg.page"
+[listen]
+# Use "-" to turn off the listener.
+pages = "tcp/:3000"
+caddy = "tcp/:3001"
+health = "tcp/:3002"
 
-# [backend]
-# type = "fs"
+[[wildcard]] # non-default section
+domain = "codeberg.page"
+clone-url = "https://codeberg.org/<user>/<project>.git"
+index-repos = ["<user>.codeberg.page", "pages"]
+fallback-proxy-to = "https://codeberg.page"
 
-# [backend.fs]
-# root = "./data"
+[backend]
+type = "fs"
 
-# [backend.s3]
-# endpoint = "play.min.io"
-# access-key-id = "Q3AM3UQ867SPQQA43P2F"
-# secret-access-key = "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"
-# region = "us-east-1"
-# bucket = "git-pages-demo"
+[backend.fs]
+root = "./data"
 
-# [limits]
-# max-site-size = "128M"
-# max-manifest-size = "1M"
-# max-inline-file-size = "256B"
-# git-large-object-threshold = "1M"
-# max-symlink-depth = 16
-# update-timeout = "60s"
+[backend.s3] # non-default bucket configuration
+endpoint = "play.min.io"
+access-key-id = "Q3AM3UQ867SPQQA43P2F"
+secret-access-key = "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"
+region = "us-east-1"
+bucket = "git-pages-demo"
+
+[backend.s3.blob-cache]
+max-size = "256MB"
+
+[backend.s3.site-cache]
+max-size = "16MB"
+max-age = "60s"
+
+[limits]
+max-site-size = "128M"
+max-manifest-size = "1M"
+max-inline-file-size = "256B"
+git-large-object-threshold = "1M"
+max-symlink-depth = 16
+update-timeout = "60s"
+max-heap-size-ratio = 0.5

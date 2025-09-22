@@ -35,7 +35,7 @@ WORKDIR /app
 RUN mkdir /app/data
 COPY conf/supervisord.conf /app/supervisord.conf
 COPY conf/Caddyfile /app/Caddyfile
-COPY conf/config.toml.example /app/config.toml
+COPY conf/config.example.toml /app/config.toml
 
 # Caddy ports:
 EXPOSE 80/tcp 443/tcp 443/udp 2019/tcp
