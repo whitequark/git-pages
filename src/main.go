@@ -3,10 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"runtime/debug"
 	"strings"
 
@@ -74,10 +76,16 @@ func main() {
 	printConfig := flag.Bool("print-config", false,
 		"print configuration as JSON and exit")
 	configTomlPath := flag.String("config", "config.toml",
-		"set path to configuration file")
+		"load configuration from `filename`")
 	getManifest := flag.String("get-manifest", "",
-		"retrieve manifest for web root as ProtoJSON")
+		"write manifest for `webroot` (either 'domain.tld' or 'domain.tld/dir') to stdout as ProtoJSON")
+	getBlob := flag.String("get-blob", "",
+		"write `blob` ('sha256-xxxxxxx...xxx') to stdout")
 	flag.Parse()
+
+	if *getManifest != "" && *getBlob != "" {
+		log.Fatalln("-get-manifest and -get-blob are mutually exclusive")
+	}
 
 	if *printConfigEnvVars {
 		PrintConfigEnvVars()
@@ -124,7 +132,8 @@ func main() {
 		log.Println("memlimit: was", memlimitBefore.HR(), "now", memlimitAfter.HR())
 	}
 
-	if *getManifest != "" {
+	switch {
+	case *getManifest != "":
 		if err := ConfigureBackend(&config.Storage); err != nil {
 			log.Fatalln(err)
 		}
@@ -139,7 +148,20 @@ func main() {
 			log.Fatalln(err)
 		}
 		fmt.Println(ManifestDebugJSON(manifest))
-	} else {
+
+	case *getBlob != "":
+		if err := ConfigureBackend(&config.Storage); err != nil {
+			log.Fatalln(err)
+		}
+
+		reader, _, err := backend.GetBlob(*getBlob)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		io.Copy(os.Stdout, reader)
+
+	default:
 		// Start listening on all ports before initializing the backend, otherwise if the backend
 		// spends some time initializing (which the S3 backend does) a proxy like Caddy can race
 		// with git-pages on startup and return errors for requests that would have been served
