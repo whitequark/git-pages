@@ -65,19 +65,22 @@ func (fs *FSBackend) Backend() Backend {
 	return fs
 }
 
-func (fs *FSBackend) GetBlob(name string) (io.ReadSeeker, time.Time, error) {
+func (fs *FSBackend) GetBlob(name string) (reader io.ReadSeeker, size uint64, mtime time.Time, err error) {
 	blobPath := filepath.Join(splitBlobName(name)...)
 	stat, err := fs.blobRoot.Stat(blobPath)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, time.Time{}, fmt.Errorf("%w: %s", errNotFound, err.(*os.PathError).Path)
+		err = fmt.Errorf("%w: %s", errNotFound, err.(*os.PathError).Path)
+		return
 	} else if err != nil {
-		return nil, time.Time{}, fmt.Errorf("stat: %w", err)
+		err = fmt.Errorf("stat: %w", err)
+		return
 	}
 	file, err := fs.blobRoot.Open(blobPath)
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("open: %w", err)
+		err = fmt.Errorf("open: %w", err)
+		return
 	}
-	return file, stat.ModTime(), nil
+	return file, uint64(stat.Size()), stat.ModTime(), nil
 }
 
 func (fs *FSBackend) PutBlob(name string, data []byte) error {

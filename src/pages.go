@@ -167,7 +167,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				w.WriteHeader(http.StatusNotModified)
 				return nil
 			} else {
-				reader, mtime, err = backend.GetBlob(string(entry.Data))
+				reader, _, mtime, err = backend.GetBlob(string(entry.Data))
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 					fmt.Fprintf(w, "internal server error: %s\n", err)

@@ -156,7 +156,7 @@ func main() {
 			log.Fatalln(err)
 		}
 
-		reader, _, err := backend.GetBlob(*getBlob)
+		reader, _, _, err := backend.GetBlob(*getBlob)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -227,6 +227,8 @@ func main() {
 		if err := ConfigureBackend(&config.Storage); err != nil {
 			log.Fatalln(err)
 		}
+
+		backend = NewObservedBackend(backend)
 
 		if err := ConfigureWildcards(config.Wildcard); err != nil {
 			log.Fatalln(err)

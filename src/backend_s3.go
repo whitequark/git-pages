@@ -13,13 +13,82 @@ import (
 	"github.com/maypok86/otter/v2"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
+
+var (
+	blobsDedupedCount prometheus.Counter
+	blobsDedupedBytes prometheus.Counter
+
+	blobCacheHitsCount      prometheus.Counter
+	blobCacheHitsBytes      prometheus.Counter
+	blobCacheMissesCount    prometheus.Counter
+	blobCacheMissesBytes    prometheus.Counter
+	blobCacheEvictionsCount prometheus.Counter
+	blobCacheEvictionsBytes prometheus.Counter
+
+	manifestCacheHitsCount      prometheus.Counter
+	manifestCacheMissesCount    prometheus.Counter
+	manifestCacheEvictionsCount prometheus.Counter
+)
+
+func initS3BackendMetrics() {
+	blobsDedupedCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "git_pages_blobs_deduped",
+		Help: "Count of blobs deduplicated",
+	})
+	blobsDedupedBytes = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "git_pages_blobs_deduped_bytes",
+		Help: "Total size in bytes of blobs deduplicated",
+	})
+
+	blobCacheHitsCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "git_pages_blob_cache_hits_count",
+		Help: "Count of blobs that were retrieved from the cache",
+	})
+	blobCacheHitsBytes = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "git_pages_blob_cache_hits_bytes",
+		Help: "Total size in bytes of blobs that were retrieved from the cache",
+	})
+	blobCacheMissesCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "git_pages_blob_cache_misses_count",
+		Help: "Count of blobs that were not found in the cache (and were then successfully cached)",
+	})
+	blobCacheMissesBytes = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "git_pages_blob_cache_misses_bytes",
+		Help: "Total size in bytes of blobs that were not found in the cache (and were then successfully cached)",
+	})
+	blobCacheEvictionsCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "git_pages_blob_cache_evictions_count",
+		Help: "Count of blobs evicted from the cache",
+	})
+	blobCacheEvictionsBytes = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "git_pages_blob_cache_evictions_bytes",
+		Help: "Total size in bytes of blobs evicted from the cache",
+	})
+
+	manifestCacheHitsCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "git_pages_manifest_cache_hits_count",
+		Help: "Count of manifests that were retrieved from the cache",
+	})
+	manifestCacheMissesCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "git_pages_manifest_cache_misses_count",
+		Help: "Count of manifests that were not found in the cache (and were then successfully cached)",
+	})
+	manifestCacheEvictionsCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "git_pages_manifest_cache_evictions_count",
+		Help: "Count of manifests evicted from the cache",
+	})
+}
 
 // Blobs can be safely cached indefinitely. They only need to be evicted to preserve memory.
 type CachedBlob struct {
 	blob  []byte
 	mtime time.Time
 }
+
+func (c *CachedBlob) Weight() uint32 { return uint32(len(c.blob)) }
 
 // Manifests can only be cached for a short time to avoid serving stale content. Browser
 // page loads cause a large burst of manifest accesses that are essential for serving
@@ -31,12 +100,14 @@ type CachedManifest struct {
 	err      error
 }
 
+func (c *CachedManifest) Weight() uint32 { return c.weight }
+
 type S3Backend struct {
 	ctx       context.Context
 	client    *minio.Client
 	bucket    string
-	blobCache *otter.Cache[string, *CachedBlob]
-	siteCache *otter.Cache[string, *CachedManifest]
+	blobCache *observedCache[string, *CachedBlob]
+	siteCache *observedCache[string, *CachedManifest]
 }
 
 func makeCacheOptions[K comparable, V any](
@@ -85,14 +156,31 @@ func NewS3Backend(
 		}
 	}
 
-	blobCache, err := otter.New(makeCacheOptions(&config.BlobCache,
-		func(key string, value *CachedBlob) uint32 { return uint32(len(value.blob)) }))
+	initS3BackendMetrics()
+
+	blobCacheMetrics := observedCacheMetrics{
+		HitNumberCounter:      blobCacheHitsCount,
+		HitWeightCounter:      blobCacheHitsBytes,
+		MissNumberCounter:     blobCacheMissesCount,
+		MissWeightCounter:     blobCacheMissesBytes,
+		EvictionNumberCounter: blobCacheEvictionsCount,
+		EvictionWeightCounter: blobCacheEvictionsBytes,
+	}
+	blobCache, err := newObservedCache(makeCacheOptions(&config.BlobCache,
+		func(key string, value *CachedBlob) uint32 { return uint32(len(value.blob)) }),
+		blobCacheMetrics)
 	if err != nil {
 		return nil, err
 	}
 
-	siteCache, err := otter.New(makeCacheOptions(&config.SiteCache,
-		func(key string, value *CachedManifest) uint32 { return value.weight }))
+	siteCacheMetrics := observedCacheMetrics{
+		HitNumberCounter:      manifestCacheHitsCount,
+		MissNumberCounter:     manifestCacheMissesCount,
+		EvictionNumberCounter: manifestCacheEvictionsCount,
+	}
+	siteCache, err := newObservedCache(makeCacheOptions(&config.SiteCache,
+		func(key string, value *CachedManifest) uint32 { return value.weight }),
+		siteCacheMetrics)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +196,7 @@ func blobObjectName(name string) string {
 	return fmt.Sprintf("blob/%s", path.Join(splitBlobName(name)...))
 }
 
-func (s3 *S3Backend) GetBlob(name string) (io.ReadSeeker, time.Time, error) {
+func (s3 *S3Backend) GetBlob(name string) (io.ReadSeeker, uint64, time.Time, error) {
 	loader := func(ctx context.Context, name string) (*CachedBlob, error) {
 		log.Printf("s3: get blob %s\n", name)
 
@@ -138,9 +226,9 @@ func (s3 *S3Backend) GetBlob(name string) (io.ReadSeeker, time.Time, error) {
 		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
 			err = fmt.Errorf("%w: %s", errNotFound, errResp.Key)
 		}
-		return nil, time.Time{}, err
+		return nil, 0, time.Time{}, err
 	} else {
-		return bytes.NewReader(cached.blob), cached.mtime, err
+		return bytes.NewReader(cached.blob), uint64(len(cached.blob)), cached.mtime, err
 	}
 }
 
@@ -164,6 +252,8 @@ func (s3 *S3Backend) PutBlob(name string, data []byte) error {
 		}
 	} else {
 		log.Printf("s3: put blob %s (exists)\n", name)
+		blobsDedupedCount.Inc()
+		blobsDedupedBytes.Add(float64(len(data)))
 		return nil
 	}
 }
@@ -246,7 +336,7 @@ func (s3 *S3Backend) CommitManifest(name string, manifest *Manifest) error {
 		bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{})
 	removeErr := s3.client.RemoveObject(s3.ctx, s3.bucket, stagedManifestObjectName(data),
 		minio.RemoveObjectOptions{})
-	s3.siteCache.Invalidate(name)
+	s3.siteCache.Cache.Invalidate(name)
 	if putErr != nil {
 		return putErr
 	} else if removeErr != nil {
@@ -261,7 +351,7 @@ func (s3 *S3Backend) DeleteManifest(name string) error {
 
 	err := s3.client.RemoveObject(s3.ctx, s3.bucket, manifestObjectName(name),
 		minio.RemoveObjectOptions{})
-	s3.siteCache.Invalidate(name)
+	s3.siteCache.Cache.Invalidate(name)
 	return err
 }
 

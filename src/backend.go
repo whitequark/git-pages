@@ -21,8 +21,8 @@ func splitBlobName(name string) []string {
 }
 
 type Backend interface {
-	// Retrieve a blob. Returns `reader, mtime, err`.
-	GetBlob(name string) (reader io.ReadSeeker, mtime time.Time, err error)
+	// Retrieve a blob. Returns `reader, size, mtime, err`.
+	GetBlob(name string) (reader io.ReadSeeker, size uint64, mtime time.Time, err error)
 
 	// Store a blob. If a blob called `name` already exists, this function returns `nil` without
 	// regards to the old or new contents. It is expected that blobs are content-addressed, i.e.
