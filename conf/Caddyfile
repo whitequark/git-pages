@@ -14,7 +14,7 @@
 	log {
 		output stderr
 		level WARN
-		exclude http.auto_https
+		exclude admin http.auto_https
 		format console {
 			time_key ""
 		}
