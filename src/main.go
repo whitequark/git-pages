@@ -10,7 +10,8 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/KimMachineGun/automemlimit/memlimit"
+	automemlimit "github.com/KimMachineGun/automemlimit/memlimit"
+	"github.com/c2h5oh/datasize"
 )
 
 var config *Config
@@ -106,16 +107,23 @@ func main() {
 	}
 
 	// Avoid being OOM killed by not garbage collecting early enough.
-	memlimit.SetGoMemLimitWithOpts(
-		memlimit.WithLogger(slog.Default()),
-		memlimit.WithProvider(
-			memlimit.ApplyFallback(
-				memlimit.FromCgroup,
-				memlimit.FromSystem,
+	memlimitBefore := datasize.ByteSize(debug.SetMemoryLimit(-1))
+	automemlimit.SetGoMemLimitWithOpts(
+		automemlimit.WithLogger(slog.New(slog.DiscardHandler)),
+		automemlimit.WithProvider(
+			automemlimit.ApplyFallback(
+				automemlimit.FromCgroup,
+				automemlimit.FromSystem,
 			),
 		),
-		memlimit.WithRatio(float64(config.Limits.MaxHeapSizeRatio)),
+		automemlimit.WithRatio(float64(config.Limits.MaxHeapSizeRatio)),
 	)
+	memlimitAfter := datasize.ByteSize(debug.SetMemoryLimit(-1))
+	if memlimitBefore == memlimitAfter {
+		log.Println("memlimit: now", memlimitBefore.HR())
+	} else {
+		log.Println("memlimit: was", memlimitBefore.HR(), "now", memlimitAfter.HR())
+	}
 
 	if *getManifest != "" {
 		if err := ConfigureBackend(&config.Storage); err != nil {
