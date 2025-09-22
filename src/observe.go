@@ -6,6 +6,7 @@ import (
 	"runtime/debug"
 
 	"github.com/honeybadger-io/honeybadger-go"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func hasHoneybadger() bool {
@@ -24,4 +25,8 @@ func ObserveHTTPHandler(handler http.Handler) http.Handler {
 		handler = honeybadger.Handler(handler)
 	}
 	return handler
+}
+
+func NewMetricsHTTPHandler() http.Handler {
+	return promhttp.Handler()
 }

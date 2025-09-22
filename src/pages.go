@@ -14,12 +14,49 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 const notFoundPage = "404.html"
 
+var (
+	siteUpdatesCount = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "git_pages_site_updates",
+		Help: "Count of site updates in total",
+	}, []string{"via"})
+	siteUpdateOkCount = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "git_pages_site_update_ok",
+		Help: "Count of successful site updates",
+	}, []string{"outcome"})
+	siteUpdateErrorCount = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "git_pages_site_update_error",
+		Help: "Count of failed site updates",
+	}, []string{"cause"})
+)
+
 func makeWebRoot(host string, projectName string) string {
 	return fmt.Sprintf("%s/%s", strings.ToLower(host), projectName)
+}
+
+func reportSiteUpdate(via string, result *UpdateResult) {
+	siteUpdatesCount.With(prometheus.Labels{"via": via}).Inc()
+
+	switch result.outcome {
+	case UpdateError:
+		siteUpdateErrorCount.With(prometheus.Labels{"cause": "other"}).Inc()
+	case UpdateTimeout:
+		siteUpdateErrorCount.With(prometheus.Labels{"cause": "timeout"}).Inc()
+	case UpdateNoChange:
+		// nothing to report
+	case UpdateCreated:
+		siteUpdateOkCount.With(prometheus.Labels{"outcome": "created"}).Inc()
+	case UpdateReplaced:
+		siteUpdateOkCount.With(prometheus.Labels{"outcome": "replaced"}).Inc()
+	case UpdateDeleted:
+		siteUpdateOkCount.With(prometheus.Labels{"outcome": "deleted"}).Inc()
+	}
 }
 
 func getPage(w http.ResponseWriter, r *http.Request) error {
@@ -266,6 +303,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 	} else {
 		fmt.Fprintln(w, "internal error")
 	}
+	reportSiteUpdate("rest", &result)
 	return nil
 }
 
@@ -401,6 +439,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 			fmt.Fprintf(w, "- %s\n", problem)
 		}
 	}
+	reportSiteUpdate("webhook", &result)
 	return nil
 }
 

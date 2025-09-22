@@ -50,10 +50,8 @@ func panicHandler(handler http.Handler) http.Handler {
 	})
 }
 
-func serve(listener net.Listener, serve func(http.ResponseWriter, *http.Request)) {
+func serve(listener net.Listener, handler http.Handler) {
 	if listener != nil {
-		var handler http.Handler
-		handler = http.HandlerFunc(serve)
 		handler = ObserveHTTPHandler(handler)
 		handler = panicHandler(handler)
 
@@ -148,6 +146,7 @@ func main() {
 		pagesListener := listen("pages", config.Server.Pages)
 		caddyListener := listen("caddy", config.Server.Caddy)
 		healthListener := listen("health", config.Server.Health)
+		metricsListener := listen("metrics", config.Server.Metrics)
 
 		if err := ConfigureBackend(&config.Storage); err != nil {
 			log.Fatalln(err)
@@ -157,9 +156,10 @@ func main() {
 			log.Fatalln(err)
 		}
 
-		go serve(pagesListener, ServePages)
-		go serve(caddyListener, ServeCaddy)
-		go serve(healthListener, ServeHealth)
+		go serve(pagesListener, http.HandlerFunc(ServePages))
+		go serve(caddyListener, http.HandlerFunc(ServeCaddy))
+		go serve(healthListener, http.HandlerFunc(ServeHealth))
+		go serve(metricsListener, NewMetricsHTTPHandler())
 
 		if config.Insecure {
 			log.Println("serve: ready (INSECURE)")
