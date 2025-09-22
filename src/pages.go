@@ -415,7 +415,7 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 	err := error(nil)
 	switch r.Method {
 	// REST API
-	case http.MethodGet, http.MethodHead:
+	case http.MethodHead, http.MethodGet:
 		err = getPage(w, r)
 	case http.MethodPut:
 		err = putPage(w, r)
@@ -425,6 +425,7 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		err = postPage(w, r)
 	default:
+		w.Header().Add("Allow", "HEAD, GET, PUT, DELETE, POST")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		err = fmt.Errorf("method %s not allowed", r.Method)
 	}
