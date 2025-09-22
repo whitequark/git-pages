@@ -102,6 +102,8 @@ type LimitsConfig struct {
 	UpdateTimeout Duration `toml:"update-timeout" default:"60s"`
 	// Soft limit on Go heap size, expressed as a fraction of total available RAM.
 	MaxHeapSizeRatio float64 `toml:"max-heap-size-ratio" default:"0.5"`
+	// List of domains unconditionally forbidden for uploads.
+	ForbiddenDomains []string `toml:"forbidden-domains"`
 }
 
 func (config *Config) DebugJSON() string {

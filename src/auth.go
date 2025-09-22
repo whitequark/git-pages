@@ -252,6 +252,10 @@ func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
 func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
+	if err := CheckForbiddenDomain(r); err != nil {
+		return nil, err
+	}
+
 	if config.Insecure {
 		log.Println("auth: INSECURE mode: allow *")
 		return &Authorization{}, nil // for testing only
@@ -344,6 +348,10 @@ func AuthorizeBranch(branch string, auth *Authorization) error {
 func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
+	if err := CheckForbiddenDomain(r); err != nil {
+		return nil, err
+	}
+
 	if config.Insecure {
 		log.Println("auth: INSECURE mode")
 		return &Authorization{}, nil // for testing only
@@ -361,4 +369,20 @@ func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
 	}
 
 	return nil, errors.Join(causes...)
+}
+
+func CheckForbiddenDomain(r *http.Request) error {
+	host, err := GetHost(r)
+	if err != nil {
+		return err
+	}
+
+	host = strings.ToLower(host)
+	for _, reservedDomain := range config.Limits.ForbiddenDomains {
+		if host == strings.ToLower(reservedDomain) {
+			return AuthError{http.StatusForbidden, "forbidden domain"}
+		}
+	}
+
+	return nil
 }
