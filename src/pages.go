@@ -407,7 +407,8 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 func ServePages(w http.ResponseWriter, r *http.Request) {
 	log.Println("pages:", r.Method, r.Host, r.URL, r.Header.Get("Content-Type"))
 	if region := os.Getenv("FLY_REGION"); region != "" {
-		w.Header().Add("Server", fmt.Sprintf("git-pages (fly.io; %s)", region))
+		w.Header().Add("Server",
+			fmt.Sprintf("git-pages (fly.io; %s; %s)", region, os.Getenv("FLY_MACHINE_ID")))
 	} else {
 		w.Header().Add("Server", "git-pages")
 	}
