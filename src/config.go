@@ -16,6 +16,24 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
+// For some reason, the standard `time.Duration` type doesn't implement the standard
+// `encoding.{TextMarshaler,TextUnmarshaler}` interfaces.
+type Duration time.Duration
+
+func (t Duration) String() string {
+	return fmt.Sprint(time.Duration(t))
+}
+
+func (t *Duration) UnmarshalText(data []byte) (err error) {
+	u, err := time.ParseDuration(string(data))
+	*t = Duration(u)
+	return
+}
+
+func (t *Duration) MarshalText() ([]byte, error) {
+	return []byte(t.String()), nil
+}
+
 type Config struct {
 	Insecure  bool             `toml:"-" env:"insecure"`
 	Features  []string         `toml:"features"`
@@ -41,7 +59,7 @@ type WildcardConfig struct {
 
 type CacheConfig struct {
 	MaxSize datasize.ByteSize `toml:"max-size"`
-	MaxAge  uint              `toml:"max-age"` // in seconds
+	MaxAge  Duration          `toml:"max-age"`
 }
 
 type StorageConfig struct {
@@ -62,7 +80,7 @@ type S3Config struct {
 	Region          string      `toml:"region"`
 	Bucket          string      `toml:"bucket"`
 	BlobCache       CacheConfig `toml:"blob-cache" default:"{\"MaxSize\":\"256MB\"}"`
-	SiteCache       CacheConfig `toml:"site-cache" default:"{\"MaxAge\":60,\"MaxSize\":\"16MB\"}"`
+	SiteCache       CacheConfig `toml:"site-cache" default:"{\"MaxAge\":\"60s\",\"MaxSize\":\"16MB\"}"`
 }
 
 type LimitsConfig struct {
@@ -80,7 +98,7 @@ type LimitsConfig struct {
 	MaxSymlinkDepth uint `toml:"max-symlink-depth" default:"16"`
 	// Maximum time that an update operation (PUT or POST request) could take before being
 	// interrupted.
-	UpdateTimeout time.Duration `toml:"update-timeout" default:"60s"`
+	UpdateTimeout Duration `toml:"update-timeout" default:"60s"`
 	// Soft limit on Go heap size, expressed as a fraction of total available RAM.
 	MaxHeapSizeRatio float64 `toml:"max-heap-size-ratio" default:"0.5"`
 }
@@ -173,6 +191,11 @@ func setConfigValue(reflValue reflect.Value, repr string) (err error) {
 		if valueCast, err = time.ParseDuration(repr); err == nil {
 			reflValue.Set(reflect.ValueOf(valueCast))
 		}
+	case Duration:
+		var parsed time.Duration
+		if parsed, err = time.ParseDuration(repr); err == nil {
+			reflValue.Set(reflect.ValueOf(Duration(parsed)))
+		}
 	case []WildcardConfig:
 		var parsed []*WildcardConfig
 		decoder := json.NewDecoder(bytes.NewReader([]byte(repr)))
@@ -194,6 +217,7 @@ func setConfigValue(reflValue reflect.Value, repr string) (err error) {
 func PrintConfigEnvVars() {
 	config := Config{}
 	defaults.MustSet(&config)
+
 	walkConfig(&config, func(envName string, reflValue reflect.Value) (err error) {
 		value := reflValue.Interface()
 		reprBefore := fmt.Sprint(value)
@@ -224,6 +248,7 @@ func Configure(tomlPath string) (config *Config, err error) {
 
 		decoder := toml.NewDecoder(file)
 		decoder.DisallowUnknownFields()
+		decoder.EnableUnmarshalerInterface()
 		if err = decoder.Decode(&config); err != nil {
 			return
 		}

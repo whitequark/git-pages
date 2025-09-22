@@ -33,7 +33,7 @@ max-size = "256MB"
 
 [storage.s3.site-cache]
 max-size = "16MB"
-max-age = 60 # seconds
+max-age = "60s"
 
 [limits]
 max-site-size = "128M"
@@ -41,5 +41,5 @@ max-manifest-size = "1M"
 max-inline-file-size = "256B"
 git-large-object-threshold = "1M"
 max-symlink-depth = 16
-update-timeout = 60 # seconds
+update-timeout = "60s"
 max-heap-size-ratio = 0.5 # * RAM_size

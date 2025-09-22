@@ -216,7 +216,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 
-		ctx, cancel := context.WithTimeout(r.Context(), config.Limits.UpdateTimeout)
+		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
 		defer cancel()
 		result = UpdateFromRepository(ctx, webRoot, repoURL, branch)
 	} else {
@@ -369,7 +369,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), config.Limits.UpdateTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
 	defer cancel()
 	result := UpdateFromRepository(ctx, webRoot, repoURL, "pages")
 	switch result.outcome {
