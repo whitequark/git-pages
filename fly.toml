@@ -1,10 +1,10 @@
 # Requires secrets to be set:
 #  - ACME_EMAIL
-#  - S3_ENDPOINT
-#  - S3_ACCESS_KEY_ID
-#  - S3_SECRET_ACCESS_KEY
-#  - S3_BUCKET
-#  - PAGES_CONFIG
+#  - PAGES_CONFIG_FILE
+#  - PAGES_STORAGE_S3_ENDPOINT
+#  - PAGES_STORAGE_S3_ACCESS_KEY_ID
+#  - PAGES_STORAGE_S3_SECRET_ACCESS_KEY
+#  - PAGES_STORAGE_S3_BUCKET
 
 [build]
 dockerfile = "Dockerfile"
@@ -24,7 +24,7 @@ AUTOMEMLIMIT = "0.25"
 
 [[files]]
 guest_path = "/app/config.toml"
-secret_name = "PAGES_CONFIG"
+local_path = "config.fly.toml"
 
 [[services]]
 internal_port = 80

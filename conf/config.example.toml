@@ -3,8 +3,8 @@
 
 log-format = "datetime+message"
 
-[listen]
-# Use "-" to turn off the listener.
+[server]
+# Use "-" to disable the handler.
 pages = "tcp/:3000"
 caddy = "tcp/:3001"
 health = "tcp/:3002"
@@ -15,25 +15,25 @@ clone-url = "https://codeberg.org/<user>/<project>.git"
 index-repos = ["<user>.codeberg.page", "pages"]
 fallback-proxy-to = "https://codeberg.page"
 
-[backend]
+[storage]
 type = "fs"
 
-[backend.fs]
+[storage.fs]
 root = "./data"
 
-[backend.s3] # non-default bucket configuration
+[storage.s3] # non-default bucket configuration
 endpoint = "play.min.io"
 access-key-id = "Q3AM3UQ867SPQQA43P2F"
 secret-access-key = "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG"
 region = "us-east-1"
 bucket = "git-pages-demo"
 
-[backend.s3.blob-cache]
+[storage.s3.blob-cache]
 max-size = "256MB"
 
-[backend.s3.site-cache]
+[storage.s3.site-cache]
 max-size = "16MB"
-max-age = "60s"
+max-age = 60 # seconds
 
 [limits]
 max-site-size = "128M"
@@ -41,5 +41,5 @@ max-manifest-size = "1M"
 max-inline-file-size = "256B"
 git-large-object-threshold = "1M"
 max-symlink-depth = 16
-update-timeout = "60s"
-max-heap-size-ratio = 0.5
+update-timeout = 60 # seconds
+max-heap-size-ratio = 0.5 # * RAM_size

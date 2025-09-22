@@ -25,10 +25,10 @@
 	}
 
 	storage s3 {
-		host "{env.S3_ENDPOINT}"
-		access_id "{env.S3_ACCESS_KEY_ID}"
-		secret_key "{env.S3_SECRET_ACCESS_KEY}"
-		bucket "{env.S3_BUCKET}"
+		host "{env.PAGES_STORAGE_S3_ENDPOINT}"
+		access_id "{env.PAGES_STORAGE_S3_ACCESS_KEY_ID}"
+		secret_key "{env.PAGES_STORAGE_S3_SECRET_ACCESS_KEY}"
+		bucket "{env.PAGES_STORAGE_S3_BUCKET}"
 		prefix "ssl"
 	}
 
@@ -68,7 +68,7 @@
 		on_demand
 	}
 
-	@h2c `{env.FEATURES}.matches(r"\bh2c\b")`
+	@h2c `{env.PAGES_FEATURES}.matches(r"\bh2c\b")`
 	reverse_proxy @h2c h2c://{$GIT_PAGES_ADDRESS:localhost}:3000
 	reverse_proxy http://{$GIT_PAGES_ADDRESS:localhost}:3000
 

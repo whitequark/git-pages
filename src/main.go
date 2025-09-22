@@ -1,29 +1,19 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
 	"runtime/debug"
-	"slices"
 	"strings"
 
 	"github.com/KimMachineGun/automemlimit/memlimit"
 )
 
-var features []string
-
-func FeatureActive(feature string) bool {
-	if features == nil {
-		features = strings.Split(strings.ToLower(os.Getenv("FEATURES")), ",")
-	}
-	return slices.Contains(features, strings.ToLower(feature))
-}
+var config *Config
 
 func listen(name string, listen string) net.Listener {
 	if listen == "-" {
@@ -69,7 +59,7 @@ func serve(listener net.Listener, serve func(http.ResponseWriter, *http.Request)
 		server := http.Server{Handler: handler}
 		server.Protocols = new(http.Protocols)
 		server.Protocols.SetHTTP1(true)
-		if FeatureActive("h2c") {
+		if config.Feature("h2c") {
 			server.Protocols.SetUnencryptedHTTP2(true)
 		}
 		log.Fatalln(server.Serve(listener))
@@ -79,22 +69,28 @@ func serve(listener net.Listener, serve func(http.ResponseWriter, *http.Request)
 func main() {
 	InitObservability()
 
-	configPath := flag.String("config", "config.toml",
-		"path to configuration file")
-	checkConfig := flag.Bool("check-config", false,
-		"validate configuration, print it as JSON, and exit")
+	printConfigEnvVars := flag.Bool("print-config-env-vars", false,
+		"print every recognized configuration environment variable and exit")
+	printConfig := flag.Bool("print-config", false,
+		"print configuration as JSON and exit")
+	configTomlPath := flag.String("config", "config.toml",
+		"set path to configuration file")
 	getManifest := flag.String("get-manifest", "",
 		"retrieve manifest for web root as ProtoJSON")
 	flag.Parse()
 
-	if err := ReadConfig(*configPath); err != nil {
+	if *printConfigEnvVars {
+		PrintConfigEnvVars()
+		return
+	}
+
+	var err error
+	if config, err = Configure(*configTomlPath); err != nil {
 		log.Fatalln("config:", err)
 	}
-	UpdateConfigEnv() // environment takes priority
 
-	if *checkConfig {
-		configJSON, _ := json.MarshalIndent(&config, "", "  ")
-		fmt.Println(string(configJSON))
+	if *printConfig {
+		fmt.Println(config.DebugJSON())
 		return
 	}
 
@@ -103,6 +99,10 @@ func main() {
 		log.SetFlags(0)
 	case "datetime+message":
 		log.SetFlags(log.Ldate | log.Ltime | log.LUTC)
+	}
+
+	if len(config.Features) > 0 {
+		log.Println("features:", strings.Join(config.Features, ", "))
 	}
 
 	// Avoid being OOM killed by not garbage collecting early enough.
@@ -118,7 +118,7 @@ func main() {
 	)
 
 	if *getManifest != "" {
-		if err := ConfigureBackend(); err != nil {
+		if err := ConfigureBackend(&config.Storage); err != nil {
 			log.Fatalln(err)
 		}
 
@@ -137,15 +137,15 @@ func main() {
 		// spends some time initializing (which the S3 backend does) a proxy like Caddy can race
 		// with git-pages on startup and return errors for requests that would have been served
 		// just 0.5s later.
-		pagesListener := listen("pages", config.Listen.Pages)
-		caddyListener := listen("caddy", config.Listen.Caddy)
-		healthListener := listen("health", config.Listen.Health)
+		pagesListener := listen("pages", config.Server.Pages)
+		caddyListener := listen("caddy", config.Server.Caddy)
+		healthListener := listen("health", config.Server.Health)
 
-		if err := ConfigureBackend(); err != nil {
+		if err := ConfigureBackend(&config.Storage); err != nil {
 			log.Fatalln(err)
 		}
 
-		if err := ConfigureWildcards(); err != nil {
+		if err := ConfigureWildcards(config.Wildcard); err != nil {
 			log.Fatalln(err)
 		}
 
@@ -153,10 +153,10 @@ func main() {
 		go serve(caddyListener, ServeCaddy)
 		go serve(healthListener, ServeHealth)
 
-		if InsecureMode() {
-			log.Println("ready (INSECURE)")
+		if config.Insecure {
+			log.Println("serve: ready (INSECURE)")
 		} else {
-			log.Println("ready")
+			log.Println("serve: ready")
 		}
 		select {}
 	}

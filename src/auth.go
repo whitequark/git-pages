@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"slices"
 	"strings"
 )
@@ -29,10 +28,6 @@ func IsUnauthorized(err error) bool {
 		return authErr.code == http.StatusUnauthorized
 	}
 	return false
-}
-
-func InsecureMode() bool {
-	return os.Getenv("INSECURE") == "very"
 }
 
 func GetHost(r *http.Request) (string, error) {
@@ -221,7 +216,7 @@ func authorizeWildcardMatchSite(r *http.Request, pattern *WildcardPattern) (*Aut
 func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
-	if InsecureMode() {
+	if config.Insecure {
 		log.Println("auth: INSECURE mode")
 		return &Authorization{}, nil // for testing only
 	}
@@ -257,7 +252,7 @@ func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
 func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
-	if InsecureMode() {
+	if config.Insecure {
 		log.Println("auth: INSECURE mode: allow *")
 		return &Authorization{}, nil // for testing only
 	}
@@ -349,7 +344,7 @@ func AuthorizeBranch(branch string, auth *Authorization) error {
 func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
-	if InsecureMode() {
+	if config.Insecure {
 		log.Println("auth: INSECURE mode")
 		return &Authorization{}, nil // for testing only
 	}

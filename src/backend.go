@@ -22,7 +22,7 @@ func splitBlobName(name string) []string {
 
 type Backend interface {
 	// Retrieve a blob. Returns `reader, mtime, err`.
-	GetBlob(name string) (io.ReadSeeker, time.Time, error)
+	GetBlob(name string) (reader io.ReadSeeker, mtime time.Time, err error)
 
 	// Store a blob. If a blob called `name` already exists, this function returns `nil` without
 	// regards to the old or new contents. It is expected that blobs are content-addressed, i.e.
@@ -48,33 +48,25 @@ type Backend interface {
 	DeleteManifest(name string) error
 
 	// Check whether a domain has any deployments.
-	CheckDomain(domain string) (bool, error)
+	CheckDomain(domain string) (found bool, err error)
 }
 
 var backend Backend
 
-func ConfigureBackend() error {
-	var err error
-	switch config.Backend.Type {
+func ConfigureBackend(config *StorageConfig) (err error) {
+	switch config.Type {
 	case "fs":
-		if backend, err = NewFSBackend(config.Backend.FS.Root); err != nil {
-			return fmt.Errorf("fs backend: %w", err)
+		if backend, err = NewFSBackend(&config.FS); err != nil {
+			err = fmt.Errorf("fs backend: %w", err)
 		}
 
 	case "s3":
-		if backend, err = NewS3Backend(
-			config.Backend.S3.Endpoint,
-			config.Backend.S3.Insecure,
-			config.Backend.S3.AccessKeyID,
-			config.Backend.S3.SecretAccessKey,
-			config.Backend.S3.Region,
-			config.Backend.S3.Bucket,
-		); err != nil {
-			return fmt.Errorf("s3 backend: %w", err)
+		if backend, err = NewS3Backend(&config.S3); err != nil {
+			err = fmt.Errorf("s3 backend: %w", err)
 		}
 
 	default:
-		return fmt.Errorf("unknown backend: %s", config.Backend.Type)
+		err = fmt.Errorf("unknown backend: %s", config.Type)
 	}
-	return nil
+	return
 }

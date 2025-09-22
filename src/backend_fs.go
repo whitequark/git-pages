@@ -49,12 +49,12 @@ func createTempInRoot(root *os.Root, name string, data []byte) (string, error) {
 	return tempPath, nil
 }
 
-func NewFSBackend(dir string) (*FSBackend, error) {
-	blobRoot, err := maybeCreateOpenRoot(dir, "blob")
+func NewFSBackend(config *FSConfig) (*FSBackend, error) {
+	blobRoot, err := maybeCreateOpenRoot(config.Root, "blob")
 	if err != nil {
 		return nil, fmt.Errorf("blob: %w", err)
 	}
-	siteRoot, err := maybeCreateOpenRoot(dir, "site")
+	siteRoot, err := maybeCreateOpenRoot(config.Root, "site")
 	if err != nil {
 		return nil, fmt.Errorf("site: %w", err)
 	}

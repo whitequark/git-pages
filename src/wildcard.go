@@ -70,20 +70,20 @@ func HandleWildcardFallback(w http.ResponseWriter, r *http.Request) (bool, error
 	return false, nil
 }
 
-func ConfigureWildcards() error {
-	for _, configWildcard := range config.Wildcard {
+func ConfigureWildcards(config []WildcardConfig) error {
+	for _, wildcardConfig := range config {
 		wildcardPattern := WildcardPattern{
-			Domain: strings.Split(configWildcard.Domain, "."),
+			Domain: strings.Split(wildcardConfig.Domain, "."),
 		}
 
-		template, err := fasttemplate.NewTemplate(configWildcard.CloneURL, "<", ">")
+		template, err := fasttemplate.NewTemplate(wildcardConfig.CloneURL, "<", ">")
 		if err != nil {
 			return fmt.Errorf("wildcard pattern: clone URL: %w", err)
 		} else {
 			wildcardPattern.CloneURL = template
 		}
 
-		for _, indexRepo := range configWildcard.IndexRepos {
+		for _, indexRepo := range wildcardConfig.IndexRepos {
 			template, err := fasttemplate.NewTemplate(indexRepo, "<", ">")
 			if err != nil {
 				return fmt.Errorf("wildcard pattern: clone URL: %w", err)
@@ -92,8 +92,8 @@ func ConfigureWildcards() error {
 			}
 		}
 
-		if configWildcard.FallbackProxyTo != "" {
-			wildcardPattern.FallbackURL, err = url.Parse(configWildcard.FallbackProxyTo)
+		if wildcardConfig.FallbackProxyTo != "" {
+			wildcardPattern.FallbackURL, err = url.Parse(wildcardConfig.FallbackProxyTo)
 			if err != nil {
 				return fmt.Errorf("wildcard pattern: fallback URL: %w", err)
 			}

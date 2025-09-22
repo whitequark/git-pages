@@ -40,7 +40,7 @@ type S3Backend struct {
 }
 
 func makeCacheOptions[K comparable, V any](
-	config CacheConfig,
+	config *CacheConfig,
 	weigher func(K, V) uint32,
 ) *otter.Options[K, V] {
 	options := &otter.Options[K, V]{}
@@ -55,47 +55,43 @@ func makeCacheOptions[K comparable, V any](
 }
 
 func NewS3Backend(
-	endpoint string,
-	insecure bool,
-	accessKeyID string,
-	secretAccessKey string,
-	region string,
-	bucket string,
+	config *S3Config,
 ) (*S3Backend, error) {
 	ctx := context.Background()
 
-	client, err := minio.New(config.Backend.S3.Endpoint, &minio.Options{
+	client, err := minio.New(config.Endpoint, &minio.Options{
 		Creds: credentials.NewStaticV4(
-			config.Backend.S3.AccessKeyID,
-			config.Backend.S3.SecretAccessKey,
+			config.AccessKeyID,
+			config.SecretAccessKey,
 			"",
 		),
-		Secure: !config.Backend.S3.Insecure,
+		Secure: !config.Insecure,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	exists, err := client.BucketExists(ctx, config.Backend.S3.Bucket)
+	bucket := config.Bucket
+	exists, err := client.BucketExists(ctx, bucket)
 	if err != nil {
 		return nil, err
 	} else if !exists {
-		log.Printf("s3: create bucket %s\n", config.Backend.S3.Bucket)
+		log.Printf("s3: create bucket %s\n", bucket)
 
-		err = client.MakeBucket(ctx, config.Backend.S3.Bucket,
-			minio.MakeBucketOptions{Region: config.Backend.S3.Region})
+		err = client.MakeBucket(ctx, bucket,
+			minio.MakeBucketOptions{Region: config.Region})
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	blobCache, err := otter.New(makeCacheOptions(config.Backend.S3.BlobCache,
+	blobCache, err := otter.New(makeCacheOptions(&config.BlobCache,
 		func(key string, value *CachedBlob) uint32 { return uint32(len(value.blob)) }))
 	if err != nil {
 		return nil, err
 	}
 
-	siteCache, err := otter.New(makeCacheOptions(config.Backend.S3.SiteCache,
+	siteCache, err := otter.New(makeCacheOptions(&config.SiteCache,
 		func(key string, value *CachedManifest) uint32 { return value.weight }))
 	if err != nil {
 		return nil, err

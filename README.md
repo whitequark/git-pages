@@ -17,11 +17,11 @@ You will need [Go](https://go.dev/) 1.25 or newer. Run:
 
 ```console
 $ mkdir -p data
-$ cp conf/config.toml.example config.toml
-$ INSECURE=very go run ./src
+$ cp conf/config.example.toml config.toml
+$ PAGES_INSECURE=1 go run ./src
 ```
 
-These commands starts an HTTP server on `0.0.0.0:3000` and use the `data` directory for persistence. **Authentication is disabled via `INSECURE=very`** to avoid the need to set up a DNS server as well; never set `INSECURE=very` in production.
+These commands starts an HTTP server on `0.0.0.0:3000` and use the `data` directory for persistence. **Authentication is disabled via `PAGES_INSECURE=1`** to avoid the need to set up a DNS server as well; never enable `PAGES_INSECURE=1` in production.
 
 To publish a site, run the following commands:
 
