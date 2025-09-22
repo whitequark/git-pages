@@ -34,10 +34,8 @@ func Update(
 
 	outcome := UpdateError
 	oldManifest, _ = backend.GetManifest(webRoot)
-	// log.Println("OLD", ManifestDebugJSON(oldManifest))
 	if IsManifestEmpty(manifest) {
 		newManifest, err = manifest, backend.DeleteManifest(webRoot)
-		// log.Println("NEW", ManifestDebugJSON(newManifest))
 		if err == nil {
 			if oldManifest == nil {
 				outcome = UpdateNoChange
@@ -47,7 +45,6 @@ func Update(
 		}
 	} else if err = PrepareManifest(manifest); err == nil {
 		newManifest, err = StoreManifest(webRoot, manifest)
-		// log.Println("NEW", ManifestDebugJSON(newManifest))
 		if err == nil {
 			if oldManifest == nil {
 				outcome = UpdateCreated
