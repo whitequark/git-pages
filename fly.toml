@@ -18,7 +18,6 @@ cpus = 2
 memory = 512
 
 [env]
-CADDY_ADMIN = ":2019"
 UDP_BIND_TO = "fly-global-services"
 ALLOW_PROXY = "172.16.0.0/16"
 AUTOMEMLIMIT = "0.25"
