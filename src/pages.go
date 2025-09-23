@@ -202,7 +202,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		// see https://web.dev/articles/stale-while-revalidate for details
 
 		// http.ServeContent handles content type and caching
-		http.ServeContent(w, r, sitePath, mtime, reader)
+		http.ServeContent(w, r, entryPath, mtime, reader)
 	}
 	return nil
 }
