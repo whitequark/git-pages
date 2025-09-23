@@ -444,12 +444,17 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 }
 
 func ServePages(w http.ResponseWriter, r *http.Request) {
-	log.Println("pages:", r.Method, r.Host, r.URL, r.Header.Get("Content-Type"))
-	if region := os.Getenv("FLY_REGION"); region != "" {
-		w.Header().Add("Server",
-			fmt.Sprintf("git-pages (fly.io; %s; %s)", region, os.Getenv("FLY_MACHINE_ID")))
-	} else {
-		w.Header().Add("Server", "git-pages")
+	// We want upstream health checks to be done as closely to the normal flow as possible;
+	// any intentional deviation is an opportunity to miss an issue that will affect our
+	// visitors but not our health checks.
+	if r.Header.Get("Health-Check") == "" {
+		log.Println("pages:", r.Method, r.Host, r.URL, r.Header.Get("Content-Type"))
+		if region := os.Getenv("FLY_REGION"); region != "" {
+			w.Header().Add("Server",
+				fmt.Sprintf("git-pages (fly.io; %s; %s)", region, os.Getenv("FLY_MACHINE_ID")))
+		} else {
+			w.Header().Add("Server", "git-pages")
+		}
 	}
 	err := error(nil)
 	switch r.Method {

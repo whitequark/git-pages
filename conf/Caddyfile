@@ -57,11 +57,6 @@
 		protocols h3
 	}
 
-	servers :2002 {
-		name health
-		protocols h1
-	}
-
 	servers :2019 {
 		name metrics
 		protocols h1
@@ -82,9 +77,10 @@
 }
 
 http:// {
-	# initial PUT/POST for a new domain has to happen over HTTP
-	@get method GET
-	redir @get https://{host}{uri} 301
+	# initial PUT/POST for a new domain has to happen over HTTP;
+	# health check also has to reach the backend over HTTP
+	@upgrade `method('GET') && !header({'Health-Check': '*'})`
+	redir @upgrade https://{host}{uri} 301
 
 	import backend
 }
@@ -98,10 +94,6 @@ https:// {
 	bind {$UDP_BIND_TO:0.0.0.0}
 
 	import backend
-}
-
-http://localhost:2002 {
-	reverse_proxy http://localhost:3002
 }
 
 http://:2019 {

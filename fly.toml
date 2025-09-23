@@ -43,6 +43,15 @@ proxy_proto_options = { version = "v2" }
 type = "connections"
 soft_limit = 250
 
+[[services.http_checks]]
+protocol = "http"
+method = "get"
+path = "/"
+headers = { Health-Check = "🩺", Host = "localhost" }
+grace_period = "5s"
+interval = "2s"
+timeout = "1.5s"
+
 # [::]:433/TCP; HTTP/1.1 and HTTP/2
 
 [[services]]
@@ -60,6 +69,20 @@ proxy_proto_options = { version = "v2" }
 type = "connections"
 soft_limit = 250
 
+[[services.http_checks]]
+protocol = "https"
+method = "get"
+path = "/"
+headers = { Health-Check = "🩺", Host = "localhost" }
+grace_period = "5s"
+interval = "2s"
+timeout = "1.5s"
+# At the moment there's no good way to handle this, so staging needs TLS keys from production
+# for this one host that isn't used for anything other than full stack health checks.
+# These can be copied over manually whenever they expire.
+tls_skip_verify = false
+tls_server_name = "git-pages.fly.dev"
+
 # 0.0.0.0:433/UDP; HTTP/3
 # (Fly.io does not support UDP on public IPv6!)
 
@@ -70,16 +93,7 @@ ports = [{ port = 443 }]
 auto_stop_machines = "stop"
 auto_start_machines = true
 
-# monitoring
-
-[checks.health]
-type = "http"
-method = "get"
-port = 2002
-path = "/"
-grace_period = "5s"
-interval = "2s"
-timeout = "1s"
+# Metrics
 
 [metrics]
 port = 2019
