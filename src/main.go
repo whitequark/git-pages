@@ -168,7 +168,6 @@ func main() {
 		// just 0.5s later.
 		pagesListener := listen("pages", config.Server.Pages)
 		caddyListener := listen("caddy", config.Server.Caddy)
-		healthListener := listen("health", config.Server.Health)
 		metricsListener := listen("metrics", config.Server.Metrics)
 
 		if err := ConfigureBackend(&config.Storage); err != nil {
@@ -181,7 +180,6 @@ func main() {
 
 		go serve(pagesListener, http.HandlerFunc(ServePages))
 		go serve(caddyListener, http.HandlerFunc(ServeCaddy))
-		go serve(healthListener, http.HandlerFunc(ServeHealth))
 		go serve(metricsListener, promhttp.Handler())
 
 		if config.Insecure {

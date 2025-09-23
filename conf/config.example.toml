@@ -7,8 +7,7 @@ log-format = "datetime+message"
 # Use "-" to disable the handler.
 pages = "tcp/:3000"
 caddy = "tcp/:3001"
-health = "tcp/:3002"
-metrics = "tcp/:3003"
+metrics = "tcp/:3002"
 
 [[wildcard]] # non-default section
 domain = "codeberg.page"

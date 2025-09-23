@@ -47,8 +47,7 @@ type Config struct {
 type ServerConfig struct {
 	Pages   string `toml:"pages" default:"tcp/:3000"`
 	Caddy   string `toml:"caddy" default:"tcp/:3001"`
-	Health  string `toml:"health" default:"tcp/:3002"`
-	Metrics string `toml:"metrics" default:"tcp/:3003"`
+	Metrics string `toml:"metrics" default:"tcp/:3002"`
 }
 
 type WildcardConfig struct {
