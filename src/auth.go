@@ -30,6 +30,17 @@ func IsUnauthorized(err error) bool {
 	return false
 }
 
+func authorizeInsecure() *Authorization {
+	if config.Insecure { // for testing only
+		log.Println("auth: INSECURE mode")
+		return &Authorization{
+			repoURLs: nil,
+			branch:   "pages",
+		}
+	}
+	return nil
+}
+
 func GetHost(r *http.Request) (string, error) {
 	// FIXME: handle IDNA
 	host, _, err := net.SplitHostPort(r.Host)
@@ -66,6 +77,8 @@ func GetProjectName(r *http.Request) (string, error) {
 type Authorization struct {
 	// If `nil`, any URL is allowed. If not, only those in the set are allowed.
 	repoURLs []string
+	// Only the exact branch is allowed.
+	branch string
 }
 
 func authorizeDNSChallenge(r *http.Request) (*Authorization, error) {
@@ -131,7 +144,10 @@ func authorizeDNSChallenge(r *http.Request) (*Authorization, error) {
 		)}
 	}
 
-	return &Authorization{}, nil
+	return &Authorization{
+		repoURLs: nil, // any
+		branch:   "pages",
+	}, nil
 }
 
 func authorizeDNSAllowlist(r *http.Request) (*Authorization, error) {
@@ -157,9 +173,13 @@ func authorizeDNSAllowlist(r *http.Request) (*Authorization, error) {
 		}
 	}
 
-	return &Authorization{repoURLs}, err
+	return &Authorization{
+		repoURLs: repoURLs,
+		branch:   "pages",
+	}, err
 }
 
+// used for `/.git-pages/...` metadata
 func authorizeWildcardMatchHost(r *http.Request, pattern *WildcardPattern) (*Authorization, error) {
 	host, err := GetHost(r)
 	if err != nil {
@@ -167,7 +187,10 @@ func authorizeWildcardMatchHost(r *http.Request, pattern *WildcardPattern) (*Aut
 	}
 
 	if _, found := pattern.Matches(host); found {
-		return &Authorization{}, nil
+		return &Authorization{
+			repoURLs: []string{},
+			branch:   "",
+		}, nil
 	} else {
 		return nil, AuthError{
 			http.StatusUnauthorized,
@@ -176,6 +199,7 @@ func authorizeWildcardMatchHost(r *http.Request, pattern *WildcardPattern) (*Aut
 	}
 }
 
+// used for updates to site content
 func authorizeWildcardMatchSite(r *http.Request, pattern *WildcardPattern) (*Authorization, error) {
 	host, err := GetHost(r)
 	if err != nil {
@@ -193,18 +217,21 @@ func authorizeWildcardMatchSite(r *http.Request, pattern *WildcardPattern) (*Aut
 		if projectName == ".index" {
 			for _, indexRepoTemplate := range pattern.IndexRepos {
 				indexRepo := indexRepoTemplate.ExecuteString(map[string]any{"user": userName})
-				repoURLs = append(repoURLs, repoURLTemplate.ExecuteString(map[string]interface{}{
+				repoURLs = append(repoURLs, repoURLTemplate.ExecuteString(map[string]any{
 					"user":    userName,
 					"project": indexRepo,
 				}))
 			}
 		} else {
-			repoURLs = append(repoURLs, repoURLTemplate.ExecuteString(map[string]interface{}{
+			repoURLs = append(repoURLs, repoURLTemplate.ExecuteString(map[string]any{
 				"user":    userName,
 				"project": projectName,
 			}))
 		}
-		return &Authorization{repoURLs}, nil
+		return &Authorization{
+			repoURLs: repoURLs,
+			branch:   "pages",
+		}, nil
 	} else {
 		return nil, AuthError{
 			http.StatusUnauthorized,
@@ -216,9 +243,9 @@ func authorizeWildcardMatchSite(r *http.Request, pattern *WildcardPattern) (*Aut
 func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
-	if config.Insecure {
-		log.Println("auth: INSECURE mode")
-		return &Authorization{}, nil // for testing only
+	auth := authorizeInsecure()
+	if auth != nil {
+		return auth, nil
 	}
 
 	auth, err := authorizeDNSChallenge(r)
@@ -256,9 +283,9 @@ func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 		return nil, err
 	}
 
-	if config.Insecure {
-		log.Println("auth: INSECURE mode: allow *")
-		return &Authorization{}, nil // for testing only
+	auth := authorizeInsecure()
+	if auth != nil {
+		return auth, nil
 	}
 
 	// DNS challenge gives absolute authority.
@@ -335,12 +362,12 @@ func AuthorizeBranch(branch string, auth *Authorization) error {
 		return nil // any
 	}
 
-	if branch == "pages" {
+	if branch == auth.branch {
 		return nil
 	} else {
 		return AuthError{
 			http.StatusUnauthorized,
-			fmt.Sprintf("branch %s: password authorization required", branch),
+			fmt.Sprintf("branch %s not in allowlist %v", branch, []string{auth.branch}),
 		}
 	}
 }
@@ -352,9 +379,9 @@ func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
 		return nil, err
 	}
 
-	if config.Insecure {
-		log.Println("auth: INSECURE mode")
-		return &Authorization{}, nil // for testing only
+	auth := authorizeInsecure()
+	if auth != nil {
+		return auth, nil
 	}
 
 	// DNS challenge gives absolute authority.
