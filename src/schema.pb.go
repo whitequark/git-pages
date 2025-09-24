@@ -82,10 +82,17 @@ func (Type) EnumDescriptor() ([]byte, []int) {
 }
 
 type Entry struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Type          *Type                  `protobuf:"varint,1,opt,name=type,enum=Type" json:"type,omitempty"`
-	Size          *uint32                `protobuf:"varint,2,opt,name=size" json:"size,omitempty"`
-	Data          []byte                 `protobuf:"bytes,3,opt,name=data" json:"data,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Type  *Type                  `protobuf:"varint,1,opt,name=type,enum=Type" json:"type,omitempty"`
+	// Only present for `type == InlineFile` and `type == ExternalFile`
+	Size *uint32 `protobuf:"varint,2,opt,name=size" json:"size,omitempty"`
+	// Meaning depends on `type`:
+	//   - If `type == InlineFile`, contains file data.
+	//   - If `type == ExternalFile`, contains blob name (an otherwise unspecified
+	//     cryptographically secure content hash).
+	//   - If `type == Symlink`, contains link target.
+	//   - Otherwise not present.
+	Data          []byte `protobuf:"bytes,3,opt,name=data" json:"data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -141,6 +148,8 @@ func (x *Entry) GetData() []byte {
 	return nil
 }
 
+// See https://docs.netlify.com/manage/routing/redirects/overview/ for details.
+// Only a subset of the Netlify specification is representable here.
 type Redirect struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	From          *string                `protobuf:"bytes,1,opt,name=from" json:"from,omitempty"`

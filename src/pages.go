@@ -10,6 +10,7 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -69,7 +70,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	sitePath, _ = strings.CutPrefix(r.URL.Path, "/")
+	sitePath = strings.TrimPrefix(r.URL.Path, "/")
 	if projectName, projectPath, found := strings.Cut(sitePath, "/"); found {
 		projectManifest, err := backend.GetManifest(makeWebRoot(host, projectName))
 		if err == nil {
@@ -122,7 +123,8 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 
 	entryPath := sitePath
 	entry := (*Entry)(nil)
-	is404 := false
+	appliedRedirect := false
+	status := 200
 	reader := io.ReadSeeker(nil)
 	mtime := time.Time{}
 	for {
@@ -135,12 +137,28 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		}
 		entry = manifest.Contents[entryPath]
 		if entry == nil || entry.GetType() == Type_Invalid {
-			is404 = true
-			if entryPath == notFoundPage {
+			if !appliedRedirect {
+				originalURL := (&url.URL{Host: r.Host}).ResolveReference(r.URL)
+				redirectURL, redirectStatus := ApplyRedirects(manifest, originalURL)
+				if Is3xxHTTPStatus(redirectStatus) {
+					w.Header().Set("Location", redirectURL.String())
+					w.WriteHeader(int(redirectStatus))
+					fmt.Fprintf(w, "see %s\n", redirectURL.String())
+					return nil
+				} else if redirectURL != nil {
+					entryPath = strings.TrimPrefix(redirectURL.Path, "/")
+					status = int(redirectStatus)
+					appliedRedirect = true
+					continue
+				}
+			}
+			status = 404
+			if entryPath != notFoundPage {
+				entryPath = notFoundPage
+				continue
+			} else {
 				break
 			}
-			entryPath = notFoundPage
-			continue
 		} else if entry.GetType() == Type_InlineFile {
 			reader = bytes.NewReader(entry.Data)
 		} else if entry.GetType() == Type_ExternalFile {
@@ -181,11 +199,9 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	// decide on the HTTP status
-	if is404 {
-		w.WriteHeader(http.StatusNotFound)
-		if entry == nil {
-			fmt.Fprintf(w, "not found\n")
-		} else {
+	if status != 200 {
+		w.WriteHeader(status)
+		if reader != nil {
 			io.Copy(w, reader)
 		}
 	} else {

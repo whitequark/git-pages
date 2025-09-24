@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -30,7 +31,7 @@ func unparseRule(rule redirects.Rule) string {
 	return strings.Join(parts, " ")
 }
 
-var validRedirectHTTPCodes []uint = []uint{
+var validRedirectHTTPStatuses []uint = []uint{
 	http.StatusOK,
 	http.StatusMovedPermanently,
 	http.StatusFound,
@@ -44,19 +45,43 @@ var validRedirectHTTPCodes []uint = []uint{
 	http.StatusUnavailableForLegalReasons,
 }
 
+func Is3xxHTTPStatus(status uint) bool {
+	return status >= 300 && status <= 399
+}
+
 func validateRule(rule redirects.Rule) error {
 	if len(rule.Params) > 0 {
 		return fmt.Errorf("rules with parameters are not supported")
 	}
-	if rule.IsProxy() {
-		return fmt.Errorf("proxy rules are not supported")
-	}
-	if !slices.Contains(validRedirectHTTPCodes, uint(rule.Status)) {
+	if !slices.Contains(validRedirectHTTPStatuses, uint(rule.Status)) {
 		return fmt.Errorf("rule cannot use status %d: must be %v",
-			rule.Status, validRedirectHTTPCodes)
+			rule.Status, validRedirectHTTPStatuses)
 	}
-	if strings.Contains(rule.From, "*") && !strings.HasSuffix(rule.From, "/*") {
+	fromURL, err := url.Parse(rule.From)
+	if err != nil {
+		return fmt.Errorf("malformed 'from' URL")
+	}
+	if fromURL.Scheme != "" {
+		return fmt.Errorf("'from' URL path must not contain a scheme")
+	}
+	if !strings.HasPrefix(fromURL.Path, "/") {
+		return fmt.Errorf("'from' URL path must start with a /")
+	}
+	if strings.Contains(fromURL.Path, "*") && !strings.HasSuffix(fromURL.Path, "/*") {
 		return fmt.Errorf("splat * must be its own final segment of the path")
+	}
+	toURL, err := url.Parse(rule.To)
+	if err != nil {
+		return fmt.Errorf("malformed 'to' URL")
+	}
+	if !strings.HasPrefix(toURL.Path, "/") {
+		return fmt.Errorf("'to' URL path must start with a /")
+	}
+	if toURL.Host != "" && !Is3xxHTTPStatus(uint(rule.Status)) {
+		return fmt.Errorf("'to' URL may only include a hostname for 3xx status rules")
+	}
+	if rule.Force {
+		return fmt.Errorf("force redirects are not supported")
 	}
 	return nil
 }
@@ -91,4 +116,70 @@ func ProcessRedirects(manifest *Manifest) error {
 		})
 	}
 	return nil
+}
+
+func pathSegments(path string) []string {
+	return strings.Split(strings.TrimPrefix(path, "/"), "/")
+}
+
+func toOrFromComponent(to, from string) string {
+	if to == "" {
+		return from
+	} else {
+		return to
+	}
+}
+
+func ApplyRedirects(manifest *Manifest, fromURL *url.URL) (toURL *url.URL, status uint) {
+	fromSegments := pathSegments(fromURL.Path)
+next:
+	for _, rule := range manifest.Redirects {
+		// check if the rule matches fromURL
+		ruleFromURL, _ := url.Parse(*rule.From) // pre-validated in `validateRule`
+		if ruleFromURL.Scheme != "" && fromURL.Scheme != ruleFromURL.Scheme {
+			continue
+		}
+		if ruleFromURL.Host != "" && fromURL.Hostname() != ruleFromURL.Host {
+			continue
+		}
+		ruleFromSegments := pathSegments(ruleFromURL.Path)
+		splatSegments := []string{}
+		if ruleFromSegments[len(ruleFromSegments)-1] != "*" {
+			if len(ruleFromSegments) < len(fromSegments) {
+				continue
+			}
+		}
+		for index, ruleFromSegment := range ruleFromSegments {
+			if ruleFromSegment == "*" {
+				splatSegments = fromSegments[index:]
+				break
+			}
+			if len(fromSegments) <= index {
+				continue next
+			}
+			if fromSegments[index] != ruleFromSegment {
+				continue next
+			}
+		}
+		// the rule has matched fromURL, figure out where to redirect
+		ruleToURL, _ := url.Parse(*rule.To) // pre-validated in `validateRule`
+		toSegments := []string{}
+		for _, ruleToSegment := range pathSegments(ruleToURL.Path) {
+			if ruleToSegment == ":splat" {
+				toSegments = append(toSegments, splatSegments...)
+			} else {
+				toSegments = append(toSegments, ruleToSegment)
+			}
+		}
+		toURL = &url.URL{
+			Scheme:   toOrFromComponent(ruleToURL.Scheme, fromURL.Scheme),
+			Host:     toOrFromComponent(ruleToURL.Host, fromURL.Host),
+			Path:     "/" + strings.Join(toSegments, "/"),
+			RawQuery: fromURL.RawQuery,
+		}
+		status = uint(*rule.Status)
+		break
+	}
+	// no redirect found
+	return
 }
