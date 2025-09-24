@@ -86,9 +86,12 @@ func ConfigureWildcards(configs []WildcardConfig) error {
 			indexRepoTemplates = append(indexRepoTemplates, indexRepoTemplate)
 		}
 
-		fallbackURL, err := url.Parse(config.FallbackProxyTo)
-		if err != nil {
-			return fmt.Errorf("wildcard pattern: fallback URL: %w", err)
+		var fallbackURL *url.URL
+		if config.FallbackProxyTo != "" {
+			fallbackURL, err = url.Parse(config.FallbackProxyTo)
+			if err != nil {
+				return fmt.Errorf("wildcard pattern: fallback URL: %w", err)
+			}
 		}
 
 		wildcardPatterns = append(wildcardPatterns, &WildcardPattern{
