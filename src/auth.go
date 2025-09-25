@@ -240,6 +240,72 @@ func authorizeWildcardMatchSite(r *http.Request, pattern *WildcardPattern) (*Aut
 	}
 }
 
+// used for compatibility with Codeberg Pages v2
+// see https://docs.codeberg.org/codeberg-pages/using-custom-domain/
+func authorizeCodebergPagesV2(r *http.Request) (*Authorization, error) {
+	host, err := GetHost(r)
+	if err != nil {
+		return nil, err
+	}
+
+	dnsRecords := []string{}
+
+	cnameRecord, err := net.LookupCNAME(host)
+	// "LookupCNAME does not return an error if host does not contain DNS "CNAME" records,
+	// as long as host resolves to address records.
+	if err == nil && cnameRecord != host {
+		// LookupCNAME() returns a domain with the root label, i.e. `username.codeberg.page.`,
+		// with the trailing dot
+		dnsRecords = append(dnsRecords, strings.TrimSuffix(cnameRecord, "."))
+	}
+
+	txtRecords, err := net.LookupTXT(host)
+	if err == nil {
+		dnsRecords = append(dnsRecords, txtRecords...)
+	}
+
+	if len(dnsRecords) > 0 {
+		log.Printf("auth: %s TXT/CNAME: %v\n", host, dnsRecords)
+	}
+
+	for _, dnsRecord := range dnsRecords {
+		domainParts := strings.Split(dnsRecord, ".")
+		slices.Reverse(domainParts)
+		if len(domainParts) >= 3 && len(domainParts) <= 5 {
+			if domainParts[0] == "page" && domainParts[1] == "codeberg" {
+				// map of domain names to allowed repository and branch:
+				//  * {username}.codeberg.page =>
+				//      https://codeberg.org/{username}/pages.git#main
+				//  * {reponame}.{username}.codeberg.page =>
+				//      https://codeberg.org/{username}/{reponame}.git#pages
+				//  * {branch}.{reponame}.{username}.codeberg.page =>
+				//      https://codeberg.org/{username}/{reponame}.git#{branch}
+				username := domainParts[2]
+				reponame := "pages"
+				branch := "main"
+				if len(domainParts) >= 4 {
+					reponame = domainParts[3]
+					branch = "pages"
+				}
+				if len(domainParts) == 5 {
+					branch = domainParts[4]
+				}
+				return &Authorization{
+					repoURLs: []string{
+						fmt.Sprintf("https://codeberg.org/%s/%s.git", username, reponame),
+					},
+					branch: branch,
+				}, nil
+			}
+		}
+	}
+
+	return nil, AuthError{
+		http.StatusUnauthorized,
+		fmt.Sprintf("domain %s does not have Codeberg Pages TXT or CNAME records", host),
+	}
+}
+
 func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
@@ -322,6 +388,19 @@ func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 				return nil, err
 			} else {
 				log.Printf("auth: wildcard %s: allow %v\n", pattern.GetHost(), auth.repoURLs)
+				return auth, nil
+			}
+		}
+
+		if config.Feature("codeberg-pages-compat") {
+			auth, err = authorizeCodebergPagesV2(r)
+			if err != nil && IsUnauthorized(err) {
+				causes = append(causes, err)
+			} else if err != nil { // bad request
+				return nil, err
+			} else {
+				log.Printf("auth: codeberg %s: allow %v branch %s\n",
+					r.Host, auth.repoURLs, auth.branch)
 				return auth, nil
 			}
 		}

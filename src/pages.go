@@ -412,9 +412,11 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	eventRef := event["ref"].(string)
-	if eventRef != "refs/heads/pages" {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "ignored %s\n", eventRef)
+	if eventRef != fmt.Sprintf("refs/heads/%s", auth.branch) {
+		http.Error(w,
+			fmt.Sprintf("ref %s not in allowlist [refs/heads/%v])",
+				eventRef, auth.branch),
+			http.StatusUnauthorized)
 		return nil
 	}
 
@@ -425,7 +427,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
 	defer cancel()
-	result := UpdateFromRepository(ctx, webRoot, repoURL, "pages")
+	result := UpdateFromRepository(ctx, webRoot, repoURL, auth.branch)
 	switch result.outcome {
 	case UpdateError:
 		w.WriteHeader(http.StatusServiceUnavailable)
