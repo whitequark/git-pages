@@ -1,6 +1,6 @@
 edition = "2023";
 
-option go_package = "whitequark.org/git-pages/main";
+option go_package = "codeberg.org/git-pages/git-pages/main";
 
 enum Type {
 	// Invalid entry.

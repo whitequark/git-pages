@@ -19,15 +19,15 @@ jobs:
           apt-get -y install buildah ca-certificates nodejs
       - name: Check out source code
         uses: https://code.forgejo.org/actions/checkout@v5
-      - if: ${{ forge.repository == 'whitequark/git-pages' && 'true' || 'false' }}
+      - if: ${{ forge.repository == 'git-pages/git-pages' && 'true' || 'false' }}
         name: Log into container registry
         run: |
           buildah login --authfile=/tmp/authfile.json \
-            -u whitequark -p ${{ secrets.PACKAGES_TOKEN }} codeberg.org
+            -u git-pages-bot -p ${{ secrets.PACKAGES_TOKEN }} codeberg.org
       - name: Build container
         uses: https://codeberg.org/actions/buildah-simple@main
         with:
           context: .
-          tag: "codeberg.org/whitequark/git-pages:latest"
-          push: ${{ forge.repository == 'whitequark/git-pages' && 'true' || 'false' }}
+          tag: "codeberg.org/git-pages/git-pages:latest"
+          push: ${{ forge.repository == 'git-pages/git-pages' && 'true' || 'false' }}
           authfile: /tmp/authfile.json

@@ -1,4 +1,4 @@
-module whitequark.org/git-pages
+module codeberg.org/git-pages/git-pages
 
 go 1.25.0
 

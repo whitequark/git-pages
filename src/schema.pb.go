@@ -401,7 +401,7 @@ const file_schema_proto_rawDesc = "" +
 	"\n" +
 	"InlineFile\x10\x02\x12\x10\n" +
 	"\fExternalFile\x10\x03\x12\v\n" +
-	"\aSymlink\x10\x04B\x1fZ\x1dwhitequark.org/git-pages/mainb\beditionsp\xe8\a"
+	"\aSymlink\x10\x04B'Z%codeberg.org/git-pages/git-pages/mainb\beditionsp\xe8\a"
 
 var (
 	file_schema_proto_rawDescOnce sync.Once

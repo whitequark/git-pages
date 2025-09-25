@@ -1,3 +1,4 @@
+Copyright (C)  git-pages contributors
 Copyright (C)  Catherine 'whitequark'
 
 Permission to use, copy, modify, and/or distribute this software for

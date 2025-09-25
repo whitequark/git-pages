@@ -26,7 +26,7 @@ These commands starts an HTTP server on `0.0.0.0:3000` and use the `data` direct
 To publish a site, run the following commands:
 
 ```console
-$ curl http://localhost:3000/ -X PUT --data https://codeberg.org/whitequark/git-pages.git
+$ curl http://localhost:3000/ -X PUT --data https://codeberg.org/git-pages/git-pages.git
 b70644b523c4aaf4efd206a588087a1d406cb047
 ```
 
@@ -43,7 +43,7 @@ To run _git-pages_ standalone and use the filesystem to store site data:
 ```console
 $ docker run -u $(id -u):$(id -g)--mount type=bind,src=$(pwd)/data,dst=/app/data \
     -p 3000:3000 \
-    codeberg.org/whitequark/git-pages:latest
+    codeberg.org/git-pages/git-pages:latest
 ```
 
 To run _git-pages_ with Caddy and use an S3-compatible endpoint to store site data and TLS key material:
@@ -51,7 +51,7 @@ To run _git-pages_ with Caddy and use an S3-compatible endpoint to store site da
 ```console
 $ docker run -e S3_ENDPOINT -e S3_REGION -e S3_ACCESS_KEY_ID -e S3_SECRET_ACCESS_KEY -e S3_BUCKET \
     -e ACME_EMAIL -p 80:80 -p 443:443 \
-    codeberg.org/whitequark/git-pages:latest supervisord
+    codeberg.org/git-pages/git-pages:latest supervisord
 ```
 
 See also the included [configuration](fly.toml) for [Fly.io](https://fly.io).
@@ -122,7 +122,7 @@ The S3 backend, intended for (relatively) high latency connections, caches both 
 Architecture (v1)
 -----------------
 
-*This was the original architecture and it is no longer used. Migration to v2 was last available in commit [7e9cd17b](https://codeberg.org/whitequark/git-pages/commit/7e9cd17b70717bea2fe240eb6a784cb206243690).*
+*This was the original architecture and it is no longer used. Migration to v2 was last available in commit [7e9cd17b](https://codeberg.org/git-pages/git-pages/commit/7e9cd17b70717bea2fe240eb6a784cb206243690).*
 
 Filesystem is used as the sole mechanism for state storage.
 
