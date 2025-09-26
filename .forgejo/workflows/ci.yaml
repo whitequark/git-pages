@@ -11,7 +11,7 @@ jobs:
   check:
     runs-on: codeberg-small-lazy
     container:
-      image: docker.io/library/debian:bookworm
+      image: docker.io/library/node:24-trixie-slim
     steps:
       - name: Check out source code
         uses: https://code.forgejo.org/actions/checkout@v5
@@ -19,6 +19,10 @@ jobs:
         uses: https://code.forgejo.org/actions/setup-go@v6
         with:
           go-version: '>=1.25.0'
+      - name: Install dependencies
+        run: |
+          apt-get -y update
+          apt-get -y install ca-certificates
       - name: Build service
         run: |
           go build -o bin/git-pages ./src
@@ -30,12 +34,12 @@ jobs:
     needs: [check]
     runs-on: codeberg-small-lazy
     container:
-      image: docker.io/library/debian:bookworm
+      image: docker.io/library/node:24-trixie-slim
     steps:
       - name: Install dependencies
         run: |
           apt-get -y update
-          apt-get -y install buildah ca-certificates nodejs
+          apt-get -y install buildah ca-certificates
       - name: Check out source code
         uses: https://code.forgejo.org/actions/checkout@v5
       - if: ${{ forge.repository == 'git-pages/git-pages' && 'true' || 'false' }}
