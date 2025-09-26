@@ -81,6 +81,8 @@ func main() {
 		"write manifest for `webroot` (either 'domain.tld' or 'domain.tld/dir') to stdout as ProtoJSON")
 	getBlob := flag.String("get-blob", "",
 		"write `blob` ('sha256-xxxxxxx...xxx') to stdout")
+	updateSite := flag.String("update-site", "",
+		"update site for `webroot` (either 'domain.tld' or 'domain.tld/dir') from archive")
 	flag.Parse()
 
 	if *getManifest != "" && *getBlob != "" {
@@ -160,6 +162,58 @@ func main() {
 		}
 
 		io.Copy(os.Stdout, reader)
+
+	case *updateSite != "":
+		if err := ConfigureBackend(&config.Storage); err != nil {
+			log.Fatalln(err)
+		}
+
+		filename := flag.Arg(0)
+		if filename == "" {
+			log.Fatalln("archive filename must be provided as an argument")
+		}
+
+		webRoot := *updateSite
+		if !strings.Contains(webRoot, "/") {
+			webRoot += "/.index"
+		}
+
+		file, err := os.Open(filename)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		var contentType string
+		switch {
+		case strings.HasSuffix(filename, ".zip"):
+			contentType = "application/zip"
+		case strings.HasSuffix(filename, ".tar"):
+			contentType = "application/x-tar"
+		case strings.HasSuffix(filename, ".tar.gz"):
+			contentType = "application/x-tar+gzip"
+		case strings.HasSuffix(filename, ".tar.zst"):
+			contentType = "application/x-tar+zstd"
+		default:
+			log.Fatalf("cannot determine content type from filename %q\n", filename)
+		}
+
+		result := UpdateFromArchive(webRoot, contentType, file)
+		switch result.outcome {
+		case UpdateError:
+			log.Printf("error: %s\n", result.err)
+			os.Exit(2)
+		case UpdateTimeout:
+			log.Println("timeout")
+			os.Exit(1)
+		case UpdateCreated:
+			log.Println("created")
+		case UpdateReplaced:
+			log.Println("replaced")
+		case UpdateDeleted:
+			log.Println("deleted")
+		case UpdateNoChange:
+			log.Println("no-change")
+		}
 
 	default:
 		// Start listening on all ports before initializing the backend, otherwise if the backend
