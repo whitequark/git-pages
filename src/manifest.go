@@ -134,52 +134,47 @@ func PrepareManifest(manifest *Manifest) error {
 	return nil
 }
 
-// Replaces inline file data over certain size with references to an external content-addressable
-// store, without performing any I/O. Returns an updated copy of the manifest.
-func ExternalizeFiles(manifest *Manifest) *Manifest {
-	newManifest := Manifest{
+var ErrManifestTooLarge = errors.New("manifest too large")
+
+// Uploads inline file data over certain size to the storage backend. Returns a copy of
+// the manifest updated to refer to an external content-addressable store.
+func StoreManifest(name string, manifest *Manifest) (*Manifest, error) {
+	// Replace inline files over certain size with references to external data.
+	extManifest := Manifest{
 		RepoUrl:   manifest.RepoUrl,
 		Branch:    manifest.Branch,
 		Commit:    manifest.Commit,
 		Contents:  make(map[string]*Entry),
 		Redirects: manifest.Redirects,
 		Problems:  manifest.Problems,
+		TotalSize: proto.Uint32(0),
 	}
-	var totalSize uint32
 	for name, entry := range manifest.Contents {
 		cannotBeInlined := entry.GetType() == Type_InlineFile &&
 			entry.GetSize() > uint32(config.Limits.MaxInlineFileSize.Bytes())
 		if cannotBeInlined {
-			newManifest.Contents[name] = &Entry{
+			extManifest.Contents[name] = &Entry{
 				Type: Type_ExternalFile.Enum(),
 				Size: entry.Size,
 				Data: fmt.Appendf(nil, "sha256-%x", sha256.Sum256(entry.Data)),
 			}
 		} else {
-			newManifest.Contents[name] = entry
+			extManifest.Contents[name] = entry
 		}
-		totalSize += entry.GetSize()
+		*extManifest.TotalSize += entry.GetSize()
 	}
-	newManifest.TotalSize = proto.Uint32(totalSize)
-	return &newManifest
-}
 
-var ErrManifestTooLarge = errors.New("manifest too large")
-
-// Uploads inline file data over certain size to the storage backend. Returns a copy of
-// the manifest updated to refer to an external content-addressable store.
-func StoreManifest(name string, manifest *Manifest) (*Manifest, error) {
-	extManifest := ExternalizeFiles(manifest)
-	extManifestData := EncodeManifest(extManifest)
+	// Upload the resulting manifest and the blob it references.
+	extManifestData := EncodeManifest(&extManifest)
 	if uint64(len(extManifestData)) > config.Limits.MaxManifestSize.Bytes() {
-		return nil, fmt.Errorf("%w: decompressed size %s exceeds %s limit",
+		return nil, fmt.Errorf("%w: manifest size %s exceeds %s limit",
 			ErrManifestTooLarge,
 			datasize.ByteSize(len(extManifestData)).HR(),
 			config.Limits.MaxManifestSize,
 		)
 	}
 
-	if err := backend.StageManifest(extManifest); err != nil {
+	if err := backend.StageManifest(&extManifest); err != nil {
 		return nil, fmt.Errorf("stage manifest: %w", err)
 	}
 
@@ -201,9 +196,9 @@ func StoreManifest(name string, manifest *Manifest) (*Manifest, error) {
 		return nil, err // currently ignores all but 1st error
 	}
 
-	if err := backend.CommitManifest(name, extManifest); err != nil {
+	if err := backend.CommitManifest(name, &extManifest); err != nil {
 		return nil, fmt.Errorf("commit manifest: %w", err)
 	}
 
-	return extManifest, nil
+	return &extManifest, nil
 }
