@@ -147,9 +147,9 @@ func ExternalizeFiles(manifest *Manifest) *Manifest {
 	}
 	var totalSize uint32
 	for name, entry := range manifest.Contents {
-		canBeInlined := entry.GetType() == Type_InlineFile &&
+		cannotBeInlined := entry.GetType() == Type_InlineFile &&
 			entry.GetSize() > uint32(config.Limits.MaxInlineFileSize.Bytes())
-		if canBeInlined {
+		if cannotBeInlined {
 			newManifest.Contents[name] = &Entry{
 				Type: Type_ExternalFile.Enum(),
 				Size: entry.Size,
