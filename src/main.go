@@ -63,7 +63,7 @@ func serve(listener net.Listener, handler http.Handler) {
 		server := http.Server{Handler: handler}
 		server.Protocols = new(http.Protocols)
 		server.Protocols.SetHTTP1(true)
-		if config.Feature("h2c") {
+		if config.Feature("serve-h2c") {
 			server.Protocols.SetUnencryptedHTTP2(true)
 		}
 		log.Fatalln(server.Serve(listener))

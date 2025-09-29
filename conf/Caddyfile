@@ -68,7 +68,7 @@
 		on_demand
 	}
 
-	@h2c `{env.PAGES_FEATURES}.matches(r"\bh2c\b")`
+	@h2c `{env.PAGES_FEATURES}.matches(r"\bserve-h2c\b")`
 	reverse_proxy @h2c h2c://{$GIT_PAGES_ADDRESS:localhost}:3000
 	reverse_proxy http://{$GIT_PAGES_ADDRESS:localhost}:3000
 
