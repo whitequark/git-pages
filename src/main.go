@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime/debug"
 	"strings"
@@ -82,7 +84,7 @@ func main() {
 	getBlob := flag.String("get-blob", "",
 		"write `blob` ('sha256-xxxxxxx...xxx') to stdout")
 	updateSite := flag.String("update-site", "",
-		"update site for `webroot` (either 'domain.tld' or 'domain.tld/dir') from archive")
+		"update site for `webroot` (either 'domain.tld' or 'domain.tld/dir') from archive or repository URL")
 	flag.Parse()
 
 	if *getManifest != "" && *getBlob != "" {
@@ -168,9 +170,9 @@ func main() {
 			log.Fatalln(err)
 		}
 
-		filename := flag.Arg(0)
-		if filename == "" {
-			log.Fatalln("archive filename must be provided as an argument")
+		sourceURL, _ := url.Parse(flag.Arg(0))
+		if sourceURL == (&url.URL{}) {
+			log.Fatalln("update source must be provided as an argument")
 		}
 
 		webRoot := *updateSite
@@ -178,26 +180,36 @@ func main() {
 			webRoot += "/.index"
 		}
 
-		file, err := os.Open(filename)
-		if err != nil {
-			log.Fatalln(err)
+		var result UpdateResult
+		if sourceURL.Scheme == "" {
+			file, err := os.Open(sourceURL.Path)
+			if err != nil {
+				log.Fatalln(err)
+			}
+
+			var contentType string
+			switch {
+			case strings.HasSuffix(sourceURL.Path, ".zip"):
+				contentType = "application/zip"
+			case strings.HasSuffix(sourceURL.Path, ".tar"):
+				contentType = "application/x-tar"
+			case strings.HasSuffix(sourceURL.Path, ".tar.gz"):
+				contentType = "application/x-tar+gzip"
+			case strings.HasSuffix(sourceURL.Path, ".tar.zst"):
+				contentType = "application/x-tar+zstd"
+			default:
+				log.Fatalf("cannot determine content type from filename %q\n", sourceURL)
+			}
+
+			result = UpdateFromArchive(webRoot, contentType, file)
+		} else {
+			branch := "pages"
+			if sourceURL.Fragment != "" {
+				branch, sourceURL.Fragment = sourceURL.Fragment, ""
+			}
+			result = UpdateFromRepository(context.Background(), webRoot, sourceURL.String(), branch)
 		}
 
-		var contentType string
-		switch {
-		case strings.HasSuffix(filename, ".zip"):
-			contentType = "application/zip"
-		case strings.HasSuffix(filename, ".tar"):
-			contentType = "application/x-tar"
-		case strings.HasSuffix(filename, ".tar.gz"):
-			contentType = "application/x-tar+gzip"
-		case strings.HasSuffix(filename, ".tar.zst"):
-			contentType = "application/x-tar+zstd"
-		default:
-			log.Fatalf("cannot determine content type from filename %q\n", filename)
-		}
-
-		result := UpdateFromArchive(webRoot, contentType, file)
 		switch result.outcome {
 		case UpdateError:
 			log.Printf("error: %s\n", result.err)
