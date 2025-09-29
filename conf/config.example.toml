@@ -1,7 +1,7 @@
 # Unless otherwise noted, every value in this file is the same
 # as the intrinsic default value.
 
-log-format = "datetime+message"
+log-format = "text"
 
 [server]
 # Use "-" to disable the handler.

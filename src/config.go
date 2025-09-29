@@ -37,7 +37,7 @@ func (t *Duration) MarshalText() ([]byte, error) {
 type Config struct {
 	Insecure  bool             `toml:"-" env:"insecure"`
 	Features  []string         `toml:"features"`
-	LogFormat string           `toml:"log-format" default:"datetime+message"`
+	LogFormat string           `toml:"log-format" default:"text"`
 	Server    ServerConfig     `toml:"server"`
 	Wildcard  []WildcardConfig `toml:"wildcard"`
 	Storage   StorageConfig    `toml:"storage"`

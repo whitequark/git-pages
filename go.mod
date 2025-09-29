@@ -7,6 +7,7 @@ require (
 	github.com/c2h5oh/datasize v0.0.0-20231215233829-aa82cc1e6500
 	github.com/creasty/defaults v1.8.0
 	github.com/getsentry/sentry-go v0.35.3
+	github.com/getsentry/sentry-go/slog v0.35.3
 	github.com/go-git/go-billy/v6 v6.0.0-20250627091229-31e2a16eef30
 	github.com/go-git/go-git/v6 v6.0.0-20250910120214-3a68d0404116
 	github.com/honeybadger-io/honeybadger-go v0.8.0
@@ -15,6 +16,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/prometheus/client_golang v1.23.2
+	github.com/samber/slog-multi v1.5.0
 	github.com/tj/go-redirects v0.0.0-20200911105812-fd1ba1020b37
 	github.com/valyala/fasttemplate v1.2.2
 	google.golang.org/protobuf v1.36.9
@@ -50,6 +52,8 @@ require (
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/rs/xid v1.6.0 // indirect
+	github.com/samber/lo v1.51.0 // indirect
+	github.com/samber/slog-common v0.19.0 // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/tinylib/msgp v1.3.0 // indirect
