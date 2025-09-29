@@ -155,7 +155,9 @@ func PrepareManifest(manifest *Manifest) error {
 		log.Printf("redirects ok: %d rules\n", len(manifest.Redirects))
 	}
 
-	CompressFiles(manifest)
+	if config.Feature("compress") {
+		CompressFiles(manifest)
+	}
 
 	return nil
 }
