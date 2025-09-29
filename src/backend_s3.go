@@ -103,12 +103,13 @@ type CachedManifest struct {
 func (c *CachedManifest) Weight() uint32 { return c.weight }
 
 type S3Backend struct {
-	ctx       context.Context
 	client    *minio.Client
 	bucket    string
 	blobCache *observedCache[string, *CachedBlob]
 	siteCache *observedCache[string, *CachedManifest]
 }
+
+var _ Backend = (*S3Backend)(nil)
 
 func makeCacheOptions[K comparable, V any](
 	config *CacheConfig,
@@ -125,11 +126,7 @@ func makeCacheOptions[K comparable, V any](
 	return options
 }
 
-func NewS3Backend(
-	config *S3Config,
-) (*S3Backend, error) {
-	ctx := context.Background()
-
+func NewS3Backend(ctx context.Context, config *S3Config) (*S3Backend, error) {
 	client, err := minio.New(config.Endpoint, &minio.Options{
 		Creds: credentials.NewStaticV4(
 			config.AccessKeyID,
@@ -185,7 +182,7 @@ func NewS3Backend(
 		return nil, err
 	}
 
-	return &S3Backend{ctx, client, bucket, blobCache, siteCache}, nil
+	return &S3Backend{client, bucket, blobCache, siteCache}, nil
 }
 
 func (s3 *S3Backend) Backend() Backend {
@@ -196,11 +193,19 @@ func blobObjectName(name string) string {
 	return fmt.Sprintf("blob/%s", path.Join(splitBlobName(name)...))
 }
 
-func (s3 *S3Backend) GetBlob(name string) (io.ReadSeeker, uint64, time.Time, error) {
+func (s3 *S3Backend) GetBlob(
+	ctx context.Context,
+	name string,
+) (
+	reader io.ReadSeeker,
+	size uint64,
+	mtime time.Time,
+	err error,
+) {
 	loader := func(ctx context.Context, name string) (*CachedBlob, error) {
 		log.Printf("s3: get blob %s\n", name)
 
-		object, err := s3.client.GetObject(s3.ctx, s3.bucket, blobObjectName(name),
+		object, err := s3.client.GetObject(ctx, s3.bucket, blobObjectName(name),
 			minio.GetObjectOptions{})
 		// Note that many errors (e.g. NoSuchKey) will be reported only after this point.
 		if err != nil {
@@ -221,25 +226,28 @@ func (s3 *S3Backend) GetBlob(name string) (io.ReadSeeker, uint64, time.Time, err
 		return &CachedBlob{data, stat.LastModified}, nil
 	}
 
-	cached, err := s3.blobCache.Get(s3.ctx, name, otter.LoaderFunc[string, *CachedBlob](loader))
+	var cached *CachedBlob
+	cached, err = s3.blobCache.Get(ctx, name, otter.LoaderFunc[string, *CachedBlob](loader))
 	if err != nil {
 		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
 			err = fmt.Errorf("%w: %s", errNotFound, errResp.Key)
 		}
-		return nil, 0, time.Time{}, err
 	} else {
-		return bytes.NewReader(cached.blob), uint64(len(cached.blob)), cached.mtime, err
+		reader = bytes.NewReader(cached.blob)
+		size = uint64(len(cached.blob))
+		mtime = cached.mtime
 	}
+	return
 }
 
-func (s3 *S3Backend) PutBlob(name string, data []byte) error {
+func (s3 *S3Backend) PutBlob(ctx context.Context, name string, data []byte) error {
 	log.Printf("s3: put blob %s (%d bytes)\n", name, len(data))
 
-	_, err := s3.client.StatObject(s3.ctx, s3.bucket, blobObjectName(name),
+	_, err := s3.client.StatObject(ctx, s3.bucket, blobObjectName(name),
 		minio.GetObjectOptions{})
 	if err != nil {
 		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
-			_, err := s3.client.PutObject(s3.ctx, s3.bucket, blobObjectName(name),
+			_, err := s3.client.PutObject(ctx, s3.bucket, blobObjectName(name),
 				bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{})
 			if err != nil {
 				return err
@@ -258,10 +266,10 @@ func (s3 *S3Backend) PutBlob(name string, data []byte) error {
 	}
 }
 
-func (s3 *S3Backend) DeleteBlob(name string) error {
+func (s3 *S3Backend) DeleteBlob(ctx context.Context, name string) error {
 	log.Printf("s3: delete blob %s\n", name)
 
-	return s3.client.RemoveObject(s3.ctx, s3.bucket, blobObjectName(name),
+	return s3.client.RemoveObject(ctx, s3.bucket, blobObjectName(name),
 		minio.RemoveObjectOptions{})
 }
 
@@ -273,12 +281,12 @@ func stagedManifestObjectName(manifestData []byte) string {
 	return fmt.Sprintf("dirty/%x", sha256.Sum256(manifestData))
 }
 
-func (s3 *S3Backend) GetManifest(name string) (*Manifest, error) {
+func (s3 *S3Backend) GetManifest(ctx context.Context, name string) (*Manifest, error) {
 	loader := func(ctx context.Context, name string) (*CachedManifest, error) {
 		manifest, size, err := func() (*Manifest, uint32, error) {
 			log.Printf("s3: get manifest %s\n", name)
 
-			object, err := s3.client.GetObject(s3.ctx, s3.bucket, manifestObjectName(name),
+			object, err := s3.client.GetObject(ctx, s3.bucket, manifestObjectName(name),
 				minio.GetObjectOptions{})
 			// Note that many errors (e.g. NoSuchKey) will be reported only after this point.
 			if err != nil {
@@ -309,7 +317,7 @@ func (s3 *S3Backend) GetManifest(name string) (*Manifest, error) {
 		}
 	}
 
-	cached, err := s3.siteCache.Get(s3.ctx, name, otter.LoaderFunc[string, *CachedManifest](loader))
+	cached, err := s3.siteCache.Get(ctx, name, otter.LoaderFunc[string, *CachedManifest](loader))
 	if err != nil {
 		return nil, err
 	} else {
@@ -317,24 +325,24 @@ func (s3 *S3Backend) GetManifest(name string) (*Manifest, error) {
 	}
 }
 
-func (s3 *S3Backend) StageManifest(manifest *Manifest) error {
+func (s3 *S3Backend) StageManifest(ctx context.Context, manifest *Manifest) error {
 	data := EncodeManifest(manifest)
 	log.Printf("s3: stage manifest %x\n", sha256.Sum256(data))
 
-	_, err := s3.client.PutObject(s3.ctx, s3.bucket, stagedManifestObjectName(data),
+	_, err := s3.client.PutObject(ctx, s3.bucket, stagedManifestObjectName(data),
 		bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{})
 	return err
 }
 
-func (s3 *S3Backend) CommitManifest(name string, manifest *Manifest) error {
+func (s3 *S3Backend) CommitManifest(ctx context.Context, name string, manifest *Manifest) error {
 	data := EncodeManifest(manifest)
 	log.Printf("s3: commit manifest %x -> %s", sha256.Sum256(data), name)
 
 	// Remove staged object unconditionally (whether commit succeeded or failed), since
 	// the upper layer has to retry the complete operation anyway.
-	_, putErr := s3.client.PutObject(s3.ctx, s3.bucket, manifestObjectName(name),
+	_, putErr := s3.client.PutObject(ctx, s3.bucket, manifestObjectName(name),
 		bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{})
-	removeErr := s3.client.RemoveObject(s3.ctx, s3.bucket, stagedManifestObjectName(data),
+	removeErr := s3.client.RemoveObject(ctx, s3.bucket, stagedManifestObjectName(data),
 		minio.RemoveObjectOptions{})
 	s3.siteCache.Cache.Invalidate(name)
 	if putErr != nil {
@@ -346,19 +354,19 @@ func (s3 *S3Backend) CommitManifest(name string, manifest *Manifest) error {
 	}
 }
 
-func (s3 *S3Backend) DeleteManifest(name string) error {
+func (s3 *S3Backend) DeleteManifest(ctx context.Context, name string) error {
 	log.Printf("s3: delete manifest %s\n", name)
 
-	err := s3.client.RemoveObject(s3.ctx, s3.bucket, manifestObjectName(name),
+	err := s3.client.RemoveObject(ctx, s3.bucket, manifestObjectName(name),
 		minio.RemoveObjectOptions{})
 	s3.siteCache.Cache.Invalidate(name)
 	return err
 }
 
-func (s3 *S3Backend) CheckDomain(domain string) (bool, error) {
+func (s3 *S3Backend) CheckDomain(ctx context.Context, domain string) (bool, error) {
 	log.Printf("s3: check domain %s\n", domain)
 
-	ctx, cancel := context.WithCancel(s3.ctx)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	for object := range s3.client.ListObjectsIter(ctx, s3.bucket, minio.ListObjectsOptions{

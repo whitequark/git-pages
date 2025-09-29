@@ -25,17 +25,14 @@ type UpdateResult struct {
 	err      error
 }
 
-func Update(
-	webRoot string,
-	manifest *Manifest,
-) UpdateResult {
+func Update(ctx context.Context, webRoot string, manifest *Manifest) UpdateResult {
 	var oldManifest, newManifest *Manifest
 	var err error
 
 	outcome := UpdateError
-	oldManifest, _ = backend.GetManifest(webRoot)
+	oldManifest, _ = backend.GetManifest(ctx, webRoot)
 	if IsManifestEmpty(manifest) {
-		newManifest, err = manifest, backend.DeleteManifest(webRoot)
+		newManifest, err = manifest, backend.DeleteManifest(ctx, webRoot)
 		if err == nil {
 			if oldManifest == nil {
 				outcome = UpdateNoChange
@@ -44,7 +41,7 @@ func Update(
 			}
 		}
 	} else if err = PrepareManifest(manifest); err == nil {
-		newManifest, err = StoreManifest(webRoot, manifest)
+		newManifest, err = StoreManifest(ctx, webRoot, manifest)
 		if err == nil {
 			if oldManifest == nil {
 				outcome = UpdateCreated
@@ -94,13 +91,14 @@ func UpdateFromRepository(
 	} else if err != nil {
 		return UpdateResult{UpdateError, nil, err}
 	} else {
-		return Update(webRoot, manifest)
+		return Update(ctx, webRoot, manifest)
 	}
 }
 
 var errArchiveFormat = errors.New("unsupported archive format")
 
 func UpdateFromArchive(
+	ctx context.Context,
 	webRoot string,
 	contentType string,
 	reader io.Reader,
@@ -129,6 +127,6 @@ func UpdateFromArchive(
 		log.Printf("update %s err: %s", webRoot, err)
 		return UpdateResult{UpdateError, nil, err}
 	} else {
-		return Update(webRoot, manifest)
+		return Update(ctx, webRoot, manifest)
 	}
 }

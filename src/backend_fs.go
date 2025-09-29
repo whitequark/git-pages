@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -14,6 +15,8 @@ type FSBackend struct {
 	blobRoot *os.Root
 	siteRoot *os.Root
 }
+
+var _ Backend = (*FSBackend)(nil)
 
 func maybeCreateOpenRoot(dir string, name string) (*os.Root, error) {
 	dirName := filepath.Join(dir, name)
@@ -65,7 +68,15 @@ func (fs *FSBackend) Backend() Backend {
 	return fs
 }
 
-func (fs *FSBackend) GetBlob(name string) (reader io.ReadSeeker, size uint64, mtime time.Time, err error) {
+func (fs *FSBackend) GetBlob(
+	ctx context.Context,
+	name string,
+) (
+	reader io.ReadSeeker,
+	size uint64,
+	mtime time.Time,
+	err error,
+) {
 	blobPath := filepath.Join(splitBlobName(name)...)
 	stat, err := fs.blobRoot.Stat(blobPath)
 	if errors.Is(err, os.ErrNotExist) {
@@ -83,7 +94,7 @@ func (fs *FSBackend) GetBlob(name string) (reader io.ReadSeeker, size uint64, mt
 	return file, uint64(stat.Size()), stat.ModTime(), nil
 }
 
-func (fs *FSBackend) PutBlob(name string, data []byte) error {
+func (fs *FSBackend) PutBlob(ctx context.Context, name string, data []byte) error {
 	blobPath := filepath.Join(splitBlobName(name)...)
 	blobDir := filepath.Dir(blobPath)
 
@@ -117,12 +128,12 @@ again:
 	return nil
 }
 
-func (fs *FSBackend) DeleteBlob(name string) error {
+func (fs *FSBackend) DeleteBlob(ctx context.Context, name string) error {
 	blobPath := filepath.Join(splitBlobName(name)...)
 	return fs.blobRoot.Remove(blobPath)
 }
 
-func (fs *FSBackend) GetManifest(name string) (*Manifest, error) {
+func (fs *FSBackend) GetManifest(ctx context.Context, name string) (*Manifest, error) {
 	data, err := fs.siteRoot.ReadFile(name)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf("%w: %s", errNotFound, err.(*os.PathError).Path)
@@ -137,7 +148,7 @@ func stagedManifestName(manifestData []byte) string {
 	return fmt.Sprintf(".%x", sha256.Sum256(manifestData))
 }
 
-func (fs *FSBackend) StageManifest(manifest *Manifest) error {
+func (fs *FSBackend) StageManifest(ctx context.Context, manifest *Manifest) error {
 	manifestData := EncodeManifest(manifest)
 
 	tempPath, err := createTempInRoot(fs.siteRoot, ".manifest", manifestData)
@@ -152,7 +163,7 @@ func (fs *FSBackend) StageManifest(manifest *Manifest) error {
 	return nil
 }
 
-func (fs *FSBackend) CommitManifest(name string, manifest *Manifest) error {
+func (fs *FSBackend) CommitManifest(ctx context.Context, name string, manifest *Manifest) error {
 	manifestData := EncodeManifest(manifest)
 	manifestHashName := stagedManifestName(manifestData)
 
@@ -171,7 +182,7 @@ func (fs *FSBackend) CommitManifest(name string, manifest *Manifest) error {
 	return nil
 }
 
-func (fs *FSBackend) DeleteManifest(name string) error {
+func (fs *FSBackend) DeleteManifest(ctx context.Context, name string) error {
 	err := fs.siteRoot.Remove(name)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -180,7 +191,7 @@ func (fs *FSBackend) DeleteManifest(name string) error {
 	}
 }
 
-func (fs *FSBackend) CheckDomain(domain string) (bool, error) {
+func (fs *FSBackend) CheckDomain(ctx context.Context, domain string) (bool, error) {
 	_, err := fs.siteRoot.Stat(domain)
 	if errors.Is(err, os.ErrNotExist) {
 		return false, nil

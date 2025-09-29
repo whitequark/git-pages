@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -166,7 +167,7 @@ var ErrManifestTooLarge = errors.New("manifest too large")
 
 // Uploads inline file data over certain size to the storage backend. Returns a copy of
 // the manifest updated to refer to an external content-addressable store.
-func StoreManifest(name string, manifest *Manifest) (*Manifest, error) {
+func StoreManifest(ctx context.Context, name string, manifest *Manifest) (*Manifest, error) {
 	// Replace inline files over certain size with references to external data.
 	extManifest := Manifest{
 		RepoUrl:   manifest.RepoUrl,
@@ -203,7 +204,7 @@ func StoreManifest(name string, manifest *Manifest) (*Manifest, error) {
 		)
 	}
 
-	if err := backend.StageManifest(&extManifest); err != nil {
+	if err := backend.StageManifest(ctx, &extManifest); err != nil {
 		return nil, fmt.Errorf("stage manifest: %w", err)
 	}
 
@@ -212,7 +213,7 @@ func StoreManifest(name string, manifest *Manifest) (*Manifest, error) {
 	for name, entry := range extManifest.Contents {
 		if entry.GetType() == Type_ExternalFile {
 			wg.Go(func() {
-				err := backend.PutBlob(string(entry.Data), manifest.Contents[name].Data)
+				err := backend.PutBlob(ctx, string(entry.Data), manifest.Contents[name].Data)
 				if err != nil {
 					ch <- fmt.Errorf("put blob %s: %w", name, err)
 				}
@@ -225,7 +226,7 @@ func StoreManifest(name string, manifest *Manifest) (*Manifest, error) {
 		return nil, err // currently ignores all but 1st error
 	}
 
-	if err := backend.CommitManifest(name, &extManifest); err != nil {
+	if err := backend.CommitManifest(ctx, name, &extManifest); err != nil {
 		return nil, fmt.Errorf("commit manifest: %w", err)
 	}
 

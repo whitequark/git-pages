@@ -77,13 +77,13 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 
 	sitePath = strings.TrimPrefix(r.URL.Path, "/")
 	if projectName, projectPath, found := strings.Cut(sitePath, "/"); found {
-		projectManifest, err := backend.GetManifest(makeWebRoot(host, projectName))
+		projectManifest, err := backend.GetManifest(r.Context(), makeWebRoot(host, projectName))
 		if err == nil {
 			sitePath, manifest = projectPath, projectManifest
 		}
 	}
 	if manifest == nil {
-		manifest, err = backend.GetManifest(makeWebRoot(host, ".index"))
+		manifest, err = backend.GetManifest(r.Context(), makeWebRoot(host, ".index"))
 		if manifest == nil {
 			if found, fallbackErr := HandleWildcardFallback(w, r); found {
 				return fallbackErr
@@ -172,7 +172,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				w.WriteHeader(http.StatusNotModified)
 				return nil
 			} else {
-				reader, _, mtime, err = backend.GetBlob(string(entry.Data))
+				reader, _, mtime, err = backend.GetBlob(r.Context(), string(entry.Data))
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 					fmt.Fprintf(w, "internal server error: %s\n", err)
@@ -266,6 +266,9 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("content type: %w", err)
 	}
 
+	updateCtx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
+	defer cancel()
+
 	if contentType == "application/x-www-form-urlencoded" {
 		auth, err := AuthorizeUpdateFromRepository(r)
 		if err != nil {
@@ -291,9 +294,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 
-		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
-		defer cancel()
-		result = UpdateFromRepository(ctx, webRoot, repoURL, branch)
+		result = UpdateFromRepository(updateCtx, webRoot, repoURL, branch)
 	} else {
 		_, err := AuthorizeUpdateFromArchive(r)
 		if err != nil {
@@ -302,7 +303,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 
 		// request body contains archive
 		reader := http.MaxBytesReader(w, r.Body, int64(config.Limits.MaxSiteSize.Bytes()))
-		result = UpdateFromArchive(webRoot, contentType, reader)
+		result = UpdateFromArchive(updateCtx, webRoot, contentType, reader)
 	}
 
 	switch result.outcome {
@@ -361,7 +362,7 @@ func deletePage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	err = backend.DeleteManifest(makeWebRoot(host, projectName))
+	err = backend.DeleteManifest(r.Context(), makeWebRoot(host, projectName))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
@@ -447,9 +448,10 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
+	updateCtx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
 	defer cancel()
-	result := UpdateFromRepository(ctx, webRoot, repoURL, auth.branch)
+
+	result := UpdateFromRepository(updateCtx, webRoot, repoURL, auth.branch)
 	switch result.outcome {
 	case UpdateError:
 		w.WriteHeader(http.StatusServiceUnavailable)

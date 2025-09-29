@@ -141,7 +141,7 @@ func main() {
 			webRoot += "/.index"
 		}
 
-		manifest, err := backend.GetManifest(webRoot)
+		manifest, err := backend.GetManifest(context.Background(), webRoot)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -152,7 +152,7 @@ func main() {
 			log.Fatalln(err)
 		}
 
-		reader, _, _, err := backend.GetBlob(*getBlob)
+		reader, _, _, err := backend.GetBlob(context.Background(), *getBlob)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -195,7 +195,7 @@ func main() {
 				log.Fatalf("cannot determine content type from filename %q\n", sourceURL)
 			}
 
-			result = UpdateFromArchive(webRoot, contentType, file)
+			result = UpdateFromArchive(context.Background(), webRoot, contentType, file)
 		} else {
 			branch := "pages"
 			if sourceURL.Fragment != "" {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"io"
 	"time"
 
@@ -37,12 +38,22 @@ type observedBackend struct {
 	backend Backend
 }
 
+var _ Backend = (*observedBackend)(nil)
+
 func NewObservedBackend(backend Backend) Backend {
 	return &observedBackend{backend: backend}
 }
 
-func (b *observedBackend) GetBlob(name string) (reader io.ReadSeeker, size uint64, mtime time.Time, err error) {
-	reader, size, mtime, err = b.backend.GetBlob(name)
+func (b *observedBackend) GetBlob(
+	ctx context.Context,
+	name string,
+) (
+	reader io.ReadSeeker,
+	size uint64,
+	mtime time.Time,
+	err error,
+) {
+	reader, size, mtime, err = b.backend.GetBlob(ctx, name)
 	if err != nil {
 		return
 	}
@@ -51,8 +62,8 @@ func (b *observedBackend) GetBlob(name string) (reader io.ReadSeeker, size uint6
 	return
 }
 
-func (b *observedBackend) PutBlob(name string, data []byte) error {
-	err := b.backend.PutBlob(name, data)
+func (b *observedBackend) PutBlob(ctx context.Context, name string, data []byte) error {
+	err := b.backend.PutBlob(ctx, name, data)
 	if err != nil {
 		return err
 	}
@@ -61,12 +72,12 @@ func (b *observedBackend) PutBlob(name string, data []byte) error {
 	return nil
 }
 
-func (b *observedBackend) DeleteBlob(name string) error {
-	return b.backend.DeleteBlob(name)
+func (b *observedBackend) DeleteBlob(ctx context.Context, name string) error {
+	return b.backend.DeleteBlob(ctx, name)
 }
 
-func (b *observedBackend) GetManifest(name string) (manifest *Manifest, err error) {
-	manifest, err = b.backend.GetManifest(name)
+func (b *observedBackend) GetManifest(ctx context.Context, name string) (manifest *Manifest, err error) {
+	manifest, err = b.backend.GetManifest(ctx, name)
 	if err != nil {
 		return
 	}
@@ -74,18 +85,18 @@ func (b *observedBackend) GetManifest(name string) (manifest *Manifest, err erro
 	return
 }
 
-func (b *observedBackend) StageManifest(manifest *Manifest) error {
-	return b.backend.StageManifest(manifest)
+func (b *observedBackend) StageManifest(ctx context.Context, manifest *Manifest) error {
+	return b.backend.StageManifest(ctx, manifest)
 }
 
-func (b *observedBackend) CommitManifest(name string, manifest *Manifest) error {
-	return b.backend.CommitManifest(name, manifest)
+func (b *observedBackend) CommitManifest(ctx context.Context, name string, manifest *Manifest) error {
+	return b.backend.CommitManifest(ctx, name, manifest)
 }
 
-func (b *observedBackend) DeleteManifest(name string) error {
-	return b.backend.DeleteManifest(name)
+func (b *observedBackend) DeleteManifest(ctx context.Context, name string) error {
+	return b.backend.DeleteManifest(ctx, name)
 }
 
-func (b *observedBackend) CheckDomain(domain string) (found bool, err error) {
-	return b.backend.CheckDomain(domain)
+func (b *observedBackend) CheckDomain(ctx context.Context, domain string) (found bool, err error) {
+	return b.backend.CheckDomain(ctx, domain)
 }

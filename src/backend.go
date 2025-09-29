@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -22,33 +23,33 @@ func splitBlobName(name string) []string {
 
 type Backend interface {
 	// Retrieve a blob. Returns `reader, size, mtime, err`.
-	GetBlob(name string) (reader io.ReadSeeker, size uint64, mtime time.Time, err error)
+	GetBlob(ctx context.Context, name string) (reader io.ReadSeeker, size uint64, mtime time.Time, err error)
 
 	// Store a blob. If a blob called `name` already exists, this function returns `nil` without
 	// regards to the old or new contents. It is expected that blobs are content-addressed, i.e.
 	// the `name` contains a cryptographic hash of `data`, but the backend is ignorant of this.
-	PutBlob(name string, data []byte) error
+	PutBlob(ctx context.Context, name string, data []byte) error
 
 	// Delete a blob. This is an unconditional operation that can break integrity of manifests.
-	DeleteBlob(name string) error
+	DeleteBlob(ctx context.Context, name string) error
 
 	// Retrieve a manifest.
-	GetManifest(name string) (*Manifest, error)
+	GetManifest(ctx context.Context, name string) (*Manifest, error)
 
 	// Stage a manifest. This operation stores a new version of a manifest, locking any blobs
 	// referenced from it in place (for garbage collection purposes) but without any other side
 	// effects.
-	StageManifest(manifest *Manifest) error
+	StageManifest(ctx context.Context, manifest *Manifest) error
 
 	// Commit a manifest. This is an atomic operation; `GetManifest` calls will return either
 	// the old version or the new version of the manifest, never anything else.
-	CommitManifest(name string, manifest *Manifest) error
+	CommitManifest(ctx context.Context, name string, manifest *Manifest) error
 
 	// Delete a manifest.
-	DeleteManifest(name string) error
+	DeleteManifest(ctx context.Context, name string) error
 
 	// Check whether a domain has any deployments.
-	CheckDomain(domain string) (found bool, err error)
+	CheckDomain(ctx context.Context, domain string) (found bool, err error)
 }
 
 var backend Backend
@@ -61,7 +62,7 @@ func ConfigureBackend(config *StorageConfig) (err error) {
 		}
 
 	case "s3":
-		if backend, err = NewS3Backend(&config.S3); err != nil {
+		if backend, err = NewS3Backend(context.Background(), &config.S3); err != nil {
 			err = fmt.Errorf("s3 backend: %w", err)
 		}
 

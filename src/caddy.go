@@ -25,7 +25,7 @@ func ServeCaddy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	found, err := backend.CheckDomain(strings.ToLower(query))
+	found, err := backend.CheckDomain(r.Context(), strings.ToLower(query))
 	if found {
 		log.Println("caddy:", query, 200)
 		w.WriteHeader(http.StatusOK)
