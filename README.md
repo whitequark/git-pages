@@ -41,17 +41,13 @@ The first-party container supports running _git-pages_ either standalone or toge
 To run _git-pages_ standalone and use the filesystem to store site data:
 
 ```console
-$ docker run -u $(id -u):$(id -g)--mount type=bind,src=$(pwd)/data,dst=/app/data \
-    -p 3000:3000 \
-    codeberg.org/git-pages/git-pages:latest
+$ docker run -u $(id -u):$(id -g)--mount type=bind,src=$(pwd)/data,dst=/app/data -p 3000:3000 codeberg.org/git-pages/git-pages:latest
 ```
 
 To run _git-pages_ with Caddy and use an S3-compatible endpoint to store site data and TLS key material:
 
 ```console
-$ docker run -e S3_ENDPOINT -e S3_REGION -e S3_ACCESS_KEY_ID -e S3_SECRET_ACCESS_KEY -e S3_BUCKET \
-    -e ACME_EMAIL -p 80:80 -p 443:443 \
-    codeberg.org/git-pages/git-pages:latest supervisord
+$ docker run -e PAGES_STORAGE_TYPE -e PAGES_STORAGE_S3_ENDPOINT -e PAGES_STORAGE_S3_REGION -e PAGES_STORAGE_S3_ACCESS_KEY_ID -e PAGES_STORAGE_S3_SECRET_ACCESS_KEY -e PAGES_STORAGE_S3_BUCKET -e ACME_EMAIL -p 80:80 -p 443:443 codeberg.org/git-pages/git-pages:latest supervisord
 ```
 
 See also the included [configuration](fly.toml) for [Fly.io](https://fly.io).
@@ -81,7 +77,7 @@ DNS is used for authorization, either via TXT records or by pattern matching.
 
 The authorization flow for content updates (`PUT`, `DELETE`, `POST` requests) proceeds sequentially in the following order, with the first of multiple applicable rule taking precedence:
 
-1. **Development Mode:** If the environment variable `INSECURE` is set to the value `very`, the request is authorized.
+1. **Development Mode:** If the environment variable `PAGES_INSECURE` is set to a truthful value like `1`, the request is authorized.
 2. **DNS Challenge:** If the method is `PUT`, `DELETE`, `POST`, and a well-formed `Authorization:` header is provided containing a `<token>`, and a TXT record lookup at `_git-pages-challenge.<host>` returns a record whose concatenated value equals `SHA256("<host> <token>")`, the request is authorized.
     - **`Pages` scheme:** Request includes an `Authorization: Pages <token>` header.
     - **`Basic` scheme:** Request includes an `Authorization: Basic <basic>` header, where `<basic>` is equal to `Base64("Pages:<token>")`. (Useful for non-Forgejo forges.)
