@@ -81,10 +81,59 @@ func (Type) EnumDescriptor() ([]byte, []int) {
 	return file_schema_proto_rawDescGZIP(), []int{0}
 }
 
+type Transform int32
+
+const (
+	// No transformation.
+	Transform_None Transform = 0
+	// Zstandard compression.
+	Transform_Zstandard Transform = 1
+)
+
+// Enum value maps for Transform.
+var (
+	Transform_name = map[int32]string{
+		0: "None",
+		1: "Zstandard",
+	}
+	Transform_value = map[string]int32{
+		"None":      0,
+		"Zstandard": 1,
+	}
+)
+
+func (x Transform) Enum() *Transform {
+	p := new(Transform)
+	*p = x
+	return p
+}
+
+func (x Transform) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Transform) Descriptor() protoreflect.EnumDescriptor {
+	return file_schema_proto_enumTypes[1].Descriptor()
+}
+
+func (Transform) Type() protoreflect.EnumType {
+	return &file_schema_proto_enumTypes[1]
+}
+
+func (x Transform) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Transform.Descriptor instead.
+func (Transform) EnumDescriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{1}
+}
+
 type Entry struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Type  *Type                  `protobuf:"varint,1,opt,name=type,enum=Type" json:"type,omitempty"`
-	// Only present for `type == InlineFile` and `type == ExternalFile`
+	// Only present for `type == InlineFile` and `type == ExternalFile`.
+	// For transformed entries, refers to the post-transformation (compressed) size.
 	Size *uint32 `protobuf:"varint,2,opt,name=size" json:"size,omitempty"`
 	// Meaning depends on `type`:
 	//   - If `type == InlineFile`, contains file data.
@@ -92,7 +141,10 @@ type Entry struct {
 	//     cryptographically secure content hash).
 	//   - If `type == Symlink`, contains link target.
 	//   - Otherwise not present.
-	Data          []byte `protobuf:"bytes,3,opt,name=data" json:"data,omitempty"`
+	Data []byte `protobuf:"bytes,3,opt,name=data" json:"data,omitempty"`
+	// Only present for `type == InlineFile` and `type == ExternalFile` that
+	// have been transformed.
+	Xfrm          *Transform `protobuf:"varint,4,opt,name=xfrm,enum=Transform" json:"xfrm,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -146,6 +198,13 @@ func (x *Entry) GetData() []byte {
 		return x.Data
 	}
 	return nil
+}
+
+func (x *Entry) GetXfrm() Transform {
+	if x != nil && x.Xfrm != nil {
+		return *x.Xfrm
+	}
+	return Transform_None
 }
 
 // See https://docs.netlify.com/manage/routing/redirects/overview/ for details.
@@ -370,11 +429,13 @@ var File_schema_proto protoreflect.FileDescriptor
 
 const file_schema_proto_rawDesc = "" +
 	"\n" +
-	"\fschema.proto\"J\n" +
+	"\fschema.proto\"j\n" +
 	"\x05Entry\x12\x19\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x05.TypeR\x04type\x12\x12\n" +
 	"\x04size\x18\x02 \x01(\rR\x04size\x12\x12\n" +
-	"\x04data\x18\x03 \x01(\fR\x04data\"\\\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\x12\x1e\n" +
+	"\x04xfrm\x18\x04 \x01(\x0e2\n" +
+	".TransformR\x04xfrm\"\\\n" +
 	"\bRedirect\x12\x12\n" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\tR\x02to\x12\x16\n" +
@@ -401,7 +462,10 @@ const file_schema_proto_rawDesc = "" +
 	"\n" +
 	"InlineFile\x10\x02\x12\x10\n" +
 	"\fExternalFile\x10\x03\x12\v\n" +
-	"\aSymlink\x10\x04B'Z%codeberg.org/git-pages/git-pages/mainb\beditionsp\xe8\a"
+	"\aSymlink\x10\x04*$\n" +
+	"\tTransform\x12\b\n" +
+	"\x04None\x10\x00\x12\r\n" +
+	"\tZstandard\x10\x01B'Z%codeberg.org/git-pages/git-pages/mainb\beditionsp\xe8\a"
 
 var (
 	file_schema_proto_rawDescOnce sync.Once
@@ -415,27 +479,29 @@ func file_schema_proto_rawDescGZIP() []byte {
 	return file_schema_proto_rawDescData
 }
 
-var file_schema_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_schema_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_schema_proto_goTypes = []any{
 	(Type)(0),        // 0: Type
-	(*Entry)(nil),    // 1: Entry
-	(*Redirect)(nil), // 2: Redirect
-	(*Problem)(nil),  // 3: Problem
-	(*Manifest)(nil), // 4: Manifest
-	nil,              // 5: Manifest.ContentsEntry
+	(Transform)(0),   // 1: Transform
+	(*Entry)(nil),    // 2: Entry
+	(*Redirect)(nil), // 3: Redirect
+	(*Problem)(nil),  // 4: Problem
+	(*Manifest)(nil), // 5: Manifest
+	nil,              // 6: Manifest.ContentsEntry
 }
 var file_schema_proto_depIdxs = []int32{
 	0, // 0: Entry.type:type_name -> Type
-	5, // 1: Manifest.contents:type_name -> Manifest.ContentsEntry
-	2, // 2: Manifest.redirects:type_name -> Redirect
-	3, // 3: Manifest.problems:type_name -> Problem
-	1, // 4: Manifest.ContentsEntry.value:type_name -> Entry
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	1, // 1: Entry.xfrm:type_name -> Transform
+	6, // 2: Manifest.contents:type_name -> Manifest.ContentsEntry
+	3, // 3: Manifest.redirects:type_name -> Redirect
+	4, // 4: Manifest.problems:type_name -> Problem
+	2, // 5: Manifest.ContentsEntry.value:type_name -> Entry
+	6, // [6:6] is the sub-list for method output_type
+	6, // [6:6] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_schema_proto_init() }
@@ -448,7 +514,7 @@ func file_schema_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_schema_proto_rawDesc), len(file_schema_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,

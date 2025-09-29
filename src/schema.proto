@@ -15,9 +15,17 @@ enum Type {
 	Symlink = 4;
 }
 
+enum Transform {
+	// No transformation.
+	None = 0;
+	// Zstandard compression.
+	Zstandard = 1;
+}
+
 message Entry {
 	Type type = 1;
-	// Only present for `type == InlineFile` and `type == ExternalFile`
+	// Only present for `type == InlineFile` and `type == ExternalFile`.
+	// For transformed entries, refers to the post-transformation (compressed) size.
 	uint32 size = 2;
 	// Meaning depends on `type`:
 	//  * If `type == InlineFile`, contains file data.
@@ -26,6 +34,9 @@ message Entry {
 	//  * If `type == Symlink`, contains link target.
 	//  * Otherwise not present.
 	bytes data = 3;
+	// Only present for `type == InlineFile` and `type == ExternalFile` that
+	// have been transformed.
+	Transform xfrm = 4;
 }
 
 // See https://docs.netlify.com/manage/routing/redirects/overview/ for details.

@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/c2h5oh/datasize"
+	"github.com/klauspost/compress/zstd"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -120,6 +121,29 @@ again:
 	}
 }
 
+// Compress contents of inline files.
+func CompressFiles(manifest *Manifest) {
+	var originalSize, transformedSize uint32
+	var encoder, _ = zstd.NewWriter(nil, zstd.WithEncoderLevel(zstd.SpeedBetterCompression))
+	for _, entry := range manifest.Contents {
+		if entry.GetType() == Type_InlineFile && entry.GetXfrm() == Transform_None {
+			originalSize += entry.GetSize()
+			compressedData := encoder.EncodeAll(entry.GetData(), make([]byte, 0, entry.GetSize()))
+			if len(compressedData) < int(*entry.Size) {
+				entry.Data = compressedData
+				entry.Size = proto.Uint32(uint32(len(entry.Data)))
+				entry.Xfrm = Transform_Zstandard.Enum()
+			}
+			transformedSize += entry.GetSize()
+		}
+	}
+	log.Printf("compress: saved %.2f%% (%s to %s)",
+		(float32(originalSize)-float32(transformedSize))/float32(originalSize)*100.0,
+		datasize.ByteSize(originalSize).HR(),
+		datasize.ByteSize(transformedSize).HR(),
+	)
+}
+
 // Apply post-processing steps to the manifest.
 // At the moment, there isn't a good way to report errors except to log them on the terminal.
 // (Perhaps in the future they could be exposed at `.git-pages/status.txt`?)
@@ -130,6 +154,8 @@ func PrepareManifest(manifest *Manifest) error {
 	} else if len(manifest.Redirects) > 0 {
 		log.Printf("redirects ok: %d rules\n", len(manifest.Redirects))
 	}
+
+	CompressFiles(manifest)
 
 	return nil
 }
@@ -157,6 +183,7 @@ func StoreManifest(name string, manifest *Manifest) (*Manifest, error) {
 				Type: Type_ExternalFile.Enum(),
 				Size: entry.Size,
 				Data: fmt.Appendf(nil, "sha256-%x", sha256.Sum256(entry.Data)),
+				Xfrm: entry.Xfrm,
 			}
 		} else {
 			extManifest.Contents[name] = entry

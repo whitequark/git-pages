@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -59,6 +60,10 @@ func reportSiteUpdate(via string, result *UpdateResult) {
 		siteUpdateOkCount.With(prometheus.Labels{"outcome": "deleted"}).Inc()
 	}
 }
+
+// The `clauspost/compress/zstd` package recommends reusing a decompressor to avoid repeated
+// allocations of internal buffers.
+var zstdDecoder, _ = zstd.NewReader(nil)
 
 func getPage(w http.ResponseWriter, r *http.Request) error {
 	var err error
@@ -196,6 +201,23 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 
 	if closer, ok := reader.(io.Closer); ok {
 		defer closer.Close()
+	}
+
+	switch entry.GetXfrm() {
+	case Transform_None:
+		// nothing to do
+	case Transform_Zstandard:
+		// Ideally, we would serve zstd-compressed data to a client that indicates support with
+		// an `Accept-Encoding: zstd` header. Unfortunately we can't because we rely on MIME
+		// type detection done in `http.ServeContent`.
+		compressedData, _ := io.ReadAll(reader)
+		decompressedData, err := zstdDecoder.DecodeAll(compressedData, []byte{})
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "internal server error: %s\n", err)
+			return err
+		}
+		reader = bytes.NewReader(decompressedData)
 	}
 
 	// decide on the HTTP status
