@@ -6,6 +6,7 @@ require (
 	github.com/KimMachineGun/automemlimit v0.7.4
 	github.com/c2h5oh/datasize v0.0.0-20231215233829-aa82cc1e6500
 	github.com/creasty/defaults v1.8.0
+	github.com/getsentry/sentry-go v0.35.3
 	github.com/go-git/go-billy/v6 v6.0.0-20250627091229-31e2a16eef30
 	github.com/go-git/go-git/v6 v6.0.0-20250910120214-3a68d0404116
 	github.com/honeybadger-io/honeybadger-go v0.8.0
