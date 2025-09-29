@@ -62,7 +62,6 @@ func InitObservability() {
 		}
 
 		options := sentry.ClientOptions{}
-		options.Dsn = os.Getenv("SENTRY_DSN")
 		options.Environment = environment
 		options.EnableLogs = enableLogs
 		if err := sentry.Init(options); err != nil {
