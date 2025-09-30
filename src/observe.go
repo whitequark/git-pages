@@ -10,8 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/honeybadger-io/honeybadger-go"
-
 	"github.com/getsentry/sentry-go"
 	sentryhttp "github.com/getsentry/sentry-go/http"
 	sentryslog "github.com/getsentry/sentry-go/slog"
@@ -19,15 +17,13 @@ import (
 	slogmulti "github.com/samber/slog-multi"
 )
 
-func hasHoneybadger() bool {
-	return os.Getenv("HONEYBADGER_API_KEY") != ""
-}
-
 func hasSentry() bool {
 	return os.Getenv("SENTRY_DSN") != ""
 }
 
 func InitObservability() {
+	debug.SetPanicOnFault(true)
+
 	environment := "development"
 	if value, ok := os.LookupEnv("ENVIRONMENT"); ok {
 		environment = value
@@ -46,13 +42,6 @@ func InitObservability() {
 			slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{}))
 	default:
 		log.Println("unknown log format", config.LogFormat)
-	}
-
-	if hasHoneybadger() {
-		honeybadger.Configure(honeybadger.Configuration{
-			Env: environment,
-		})
-		debug.SetPanicOnFault(true)
 	}
 
 	if hasSentry() {
@@ -96,10 +85,6 @@ func FiniObservability() {
 }
 
 func ObserveHTTPHandler(handler http.Handler) http.Handler {
-	if hasHoneybadger() {
-		handler = honeybadger.Handler(handler)
-	}
-
 	if hasSentry() {
 		handler = sentryhttp.New(sentryhttp.Options{
 			Repanic: true,
