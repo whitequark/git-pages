@@ -50,8 +50,6 @@ To run _git-pages_ with Caddy and use an S3-compatible endpoint to store site da
 $ docker run -e PAGES_STORAGE_TYPE -e PAGES_STORAGE_S3_ENDPOINT -e PAGES_STORAGE_S3_REGION -e PAGES_STORAGE_S3_ACCESS_KEY_ID -e PAGES_STORAGE_S3_SECRET_ACCESS_KEY -e PAGES_STORAGE_S3_BUCKET -e ACME_EMAIL -p 80:80 -p 443:443 codeberg.org/git-pages/git-pages:latest supervisord
 ```
 
-See also the included [configuration](fly.toml) for [Fly.io](https://fly.io).
-
 
 Features
 --------
