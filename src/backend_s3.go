@@ -312,8 +312,10 @@ func (s3 *S3Backend) GetManifest(ctx context.Context, name string) (*Manifest, e
 		if err != nil {
 			if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
 				err = fmt.Errorf("%w: %s", errNotFound, errResp.Key)
+				return &CachedManifest{nil, 1, err}, nil
+			} else {
+				return nil, err
 			}
-			return &CachedManifest{nil, 1, err}, nil
 		} else {
 			return &CachedManifest{manifest, size, err}, nil
 		}
