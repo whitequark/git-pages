@@ -55,6 +55,7 @@ func (backend *observedBackend) GetBlob(
 ) {
 	span, ctx := ObserveFunction(ctx, "GetBlob", "blob.name", name)
 	if reader, size, mtime, err = backend.inner.GetBlob(ctx, name); err == nil {
+		ObserveData(ctx, "blob.size", size)
 		blobsRetrievedCount.Inc()
 		blobsRetrievedBytes.Add(float64(size))
 	}
