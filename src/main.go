@@ -57,7 +57,6 @@ func panicHandler(handler http.Handler) http.Handler {
 
 func serve(listener net.Listener, handler http.Handler) {
 	if listener != nil {
-		handler = ObserveHTTPHandler(handler)
 		handler = panicHandler(handler)
 
 		server := http.Server{Handler: handler}
@@ -240,8 +239,8 @@ func main() {
 			log.Fatalln(err)
 		}
 
-		go serve(pagesListener, http.HandlerFunc(ServePages))
-		go serve(caddyListener, http.HandlerFunc(ServeCaddy))
+		go serve(pagesListener, ObserveHTTPHandler(http.HandlerFunc(ServePages)))
+		go serve(caddyListener, ObserveHTTPHandler(http.HandlerFunc(ServeCaddy)))
 		go serve(metricsListener, promhttp.Handler())
 
 		if config.Insecure {
