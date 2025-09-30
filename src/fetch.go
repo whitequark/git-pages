@@ -17,6 +17,10 @@ import (
 )
 
 func FetchRepository(ctx context.Context, repoURL string, branch string) (*Manifest, error) {
+	span, ctx := ObserveFunction(ctx, "FetchRepository",
+		"git.repository", repoURL, "git.branch", branch)
+	defer span.Finish()
+
 	baseDir, err := os.MkdirTemp("", "fetchRepo")
 	if err != nil {
 		return nil, fmt.Errorf("mkdtemp: %w", err)

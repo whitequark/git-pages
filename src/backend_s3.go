@@ -252,6 +252,7 @@ func (s3 *S3Backend) PutBlob(ctx context.Context, name string, data []byte) erro
 			if err != nil {
 				return err
 			} else {
+				ObserveData(ctx, "blob.status", "created")
 				log.Printf("s3: put blob %s (created)\n", name)
 				return nil
 			}
@@ -259,6 +260,7 @@ func (s3 *S3Backend) PutBlob(ctx context.Context, name string, data []byte) erro
 			return err
 		}
 	} else {
+		ObserveData(ctx, "blob.status", "exists")
 		log.Printf("s3: put blob %s (exists)\n", name)
 		blobsDedupedCount.Inc()
 		blobsDedupedBytes.Add(float64(len(data)))

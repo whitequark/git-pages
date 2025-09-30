@@ -40,7 +40,7 @@ func Update(ctx context.Context, webRoot string, manifest *Manifest) UpdateResul
 				outcome = UpdateDeleted
 			}
 		}
-	} else if err = PrepareManifest(manifest); err == nil {
+	} else if err = PrepareManifest(ctx, manifest); err == nil {
 		newManifest, err = StoreManifest(ctx, webRoot, manifest)
 		if err == nil {
 			if oldManifest == nil {

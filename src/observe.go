@@ -61,9 +61,20 @@ func InitObservability() {
 			enableLogs = value
 		}
 
+		enableTracing := false
+		if value, err := strconv.ParseBool(os.Getenv("SENTRY_TRACING")); err == nil {
+			enableTracing = value
+		}
+
 		options := sentry.ClientOptions{}
 		options.Environment = environment
 		options.EnableLogs = enableLogs
+		options.EnableTracing = enableTracing
+		if environment == "development" {
+			options.TracesSampleRate = 1.0
+		} else {
+			options.TracesSampleRate = 60.0
+		}
 		if err := sentry.Init(options); err != nil {
 			log.Fatalf("sentry: %s\n", err)
 		}
@@ -96,4 +107,33 @@ func ObserveHTTPHandler(handler http.Handler) http.Handler {
 	}
 
 	return handler
+}
+
+type noopSpan struct{}
+
+func (span noopSpan) Finish() {}
+
+func ObserveFunction(
+	ctx context.Context, funcName string, data ...any,
+) (
+	interface{ Finish() }, context.Context,
+) {
+	switch {
+	case hasSentry():
+		span := sentry.StartSpan(ctx, "function")
+		span.Description = funcName
+		ObserveData(span.Context(), data...)
+		return span, span.Context()
+	default:
+		return noopSpan{}, ctx
+	}
+}
+
+func ObserveData(ctx context.Context, data ...any) {
+	if span := sentry.SpanFromContext(ctx); span != nil {
+		for i := 0; i < len(data); i += 2 {
+			name, value := data[i], data[i+1]
+			span.SetData(name.(string), value)
+		}
+	}
 }

@@ -95,6 +95,17 @@ The authorization flow for metadata retrieval (`GET` requests with site paths st
 4. **Default Deny:** Otherwise, the request is not authorized.
 
 
+Observability
+-------------
+
+_git-pages_ has robust observability features built in:
+* The metrics endpoint (bound to `:3002` by default) returns Go, pages server, and storage backend metrics in the [Prometheus](https://prometheus.io/) format.
+* Optional [Sentry](https://sentry.io/) integration allows greater visibility into the application. The `ENVIRONMENT` environment variable configures the deploy environment name (`development` by default).
+    * If `SENTRY_DSN` environment variable is set, panics are reported to Sentry.
+    * If `SENTRY_DSN` and `SENTRY_LOGS=1` environment variables are set, logs are uploaded to Sentry.
+    * If `SENTRY_DSN` and `SENTRY_TRACING=1` environment variables are set, traces are uploaded to Sentry.
+
+
 Architecture (v2)
 -----------------
 

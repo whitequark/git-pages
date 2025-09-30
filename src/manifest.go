@@ -122,14 +122,20 @@ again:
 	}
 }
 
+// The `clauspost/compress/zstd` package recommends reusing a compressor to avoid repeated
+// allocations of internal buffers.
+var zstdEncoder, _ = zstd.NewWriter(nil, zstd.WithEncoderLevel(zstd.SpeedBetterCompression))
+
 // Compress contents of inline files.
-func CompressFiles(manifest *Manifest) {
+func CompressFiles(ctx context.Context, manifest *Manifest) {
+	span, _ := ObserveFunction(ctx, "CompressFiles")
+	defer span.Finish()
+
 	var originalSize, transformedSize uint32
-	var encoder, _ = zstd.NewWriter(nil, zstd.WithEncoderLevel(zstd.SpeedBetterCompression))
 	for _, entry := range manifest.Contents {
 		if entry.GetType() == Type_InlineFile && entry.GetXfrm() == Transform_None {
 			originalSize += entry.GetSize()
-			compressedData := encoder.EncodeAll(entry.GetData(), make([]byte, 0, entry.GetSize()))
+			compressedData := zstdEncoder.EncodeAll(entry.GetData(), make([]byte, 0, entry.GetSize()))
 			if len(compressedData) < int(*entry.Size) {
 				entry.Data = compressedData
 				entry.Size = proto.Uint32(uint32(len(entry.Data)))
@@ -138,6 +144,7 @@ func CompressFiles(manifest *Manifest) {
 			transformedSize += entry.GetSize()
 		}
 	}
+
 	log.Printf("compress: saved %.2f%% (%s to %s)",
 		(float32(originalSize)-float32(transformedSize))/float32(originalSize)*100.0,
 		datasize.ByteSize(originalSize).HR(),
@@ -148,7 +155,7 @@ func CompressFiles(manifest *Manifest) {
 // Apply post-processing steps to the manifest.
 // At the moment, there isn't a good way to report errors except to log them on the terminal.
 // (Perhaps in the future they could be exposed at `.git-pages/status.txt`?)
-func PrepareManifest(manifest *Manifest) error {
+func PrepareManifest(ctx context.Context, manifest *Manifest) error {
 	// Parse Netlify-style `_redirects`
 	if err := ProcessRedirects(manifest); err != nil {
 		log.Printf("redirects err: %s\n", err)
@@ -157,7 +164,7 @@ func PrepareManifest(manifest *Manifest) error {
 	}
 
 	if config.Feature("compress") {
-		CompressFiles(manifest)
+		CompressFiles(ctx, manifest)
 	}
 
 	return nil
@@ -168,6 +175,9 @@ var ErrManifestTooLarge = errors.New("manifest too large")
 // Uploads inline file data over certain size to the storage backend. Returns a copy of
 // the manifest updated to refer to an external content-addressable store.
 func StoreManifest(ctx context.Context, name string, manifest *Manifest) (*Manifest, error) {
+	span, ctx := ObserveFunction(ctx, "StoreManifest", "manifest.name", name)
+	defer span.Finish()
+
 	// Replace inline files over certain size with references to external data.
 	extManifest := Manifest{
 		RepoUrl:   manifest.RepoUrl,
