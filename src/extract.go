@@ -18,10 +18,7 @@ import (
 var ErrArchiveTooLarge = errors.New("archive too large")
 
 func ExtractTar(reader io.Reader) (*Manifest, error) {
-	boundedReader := ReadAtMost(reader, int64(config.Limits.MaxSiteSize.Bytes()),
-		fmt.Errorf("%w: %s limit exceeded", ErrArchiveTooLarge, config.Limits.MaxSiteSize.HR()))
-
-	archive := tar.NewReader(boundedReader)
+	archive := tar.NewReader(reader)
 
 	manifest := Manifest{
 		Contents: map[string]*Entry{
