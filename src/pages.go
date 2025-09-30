@@ -492,8 +492,9 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Health-Check") == "" {
 		log.Println("pages:", r.Method, r.Host, r.URL, r.Header.Get("Content-Type"))
 		if region := os.Getenv("FLY_REGION"); region != "" {
-			w.Header().Add("Server",
-				fmt.Sprintf("git-pages (fly.io; %s; %s)", region, os.Getenv("FLY_MACHINE_ID")))
+			machine_id := os.Getenv("FLY_MACHINE_ID")
+			w.Header().Add("Server", fmt.Sprintf("git-pages (fly.io; %s; %s)", region, machine_id))
+			ObserveData(r.Context(), "server.name", machine_id, "server.region", region)
 		} else {
 			w.Header().Add("Server", "git-pages")
 		}
