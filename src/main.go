@@ -164,7 +164,7 @@ func main() {
 		}
 
 		sourceURL, _ := url.Parse(flag.Arg(0))
-		if sourceURL == (&url.URL{}) {
+		if sourceURL == nil || *sourceURL == (url.URL{}) {
 			log.Fatalln("update source must be provided as an argument")
 		}
 
