@@ -49,8 +49,6 @@
             mv $out/bin/{src,git-pages}
           '';
         };
-
-        image = pkgs.callPackage ./nix/pkgs/image.nix { inherit git-pages self; };
       in
       {
         formatter = pkgs.nixfmt-tree;
@@ -59,10 +57,14 @@
           inputsFrom = [
             git-pages
           ];
+
+          packages = with pkgs; [
+            flyctl
+          ];
         };
 
         packages = {
-          inherit git-pages image;
+          inherit git-pages;
           default = git-pages;
         };
       }
