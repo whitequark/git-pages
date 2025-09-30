@@ -59,10 +59,19 @@ func InitObservability() {
 		options.Environment = environment
 		options.EnableLogs = enableLogs
 		options.EnableTracing = enableTracing
-		if environment == "development" {
+		switch environment {
+		case "development", "staging":
 			options.TracesSampleRate = 1.0
-		} else {
-			options.TracesSampleRate = 60.0
+		case "production":
+			options.TracesSampler = func(ctx sentry.SamplingContext) float64 {
+				if method, ok := ctx.Span.Data["http.request.method"].(string); ok {
+					switch method {
+					case "PUT", "DELETE", "POST":
+						return 1.0
+					}
+				}
+				return 0.05
+			}
 		}
 		if err := sentry.Init(options); err != nil {
 			log.Fatalf("sentry: %s\n", err)

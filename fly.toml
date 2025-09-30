@@ -49,7 +49,7 @@ soft_limit = 250
 [[services.http_checks]]
 protocol = "http"
 method = "get"
-path = "/"
+path = "/health"
 headers = { Health-Check = "🩺", Host = "localhost" }
 grace_period = "5s"
 interval = "2s"
@@ -76,7 +76,7 @@ soft_limit = 250
 [[services.http_checks]]
 protocol = "https"
 method = "get"
-path = "/"
+path = "/health"
 headers = { Health-Check = "🩺", Host = "localhost" }
 grace_period = "5s"
 interval = "2s"
