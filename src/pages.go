@@ -436,10 +436,16 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 
 	eventRef := event["ref"].(string)
 	if eventRef != fmt.Sprintf("refs/heads/%s", auth.branch) {
+		code := http.StatusUnauthorized
+		if strings.Contains(r.Header.Get("User-Agent"), "GitHub-Hookshot") {
+			// GitHub has no way to restrict branches for a webhook, and responding with 401
+			// for every non-pages branch makes the "Recent Deliveries" tab look awful.
+			code = http.StatusOK
+		}
 		http.Error(w,
-			fmt.Sprintf("ref %s not in allowlist [refs/heads/%v])",
+			fmt.Sprintf("ref %s not in allowlist [refs/heads/%v]",
 				eventRef, auth.branch),
-			http.StatusUnauthorized)
+			code)
 		return nil
 	}
 
