@@ -141,22 +141,28 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 		entry = manifest.Contents[entryPath]
-		if entry == nil || entry.GetType() == Type_Invalid {
-			if !appliedRedirect {
-				originalURL := (&url.URL{Host: r.Host}).ResolveReference(r.URL)
-				redirectURL, redirectStatus := ApplyRedirects(manifest, originalURL)
-				if Is3xxHTTPStatus(redirectStatus) {
-					w.Header().Set("Location", redirectURL.String())
-					w.WriteHeader(int(redirectStatus))
-					fmt.Fprintf(w, "see %s\n", redirectURL.String())
-					return nil
-				} else if redirectURL != nil {
-					entryPath = strings.TrimPrefix(redirectURL.Path, "/")
-					status = int(redirectStatus)
-					appliedRedirect = true
-					continue
-				}
+		if !appliedRedirect {
+			redirectKind := RedirectAny
+			if entry != nil && entry.GetType() != Type_Invalid {
+				redirectKind = RedirectForce
 			}
+			originalURL := (&url.URL{Host: r.Host}).ResolveReference(r.URL)
+			redirectURL, redirectStatus := ApplyRedirects(manifest, originalURL, redirectKind)
+			if Is3xxHTTPStatus(redirectStatus) {
+				w.Header().Set("Location", redirectURL.String())
+				w.WriteHeader(int(redirectStatus))
+				fmt.Fprintf(w, "see %s\n", redirectURL.String())
+				return nil
+			} else if redirectURL != nil {
+				entryPath = strings.TrimPrefix(redirectURL.Path, "/")
+				status = int(redirectStatus)
+				// Apply user redirects at most once; if something ends in a loop, it should be
+				// the user agent, not the pages server.
+				appliedRedirect = true
+				continue
+			}
+		}
+		if entry == nil || entry.GetType() == Type_Invalid {
 			status = 404
 			if entryPath != notFoundPage {
 				entryPath = notFoundPage

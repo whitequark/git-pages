@@ -80,9 +80,6 @@ func validateRule(rule redirects.Rule) error {
 	if toURL.Host != "" && !Is3xxHTTPStatus(uint(rule.Status)) {
 		return fmt.Errorf("'to' URL may only include a hostname for 3xx status rules")
 	}
-	if rule.Force {
-		return fmt.Errorf("force redirects are not supported")
-	}
 	return nil
 }
 
@@ -130,10 +127,24 @@ func toOrFromComponent(to, from string) string {
 	}
 }
 
-func ApplyRedirects(manifest *Manifest, fromURL *url.URL) (toURL *url.URL, status uint) {
+type RedirectKind int
+
+const (
+	RedirectAny RedirectKind = iota
+	RedirectForce
+)
+
+func ApplyRedirects(
+	manifest *Manifest, fromURL *url.URL, kind RedirectKind,
+) (
+	toURL *url.URL, status uint,
+) {
 	fromSegments := pathSegments(fromURL.Path)
 next:
 	for _, rule := range manifest.Redirects {
+		if kind == RedirectForce && !*rule.Force {
+			continue
+		}
 		// check if the rule matches fromURL
 		ruleFromURL, _ := url.Parse(*rule.From) // pre-validated in `validateRule`
 		if ruleFromURL.Scheme != "" && fromURL.Scheme != ruleFromURL.Scheme {
