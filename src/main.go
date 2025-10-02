@@ -74,8 +74,10 @@ func main() {
 		"print every recognized configuration environment variable and exit")
 	printConfig := flag.Bool("print-config", false,
 		"print configuration as JSON and exit")
-	configTomlPath := flag.String("config", "config.toml",
+	configTomlPath := flag.String("config", "",
 		"load configuration from `filename`")
+	noConfig := flag.Bool("no-config", false,
+		"run without configuration file (configure via environment variables)")
 	getManifest := flag.String("get-manifest", "",
 		"write manifest for `webroot` (either 'domain.tld' or 'domain.tld/dir') to stdout as ProtoJSON")
 	getBlob := flag.String("get-blob", "",
@@ -88,12 +90,19 @@ func main() {
 		log.Fatalln("-get-manifest and -get-blob are mutually exclusive")
 	}
 
+	if *configTomlPath != "" && *noConfig {
+		log.Fatalln("-no-config and -config are mutually exclusive")
+	}
+
 	if *printConfigEnvVars {
 		PrintConfigEnvVars()
 		return
 	}
 
 	var err error
+	if *configTomlPath == "" && !*noConfig {
+		*configTomlPath = "config.toml"
+	}
 	if config, err = Configure(*configTomlPath); err != nil {
 		log.Fatalln("config:", err)
 	}
