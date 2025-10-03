@@ -101,7 +101,7 @@ func FetchRepository(ctx context.Context, repoURL string, branch string) (*Manif
 				} else {
 					manifestEntry.Type = Type_InlineFile.Enum()
 				}
-				manifestEntry.Size = proto.Uint32(uint32(blob.Size))
+				manifestEntry.Size = proto.Int64(blob.Size)
 				manifestEntry.Data = data
 			} else if entry.Mode == filemode.Dir {
 				manifestEntry.Type = Type_Directory.Enum()

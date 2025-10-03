@@ -134,7 +134,7 @@ type Entry struct {
 	Type  *Type                  `protobuf:"varint,1,opt,name=type,enum=Type" json:"type,omitempty"`
 	// Only present for `type == InlineFile` and `type == ExternalFile`.
 	// For transformed entries, refers to the post-transformation (compressed) size.
-	Size *uint32 `protobuf:"varint,2,opt,name=size" json:"size,omitempty"`
+	Size *int64 `protobuf:"varint,2,opt,name=size" json:"size,omitempty"`
 	// Meaning depends on `type`:
 	//   - If `type == InlineFile`, contains file data.
 	//   - If `type == ExternalFile`, contains blob name (an otherwise unspecified
@@ -186,7 +186,7 @@ func (x *Entry) GetType() Type {
 	return Type_Invalid
 }
 
-func (x *Entry) GetSize() uint32 {
+func (x *Entry) GetSize() int64 {
 	if x != nil && x.Size != nil {
 		return *x.Size
 	}
@@ -337,7 +337,7 @@ type Manifest struct {
 	Commit  *string `protobuf:"bytes,3,opt,name=commit" json:"commit,omitempty"`
 	// Contents
 	Contents  map[string]*Entry `protobuf:"bytes,4,rep,name=contents" json:"contents,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	TotalSize *uint32           `protobuf:"varint,5,opt,name=total_size,json=totalSize" json:"total_size,omitempty"`
+	TotalSize *int64            `protobuf:"varint,5,opt,name=total_size,json=totalSize" json:"total_size,omitempty"`
 	// Netlify-style `_redirects`
 	Redirects []*Redirect `protobuf:"bytes,6,rep,name=redirects" json:"redirects,omitempty"`
 	// Diagnostics for non-fatal errors
@@ -404,7 +404,7 @@ func (x *Manifest) GetContents() map[string]*Entry {
 	return nil
 }
 
-func (x *Manifest) GetTotalSize() uint32 {
+func (x *Manifest) GetTotalSize() int64 {
 	if x != nil && x.TotalSize != nil {
 		return *x.TotalSize
 	}
@@ -432,7 +432,7 @@ const file_schema_proto_rawDesc = "" +
 	"\fschema.proto\"j\n" +
 	"\x05Entry\x12\x19\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x05.TypeR\x04type\x12\x12\n" +
-	"\x04size\x18\x02 \x01(\rR\x04size\x12\x12\n" +
+	"\x04size\x18\x02 \x01(\x03R\x04size\x12\x12\n" +
 	"\x04data\x18\x03 \x01(\fR\x04data\x12\x1e\n" +
 	"\x04xfrm\x18\x04 \x01(\x0e2\n" +
 	".TransformR\x04xfrm\"\\\n" +
@@ -450,7 +450,7 @@ const file_schema_proto_rawDesc = "" +
 	"\x06commit\x18\x03 \x01(\tR\x06commit\x123\n" +
 	"\bcontents\x18\x04 \x03(\v2\x17.Manifest.ContentsEntryR\bcontents\x12\x1d\n" +
 	"\n" +
-	"total_size\x18\x05 \x01(\rR\ttotalSize\x12'\n" +
+	"total_size\x18\x05 \x01(\x03R\ttotalSize\x12'\n" +
 	"\tredirects\x18\x06 \x03(\v2\t.RedirectR\tredirects\x12$\n" +
 	"\bproblems\x18\a \x03(\v2\b.ProblemR\bproblems\x1aC\n" +
 	"\rContentsEntry\x12\x10\n" +

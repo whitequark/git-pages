@@ -26,7 +26,7 @@ message Entry {
 	Type type = 1;
 	// Only present for `type == InlineFile` and `type == ExternalFile`.
 	// For transformed entries, refers to the post-transformation (compressed) size.
-	uint32 size = 2;
+	int64 size = 2;
 	// Meaning depends on `type`:
 	//  * If `type == InlineFile`, contains file data.
 	//  * If `type == ExternalFile`, contains blob name (an otherwise unspecified
@@ -61,7 +61,7 @@ message Manifest {
 
 	// Contents
 	map<string, Entry> contents = 4;
-	uint32 total_size = 5;
+	int64 total_size = 5;
 
 	// Netlify-style `_redirects`
 	repeated Redirect redirects = 6;

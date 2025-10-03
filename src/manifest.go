@@ -131,14 +131,14 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 	span, _ := ObserveFunction(ctx, "CompressFiles")
 	defer span.Finish()
 
-	var originalSize, transformedSize uint32
+	var originalSize, transformedSize int64
 	for _, entry := range manifest.Contents {
 		if entry.GetType() == Type_InlineFile && entry.GetXfrm() == Transform_None {
 			originalSize += entry.GetSize()
 			compressedData := zstdEncoder.EncodeAll(entry.GetData(), make([]byte, 0, entry.GetSize()))
 			if len(compressedData) < int(*entry.Size) {
 				entry.Data = compressedData
-				entry.Size = proto.Uint32(uint32(len(entry.Data)))
+				entry.Size = proto.Int64(int64(len(entry.Data)))
 				entry.Xfrm = Transform_Zstandard.Enum()
 			}
 			transformedSize += entry.GetSize()
@@ -186,11 +186,11 @@ func StoreManifest(ctx context.Context, name string, manifest *Manifest) (*Manif
 		Contents:  make(map[string]*Entry),
 		Redirects: manifest.Redirects,
 		Problems:  manifest.Problems,
-		TotalSize: proto.Uint32(0),
+		TotalSize: proto.Int64(0),
 	}
 	for name, entry := range manifest.Contents {
 		cannotBeInlined := entry.GetType() == Type_InlineFile &&
-			entry.GetSize() > uint32(config.Limits.MaxInlineFileSize.Bytes())
+			entry.GetSize() > int64(config.Limits.MaxInlineFileSize.Bytes())
 		if cannotBeInlined {
 			extManifest.Contents[name] = &Entry{
 				Type: Type_ExternalFile.Enum(),
