@@ -121,7 +121,7 @@ func makeCacheOptions[K comparable, V any](
 		options.Weigher = weigher
 	}
 	if config.MaxAge != 0 {
-		options.ExpiryCalculator = otter.ExpiryWriting[K, V](time.Duration(config.MaxAge) * time.Second)
+		options.ExpiryCalculator = otter.ExpiryWriting[K, V](time.Duration(config.MaxAge))
 	}
 	return options
 }
