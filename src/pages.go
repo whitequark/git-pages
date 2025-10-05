@@ -507,8 +507,14 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 			machine_id := os.Getenv("FLY_MACHINE_ID")
 			w.Header().Add("Server", fmt.Sprintf("git-pages (fly.io; %s; %s)", region, machine_id))
 			ObserveData(r.Context(), "server.name", machine_id, "server.region", region)
-		} else {
-			w.Header().Add("Server", "git-pages")
+		} else if hostname, err := os.Hostname(); err == nil {
+			if region := os.Getenv("PAGES_REGION"); region != "" {
+				w.Header().Add("Server", fmt.Sprintf("git-pages (%s; %s)", region, hostname))
+				ObserveData(r.Context(), "server.name", hostname, "server.region", region)
+			} else {
+				w.Header().Add("Server", fmt.Sprintf("git-pages (%s)", hostname))
+				ObserveData(r.Context(), "server.name", hostname)
+			}
 		}
 	}
 	err := error(nil)
