@@ -271,6 +271,9 @@ func authorizeCodebergPagesV2(r *http.Request) (*Authorization, error) {
 	for _, dnsRecord := range dnsRecords {
 		domainParts := strings.Split(dnsRecord, ".")
 		slices.Reverse(domainParts)
+		if domainParts[0] == "" {
+			domainParts = domainParts[1:]
+		}
 		if len(domainParts) >= 3 && len(domainParts) <= 5 {
 			if domainParts[0] == "page" && domainParts[1] == "codeberg" {
 				// map of domain names to allowed repository and branch:
