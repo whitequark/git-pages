@@ -13,7 +13,7 @@ RUN GOBIN=/usr/bin go install -ldflags "-s -w"
 # Build Caddy with S3 storage backend.
 FROM docker.io/library/caddy:2.10.2-builder AS caddy-builder
 RUN xcaddy build ${CADDY_VERSION} \
-    --with github.com/ss098/certmagic-s3=github.com/whitequark/certmagic-s3@v0.0.0-20250919212902-21ac26c15951
+    --with=github.com/ss098/certmagic-s3@v0.0.0-20250922022452-8af482af5f39
 
 # Build git-pages.
 FROM docker.io/library/golang:1.25-alpine AS git-pages-builder
