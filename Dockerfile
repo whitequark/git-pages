@@ -38,7 +38,7 @@ COPY conf/Caddyfile /app/Caddyfile
 COPY conf/config.example.toml /app/config.toml
 
 # Caddy ports:
-EXPOSE 80/tcp 443/tcp 443/udp 2019/tcp
+EXPOSE 80/tcp 443/tcp 443/udp
 # git-pages ports:
 EXPOSE 3000/tcp 3001/tcp 3002/tcp
 

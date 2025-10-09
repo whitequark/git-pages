@@ -1,13 +1,3 @@
-(proxy) {
-	listener_wrappers {
-		proxy_protocol {
-			timeout 1s
-			allow {$ALLOW_PROXY}
-		}
-		tls
-	}
-}
-
 {
 	storage s3 {
 		host "{env.PAGES_STORAGE_S3_ENDPOINT}"
@@ -21,17 +11,6 @@
 
 	persist_config off
 
-	log {
-		output stderr
-		level WARN
-		exclude admin http.auto_https
-		format console {
-			time_key ""
-		}
-	}
-
-	metrics
-
 	email {env.ACME_EMAIL}
 
 	auto_https disable_redirects
@@ -39,63 +18,18 @@
 	on_demand_tls {
 		permission http http://localhost:3001
 	}
-
-	servers :80 {
-		name http
-		protocols h1 h2c
-		import proxy
-	}
-
-	servers :443 {
-		name https
-		protocols h1 h2
-		import proxy
-	}
-
-	servers {$UDP_BIND_TO:0.0.0.0}:443 {
-		name http3
-		protocols h3
-	}
-
-	servers :2019 {
-		name metrics
-		protocols h1
-	}
 }
 
-(backend) {
+https://, http:// {
 	tls {
 		on_demand
 	}
 
-	@h2c `{env.PAGES_FEATURES}.matches(r"\bserve-h2c\b")`
-	reverse_proxy @h2c h2c://{$GIT_PAGES_ADDRESS:localhost}:3000
-	reverse_proxy http://{$GIT_PAGES_ADDRESS:localhost}:3000
-
-	header Alt-Svc `h3=":443"; persist=1, h2=":443"; persist=1`
-	encode
-}
-
-http:// {
-	# initial PUT/POST for a new domain has to happen over HTTP;
-	# health check also has to reach the backend over HTTP
-	@upgrade `method('GET') && !header({'Health-Check': '*'})`
+	# initial PUT/POST for a new domain has to happen over HTTP
+	@upgrade `method('GET') && protocol('http')`
 	redir @upgrade https://{host}{uri} 301
 
-	import backend
-}
-
-https:// {
-	import backend
-}
-
-https:// {
-	# Fly.io requires UDP sockets to be bound to a different IP
-	bind {$UDP_BIND_TO:0.0.0.0}
-
-	import backend
-}
-
-http://:2019 {
-	metrics
+	reverse_proxy http://localhost:3000
+	header Alt-Svc `h3=":443"; persist=1, h2=":443"; persist=1`
+	encode
 }
