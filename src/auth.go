@@ -265,7 +265,7 @@ func authorizeCodebergPagesV2(r *http.Request) (*Authorization, error) {
 	}
 
 	if len(dnsRecords) > 0 {
-		log.Printf("auth: %s TXT/CNAME: %v\n", host, dnsRecords)
+		log.Printf("auth: %s TXT/CNAME: %q\n", host, dnsRecords)
 	}
 
 	for _, dnsRecord := range dnsRecords {
@@ -335,6 +335,18 @@ func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
 			return nil, err
 		} else {
 			log.Printf("auth: wildcard %s\n", pattern.GetHost())
+			return auth, nil
+		}
+	}
+
+	if config.Feature("codeberg-pages-compat") {
+		auth, err = authorizeCodebergPagesV2(r)
+		if err != nil && IsUnauthorized(err) {
+			causes = append(causes, err)
+		} else if err != nil { // bad request
+			return nil, err
+		} else {
+			log.Printf("auth: codeberg %s\n", r.Host)
 			return auth, nil
 		}
 	}
