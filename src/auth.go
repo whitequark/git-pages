@@ -417,22 +417,40 @@ func AuthorizeRepository(repoURL string, auth *Authorization) error {
 		return nil // any
 	}
 
+	repoURL = strings.ToLower(repoURL)
+
+	if config.Limits.AllowedRepositoryURLPrefixes != nil {
+		allowedPrefix := false
+		for _, allowedRepoURLPrefix := range config.Limits.AllowedRepositoryURLPrefixes {
+			if strings.HasPrefix(repoURL, strings.ToLower(allowedRepoURLPrefix)) {
+				allowedPrefix = true
+				break
+			}
+		}
+		if !allowedPrefix {
+			return AuthError{
+				http.StatusUnauthorized,
+				fmt.Sprintf("clone URL not in prefix allowlist %v",
+					config.Limits.AllowedRepositoryURLPrefixes),
+			}
+		}
+	}
+
 	allowed := false
 	for _, allowedRepoURL := range auth.repoURLs {
-		if strings.EqualFold(repoURL, allowedRepoURL) {
+		if repoURL == strings.ToLower(allowedRepoURL) {
 			allowed = true
 			break
 		}
 	}
-
-	if allowed {
-		return nil
-	} else {
+	if !allowed {
 		return AuthError{
 			http.StatusUnauthorized,
 			fmt.Sprintf("clone URL not in allowlist %v", auth.repoURLs),
 		}
 	}
+
+	return nil
 }
 
 // The purpose of `allowRepoURLs` is to make sure that only authorized content is deployed
@@ -464,6 +482,10 @@ func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
 	auth := authorizeInsecure()
 	if auth != nil {
 		return auth, nil
+	}
+
+	if config.Limits.AllowedRepositoryURLPrefixes != nil {
+		return nil, AuthError{http.StatusUnauthorized, "updating from archive not allowed"}
 	}
 
 	// DNS challenge gives absolute authority.

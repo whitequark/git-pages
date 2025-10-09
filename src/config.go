@@ -103,6 +103,8 @@ type LimitsConfig struct {
 	MaxHeapSizeRatio float64 `toml:"max-heap-size-ratio" default:"0.5"`
 	// List of domains unconditionally forbidden for uploads.
 	ForbiddenDomains []string `toml:"forbidden-domains"`
+	// List of allowed repository URL prefixes. Setting this option prohibits uploading archives.
+	AllowedRepositoryURLPrefixes []string `toml:"allowed-repository-url-prefixes"`
 }
 
 func (config *Config) DebugJSON() string {
