@@ -433,15 +433,19 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("body read: %w", err)
 	}
 
-	var event map[string]any
+	var event struct {
+		Ref        string `json:"ref"`
+		Repository struct {
+			CloneURL string `json:"clone_url"`
+		} `json:"repository"`
+	}
 	err = json.NewDecoder(bytes.NewReader(requestBody)).Decode(&event)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid request body: %s", err), http.StatusBadRequest)
 		return err
 	}
 
-	eventRef := event["ref"].(string)
-	if eventRef != fmt.Sprintf("refs/heads/%s", auth.branch) {
+	if event.Ref != fmt.Sprintf("refs/heads/%s", auth.branch) {
 		code := http.StatusUnauthorized
 		if strings.Contains(r.Header.Get("User-Agent"), "GitHub-Hookshot") {
 			// GitHub has no way to restrict branches for a webhook, and responding with 401
@@ -449,13 +453,12 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 			code = http.StatusOK
 		}
 		http.Error(w,
-			fmt.Sprintf("ref %s not in allowlist [refs/heads/%v]",
-				eventRef, auth.branch),
+			fmt.Sprintf("ref %s not in allowlist [refs/heads/%v]", event.Ref, auth.branch),
 			code)
 		return nil
 	}
 
-	repoURL := event["repository"].(map[string]any)["clone_url"].(string)
+	repoURL := event.Repository.CloneURL
 	if err := AuthorizeRepository(repoURL, auth); err != nil {
 		return err
 	}
