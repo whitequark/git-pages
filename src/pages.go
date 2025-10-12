@@ -398,6 +398,8 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 
 	webRoot := makeWebRoot(host, projectName)
 
+	isGitHub := strings.Contains(r.Header.Get("User-Agent"), "GitHub-Hookshot")
+
 	eventName := ""
 	for _, header := range []string{
 		"X-Forgejo-Event",
@@ -447,7 +449,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 
 	if event.Ref != fmt.Sprintf("refs/heads/%s", auth.branch) {
 		code := http.StatusUnauthorized
-		if strings.Contains(r.Header.Get("User-Agent"), "GitHub-Hookshot") {
+		if isGitHub {
 			// GitHub has no way to restrict branches for a webhook, and responding with 401
 			// for every non-pages branch makes the "Recent Deliveries" tab look awful.
 			code = http.StatusOK
@@ -463,10 +465,31 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	updateCtx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
-	defer cancel()
+	resultChan := make(chan UpdateResult, 1)
+	go func() {
+		defer close(resultChan)
 
-	result := UpdateFromRepository(updateCtx, webRoot, repoURL, auth.branch)
+		updateCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Limits.UpdateTimeout))
+		defer cancel()
+
+		result := UpdateFromRepository(updateCtx, webRoot, repoURL, auth.branch)
+		resultChan <- result
+		reportSiteUpdate("webhook", &result)
+	}()
+
+	var result UpdateResult
+	if isGitHub {
+		select {
+		case result = <-resultChan:
+		case <-time.After(5 * time.Second):
+			w.WriteHeader(http.StatusAccepted)
+			fmt.Fprintf(w, "updating (taking longer than 5 seconds)")
+			return nil
+		}
+	} else {
+		result = <-resultChan
+	}
+
 	switch result.outcome {
 	case UpdateError:
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -496,7 +519,6 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 			fmt.Fprintf(w, "- %s\n", problem)
 		}
 	}
-	reportSiteUpdate("webhook", &result)
 	return nil
 }
 
