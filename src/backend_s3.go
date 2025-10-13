@@ -10,6 +10,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/c2h5oh/datasize"
 	"github.com/maypok86/otter/v2"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -241,7 +242,7 @@ func (s3 *S3Backend) GetBlob(
 }
 
 func (s3 *S3Backend) PutBlob(ctx context.Context, name string, data []byte) error {
-	log.Printf("s3: put blob %s (%d bytes)\n", name, len(data))
+	log.Printf("s3: put blob %s (%s)\n", name, datasize.ByteSize(len(data)).HumanReadable())
 
 	_, err := s3.client.StatObject(ctx, s3.bucket, blobObjectName(name),
 		minio.GetObjectOptions{})
