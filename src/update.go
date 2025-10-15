@@ -83,6 +83,9 @@ func UpdateFromRepository(
 	repoURL string,
 	branch string,
 ) UpdateResult {
+	span, ctx := ObserveFunction(ctx, "UpdateFromRepository", "repo.url", repoURL)
+	defer span.Finish()
+
 	log.Printf("update %s: %s %s\n", webRoot, repoURL, branch)
 
 	manifest, err := FetchRepository(ctx, repoURL, branch)

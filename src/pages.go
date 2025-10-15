@@ -465,17 +465,22 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	updateCtx := r.Context()
+	if isGitHub {
+		updateCtx = context.Background()
+	}
+
 	resultChan := make(chan UpdateResult, 1)
-	go func() {
+	go func(ctx context.Context) {
 		defer close(resultChan)
 
-		updateCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Limits.UpdateTimeout))
+		ctx, cancel := context.WithTimeout(ctx, time.Duration(config.Limits.UpdateTimeout))
 		defer cancel()
 
-		result := UpdateFromRepository(updateCtx, webRoot, repoURL, auth.branch)
+		result := UpdateFromRepository(ctx, webRoot, repoURL, auth.branch)
 		resultChan <- result
 		reportSiteUpdate("webhook", &result)
-	}()
+	}(updateCtx)
 
 	var result UpdateResult
 	if isGitHub {

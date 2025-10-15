@@ -35,13 +35,14 @@ func (t *Duration) MarshalText() ([]byte, error) {
 }
 
 type Config struct {
-	Insecure  bool             `toml:"-" env:"insecure"`
-	Features  []string         `toml:"features"`
-	LogFormat string           `toml:"log-format" default:"text"`
-	Server    ServerConfig     `toml:"server"`
-	Wildcard  []WildcardConfig `toml:"wildcard"`
-	Storage   StorageConfig    `toml:"storage"`
-	Limits    LimitsConfig     `toml:"limits"`
+	Insecure      bool                `toml:"-" env:"insecure"`
+	Features      []string            `toml:"features"`
+	LogFormat     string              `toml:"log-format" default:"text"`
+	Server        ServerConfig        `toml:"server"`
+	Wildcard      []WildcardConfig    `toml:"wildcard"`
+	Storage       StorageConfig       `toml:"storage"`
+	Limits        LimitsConfig        `toml:"limits"`
+	Observability ObservabilityConfig `toml:"observability"`
 }
 
 type ServerConfig struct {
@@ -105,6 +106,11 @@ type LimitsConfig struct {
 	ForbiddenDomains []string `toml:"forbidden-domains"`
 	// List of allowed repository URL prefixes. Setting this option prohibits uploading archives.
 	AllowedRepositoryURLPrefixes []string `toml:"allowed-repository-url-prefixes"`
+}
+
+type ObservabilityConfig struct {
+	// Minimum duration for an HTTP request transaction to be unconditionally sampled.
+	SlowResponseThreshold Duration `toml:"slow-response-threshold" default:"500ms"`
 }
 
 func (config *Config) DebugJSON() string {

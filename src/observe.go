@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"runtime/debug"
@@ -63,18 +64,32 @@ func InitObservability() {
 		options.Environment = environment
 		options.EnableLogs = enableLogs
 		options.EnableTracing = enableTracing
+		options.TracesSampleRate = 1
 		switch environment {
 		case "development", "staging":
-			options.TracesSampleRate = 1.0
-		case "production":
-			options.TracesSampler = func(ctx sentry.SamplingContext) float64 {
-				if method, ok := ctx.Span.Data["http.request.method"].(string); ok {
-					switch method {
-					case "PUT", "DELETE", "POST":
-						return 1.0
+		default:
+			options.BeforeSendTransaction = func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+				sampleRate := 0.05
+				if trace, ok := event.Contexts["trace"]; ok {
+					if data, ok := trace["data"].(map[string]any); ok {
+						if method, ok := data["http.request.method"].(string); ok {
+							switch method {
+							case "PUT", "DELETE", "POST":
+								sampleRate = 1
+							default:
+								duration := event.Timestamp.Sub(event.StartTime)
+								threshold := time.Duration(config.Observability.SlowResponseThreshold)
+								if duration >= threshold {
+									sampleRate = 1
+								}
+							}
+						}
 					}
 				}
-				return 0.05
+				if rand.Float64() < sampleRate {
+					return event
+				}
+				return nil
 			}
 		}
 		if err := sentry.Init(options); err != nil {
@@ -99,9 +114,19 @@ func FiniObservability() {
 
 func ObserveHTTPHandler(handler http.Handler) http.Handler {
 	if hasSentry() {
-		handler = sentryhttp.New(sentryhttp.Options{
-			Repanic: true,
-		}).Handle(handler)
+		handler = func(next http.Handler) http.Handler {
+			next = sentryhttp.New(sentryhttp.Options{
+				Repanic: true,
+			}).Handle(handler)
+
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Prevent the Sentry SDK from continuing traces as we don't use this feature.
+				r.Header.Del(sentry.SentryTraceHeader)
+				r.Header.Del(sentry.SentryBaggageHeader)
+
+				next.ServeHTTP(w, r)
+			})
+		}(handler)
 	}
 
 	return handler

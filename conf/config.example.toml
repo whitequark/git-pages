@@ -43,3 +43,6 @@ git-large-object-threshold = "1M"
 max-symlink-depth = 16
 update-timeout = "60s"
 max-heap-size-ratio = 0.5 # * RAM_size
+
+[observability]
+slow-response-threshold = "500ms"
