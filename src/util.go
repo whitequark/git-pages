@@ -1,6 +1,10 @@
 package main
 
-import "io"
+import (
+	"errors"
+	"io"
+	"strings"
+)
 
 type BoundedReader struct {
 	inner io.Reader
@@ -22,4 +26,56 @@ func (reader *BoundedReader) Read(dest []byte) (count int, err error) {
 	count, err = reader.inner.Read(dest)
 	reader.fuel -= int64(count)
 	return
+}
+
+type prettyError interface {
+	error
+	Pretty() string
+}
+
+func prettyErrMsg(err error) string {
+	switch cerr := err.(type) {
+	case prettyError:
+		return cerr.Pretty()
+	default:
+		return cerr.Error()
+	}
+}
+
+type prettyJoinError struct {
+	errs []error
+}
+
+func joinErrors(errs ...error) error {
+	if err := errors.Join(errs...); err != nil {
+		wrapErr := err.(interface{ Unwrap() []error })
+		return &prettyJoinError{errs: wrapErr.Unwrap()}
+	}
+	return nil
+}
+
+func (e *prettyJoinError) Error() string {
+	var s strings.Builder
+	for i, err := range e.errs {
+		if i > 0 {
+			s.WriteString("; ")
+		}
+		s.WriteString(err.Error())
+	}
+	return s.String()
+}
+
+func (e *prettyJoinError) Pretty() string {
+	var s strings.Builder
+	for i, err := range e.errs {
+		if i > 0 {
+			s.WriteString("\n- ")
+		}
+		s.WriteString(strings.ReplaceAll(prettyErrMsg(err), "\n", "\n  "))
+	}
+	return s.String()
+}
+
+func (e *prettyJoinError) Unwrap() []error {
+	return e.errs
 }

@@ -157,19 +157,35 @@ func authorizeDNSAllowlist(r *http.Request) (*Authorization, error) {
 	}
 
 	allowlistHostname := fmt.Sprintf("_git-pages-repository.%s", host)
-	repoURLs, err := net.LookupTXT(allowlistHostname)
+	records, err := net.LookupTXT(allowlistHostname)
 	if err != nil {
 		return nil, AuthError{http.StatusUnauthorized,
 			fmt.Sprintf("failed to look up DNS repository allowlist: %s TXT", allowlistHostname)}
 	}
 
-	for _, repoURL := range repoURLs {
-		if parsedURL, err := url.Parse(repoURL); err != nil {
-			return nil, AuthError{http.StatusBadRequest,
-				fmt.Sprintf("failed to parse URL: %s TXT %q", allowlistHostname, repoURL)}
+	var (
+		repoURLs []string
+		errs     []error
+	)
+	for _, record := range records {
+		if parsedURL, err := url.Parse(record); err != nil {
+			errs = append(errs, fmt.Errorf("failed to parse URL: %s TXT %q", allowlistHostname, record))
 		} else if !parsedURL.IsAbs() {
-			return nil, AuthError{http.StatusBadRequest,
-				fmt.Sprintf("repository URL is not absolute: %s TXT %q", allowlistHostname, repoURL)}
+			errs = append(errs, fmt.Errorf("repository URL is not absolute: %s TXT %q", allowlistHostname, record))
+		} else {
+			repoURLs = append(repoURLs, record)
+		}
+	}
+
+	if len(repoURLs) == 0 {
+		if len(records) > 0 {
+			errs = append([]error{AuthError{http.StatusUnauthorized,
+				fmt.Sprintf("no valid DNS TXT records for %s", allowlistHostname)}},
+				errs...)
+			return nil, joinErrors(errs...)
+		} else {
+			return nil, AuthError{http.StatusUnauthorized,
+				fmt.Sprintf("no DNS TXT records found for %s", allowlistHostname)}
 		}
 	}
 
@@ -351,7 +367,7 @@ func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
 		}
 	}
 
-	return nil, errors.Join(causes...)
+	return nil, joinErrors(causes...)
 }
 
 // Returns `repoURLs, err` where if `err == nil` then the request is authorized to clone from
@@ -421,7 +437,7 @@ func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 		}
 	}
 
-	return nil, errors.Join(causes...)
+	return nil, joinErrors(causes...)
 }
 
 func AuthorizeRepository(repoURL string, auth *Authorization) error {
@@ -511,7 +527,7 @@ func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
 		return auth, nil
 	}
 
-	return nil, errors.Join(causes...)
+	return nil, joinErrors(causes...)
 }
 
 func CheckForbiddenDomain(r *http.Request) error {

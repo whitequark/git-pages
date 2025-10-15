@@ -562,9 +562,7 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var authErr AuthError
 		if errors.As(err, &authErr) {
-			message := fmt.Sprint(err)
-			http.Error(w, strings.ReplaceAll(message, "\n", "\n- "), authErr.code)
-			err = errors.New(strings.ReplaceAll(message, "\n", "; "))
+			http.Error(w, prettyErrMsg(err), authErr.code)
 		}
 		var tooLargeErr *http.MaxBytesError
 		if errors.As(err, &tooLargeErr) {
