@@ -266,6 +266,20 @@ func NewObservedBackend(backend Backend) Backend {
 	return &observedBackend{inner: backend}
 }
 
+func (backend *observedBackend) HasFeature(ctx context.Context, feature BackendFeature) (isOn bool) {
+	span, ctx := ObserveFunction(ctx, "HasFeature")
+	isOn = backend.inner.HasFeature(ctx, feature)
+	span.Finish()
+	return
+}
+
+func (backend *observedBackend) EnableFeature(ctx context.Context, feature BackendFeature) (err error) {
+	span, ctx := ObserveFunction(ctx, "EnableFeature")
+	err = backend.inner.EnableFeature(ctx, feature)
+	span.Finish()
+	return
+}
+
 func (backend *observedBackend) GetBlob(
 	ctx context.Context,
 	name string,
@@ -298,6 +312,13 @@ func (backend *observedBackend) PutBlob(ctx context.Context, name string, data [
 func (backend *observedBackend) DeleteBlob(ctx context.Context, name string) (err error) {
 	span, ctx := ObserveFunction(ctx, "DeleteBlob", "blob.name", name)
 	err = backend.inner.DeleteBlob(ctx, name)
+	span.Finish()
+	return
+}
+
+func (backend *observedBackend) ListManifests(ctx context.Context) (manifests []string, err error) {
+	span, ctx := ObserveFunction(ctx, "ListManifests")
+	manifests, err = backend.inner.ListManifests(ctx)
 	span.Finish()
 	return
 }
@@ -342,6 +363,13 @@ func (backend *observedBackend) DeleteManifest(ctx context.Context, name string)
 func (backend *observedBackend) CheckDomain(ctx context.Context, domain string) (found bool, err error) {
 	span, ctx := ObserveFunction(ctx, "CheckDomain", "manifest.domain", domain)
 	found, err = backend.inner.CheckDomain(ctx, domain)
+	span.Finish()
+	return
+}
+
+func (backend *observedBackend) CreateDomain(ctx context.Context, domain string) (err error) {
+	span, ctx := ObserveFunction(ctx, "CreateDomain", "manifest.domain", domain)
+	err = backend.inner.CreateDomain(ctx, domain)
 	span.Finish()
 	return
 }

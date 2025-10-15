@@ -21,11 +21,23 @@ func splitBlobName(name string) []string {
 	}
 }
 
+type BackendFeature string
+
+const (
+	FeatureCheckDomainMarker BackendFeature = "check-domain-marker"
+)
+
 type GetManifestOptions struct {
 	BypassCache bool
 }
 
 type Backend interface {
+	// Returns true if the feature has been enabled for this store, false otherwise.
+	HasFeature(ctx context.Context, feature BackendFeature) bool
+
+	// Enables the feature for this store.
+	EnableFeature(ctx context.Context, feature BackendFeature) error
+
 	// Retrieve a blob. Returns `reader, size, mtime, err`.
 	GetBlob(ctx context.Context, name string) (reader io.ReadSeeker, size uint64, mtime time.Time, err error)
 
@@ -52,8 +64,14 @@ type Backend interface {
 	// Delete a manifest.
 	DeleteManifest(ctx context.Context, name string) error
 
+	// List all manifests.
+	ListManifests(ctx context.Context) (manifests []string, err error)
+
 	// Check whether a domain has any deployments.
 	CheckDomain(ctx context.Context, domain string) (found bool, err error)
+
+	// Creates a domain. This allows us to start serving content for the domain.
+	CreateDomain(ctx context.Context, domain string) error
 }
 
 var backend Backend

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strings"
 )
 
 type UpdateOutcome int
@@ -42,6 +43,10 @@ func Update(ctx context.Context, webRoot string, manifest *Manifest) UpdateResul
 		}
 	} else if err = PrepareManifest(ctx, manifest); err == nil {
 		newManifest, err = StoreManifest(ctx, webRoot, manifest)
+		if err == nil {
+			domain, _, _ := strings.Cut(webRoot, "/")
+			err = backend.CreateDomain(ctx, domain)
+		}
 		if err == nil {
 			if oldManifest == nil {
 				outcome = UpdateCreated

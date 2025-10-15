@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -66,6 +68,24 @@ func NewFSBackend(config *FSConfig) (*FSBackend, error) {
 
 func (fs *FSBackend) Backend() Backend {
 	return fs
+}
+
+func (fs *FSBackend) HasFeature(ctx context.Context, feature BackendFeature) bool {
+	switch feature {
+	case FeatureCheckDomainMarker:
+		return true
+	default:
+		return false
+	}
+}
+
+func (fs *FSBackend) EnableFeature(ctx context.Context, feature BackendFeature) error {
+	switch feature {
+	case FeatureCheckDomainMarker:
+		return nil
+	default:
+		return fmt.Errorf("not implemented")
+	}
 }
 
 func (fs *FSBackend) GetBlob(
@@ -131,6 +151,21 @@ again:
 func (fs *FSBackend) DeleteBlob(ctx context.Context, name string) error {
 	blobPath := filepath.Join(splitBlobName(name)...)
 	return fs.blobRoot.Remove(blobPath)
+}
+
+func (b *FSBackend) ListManifests(ctx context.Context) (manifests []string, err error) {
+	err = fs.WalkDir(b.siteRoot.FS(), ".", func(path string, d fs.DirEntry, err error) error {
+		if strings.Count(path, "/") > 1 {
+			return fs.SkipDir
+		}
+		_, project, _ := strings.Cut(path, "/")
+		if project == "" || strings.HasPrefix(project, ".") && project != ".index" {
+			return nil
+		}
+		manifests = append(manifests, path)
+		return nil
+	})
+	return
 }
 
 func (fs *FSBackend) GetManifest(ctx context.Context, name string, opts GetManifestOptions) (*Manifest, error) {
@@ -200,4 +235,8 @@ func (fs *FSBackend) CheckDomain(ctx context.Context, domain string) (bool, erro
 	} else {
 		return false, err
 	}
+}
+
+func (fs *FSBackend) CreateDomain(ctx context.Context, domain string) error {
+	return nil // no-op
 }

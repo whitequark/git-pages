@@ -78,6 +78,8 @@ func Main() {
 		"load configuration from `filename`")
 	noConfig := flag.Bool("no-config", false,
 		"run without configuration file (configure via environment variables)")
+	runMigration := flag.String("run-migration", "",
+		"run a specific store migration (available: \"create-domain-markers\")")
 	getManifest := flag.String("get-manifest", "",
 		"write manifest for `webroot` (either 'domain.tld' or 'domain.tld/dir') to stdout as ProtoJSON")
 	getBlob := flag.String("get-blob", "",
@@ -139,6 +141,15 @@ func Main() {
 	}
 
 	switch {
+	case *runMigration != "":
+		if err := ConfigureBackend(&config.Storage); err != nil {
+			log.Fatalln(err)
+		}
+
+		if err := RunMigration(context.Background(), *runMigration); err != nil {
+			log.Fatalln(err)
+		}
+
 	case *getManifest != "":
 		if err := ConfigureBackend(&config.Storage); err != nil {
 			log.Fatalln(err)

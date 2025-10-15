@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/c2h5oh/datasize"
@@ -118,10 +119,11 @@ type CachedManifest struct {
 func (c *CachedManifest) Weight() uint32 { return c.weight }
 
 type S3Backend struct {
-	client    *minio.Client
-	bucket    string
-	blobCache *observedCache[string, *CachedBlob]
-	siteCache *observedCache[string, *CachedManifest]
+	client       *minio.Client
+	bucket       string
+	blobCache    *observedCache[string, *CachedBlob]
+	siteCache    *observedCache[string, *CachedManifest]
+	featureCache *otter.Cache[BackendFeature, bool]
 }
 
 var _ Backend = (*S3Backend)(nil)
@@ -200,7 +202,14 @@ func NewS3Backend(ctx context.Context, config *S3Config) (*S3Backend, error) {
 		return nil, err
 	}
 
-	return &S3Backend{client, bucket, blobCache, siteCache}, nil
+	featureCache, err := otter.New(&otter.Options[BackendFeature, bool]{
+		RefreshCalculator: otter.RefreshWriting[BackendFeature, bool](10 * time.Minute),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &S3Backend{client, bucket, blobCache, siteCache, featureCache}, nil
 }
 
 func (s3 *S3Backend) Backend() Backend {
@@ -209,6 +218,42 @@ func (s3 *S3Backend) Backend() Backend {
 
 func blobObjectName(name string) string {
 	return fmt.Sprintf("blob/%s", path.Join(splitBlobName(name)...))
+}
+
+func storeFeatureObjectName(feature BackendFeature) string {
+	return fmt.Sprintf("meta/feature/%s", feature)
+}
+
+func (s3 *S3Backend) HasFeature(ctx context.Context, feature BackendFeature) bool {
+	loader := func(ctx context.Context, feature BackendFeature) (bool, error) {
+		_, err := s3.client.StatObject(ctx, s3.bucket, storeFeatureObjectName(feature),
+			minio.StatObjectOptions{})
+		if err != nil {
+			if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
+				log.Printf("s3 feature %q: disabled", feature)
+				return false, nil
+			} else {
+				return false, err
+			}
+		}
+		log.Printf("s3 feature %q: enabled", feature)
+		return true, nil
+	}
+
+	isOn, err := s3.featureCache.Get(ctx, feature, otter.LoaderFunc[BackendFeature, bool](loader))
+	if err != nil {
+		err = fmt.Errorf("getting s3 backend feature %q: %w", feature, err)
+		ObserveError(err)
+		log.Print(err)
+		return false
+	}
+	return isOn
+}
+
+func (s3 *S3Backend) EnableFeature(ctx context.Context, feature BackendFeature) error {
+	_, err := s3.client.PutObject(ctx, s3.bucket, storeFeatureObjectName(feature),
+		&bytes.Reader{}, 0, minio.PutObjectOptions{})
+	return err
 }
 
 func (s3 *S3Backend) GetBlob(
@@ -305,6 +350,34 @@ func manifestObjectName(name string) string {
 
 func stagedManifestObjectName(manifestData []byte) string {
 	return fmt.Sprintf("dirty/%x", sha256.Sum256(manifestData))
+}
+
+func (s3 *S3Backend) ListManifests(ctx context.Context) (manifests []string, err error) {
+	log.Print("s3: list manifests")
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	prefix := manifestObjectName("")
+	for object := range s3.client.ListObjectsIter(ctx, s3.bucket, minio.ListObjectsOptions{
+		Prefix:    prefix,
+		Recursive: true,
+	}) {
+		if object.Err != nil {
+			return nil, object.Err
+		}
+		key := strings.TrimRight(strings.TrimPrefix(object.Key, prefix), "/")
+		if strings.Count(key, "/") > 1 {
+			continue
+		}
+		_, project, _ := strings.Cut(key, "/")
+		if project == "" || strings.HasPrefix(project, ".") && project != ".index" {
+			continue
+		}
+		manifests = append(manifests, key)
+	}
+
+	return
 }
 
 type s3ManifestLoader struct {
@@ -426,19 +499,45 @@ func (s3 *S3Backend) DeleteManifest(ctx context.Context, name string) error {
 	return err
 }
 
-func (s3 *S3Backend) CheckDomain(ctx context.Context, domain string) (bool, error) {
+func domainCheckObjectName(domain string) string {
+	return manifestObjectName(fmt.Sprintf("%s/.exists", domain))
+}
+
+func (s3 *S3Backend) CheckDomain(ctx context.Context, domain string) (exists bool, err error) {
 	log.Printf("s3: check domain %s\n", domain)
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	for object := range s3.client.ListObjectsIter(ctx, s3.bucket, minio.ListObjectsOptions{
-		Prefix: manifestObjectName(fmt.Sprintf("%s/", domain)),
-	}) {
-		if object.Err != nil {
-			return false, object.Err
+	_, err = s3.client.StatObject(ctx, s3.bucket, domainCheckObjectName(domain),
+		minio.StatObjectOptions{})
+	if err != nil {
+		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
+			exists, err = false, nil
 		}
-		return true, nil
+	} else {
+		exists = true
 	}
-	return false, nil
+
+	if !exists && !s3.HasFeature(ctx, FeatureCheckDomainMarker) {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		for object := range s3.client.ListObjectsIter(ctx, s3.bucket, minio.ListObjectsOptions{
+			Prefix: manifestObjectName(fmt.Sprintf("%s/", domain)),
+		}) {
+			if object.Err != nil {
+				return false, object.Err
+			}
+			return true, nil
+		}
+		return false, nil
+	}
+
+	return
+}
+
+func (s3 *S3Backend) CreateDomain(ctx context.Context, domain string) error {
+	log.Printf("s3: create domain %s\n", domain)
+
+	_, err := s3.client.PutObject(ctx, s3.bucket, domainCheckObjectName(domain),
+		&bytes.Reader{}, 0, minio.PutObjectOptions{})
+	return err
 }
