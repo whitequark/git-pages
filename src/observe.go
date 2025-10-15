@@ -22,6 +22,17 @@ import (
 	sentryslog "github.com/getsentry/sentry-go/slog"
 )
 
+var (
+	httpRequestDurationSeconds = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name: "git_pages_http_request_duration_seconds",
+		Help: "Time to respond to incoming HTTP requests",
+
+		NativeHistogramBucketFactor:     1.1,
+		NativeHistogramMaxBucketNumber:  100,
+		NativeHistogramMinResetDuration: 10 * time.Minute,
+	}, []string{"method"})
+)
+
 func hasSentry() bool {
 	return os.Getenv("SENTRY_DSN") != ""
 }
@@ -128,6 +139,18 @@ func ObserveHTTPHandler(handler http.Handler) http.Handler {
 			})
 		}(handler)
 	}
+
+	handler = func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			next.ServeHTTP(w, r)
+			duration := time.Since(start)
+
+			httpRequestDurationSeconds.
+				With(prometheus.Labels{"method": r.Method}).
+				Observe(duration.Seconds())
+		})
+	}(handler)
 
 	return handler
 }
