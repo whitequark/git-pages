@@ -13,19 +13,20 @@ type weightedCacheEntry interface {
 }
 
 type trackedLoader[K comparable, V any] struct {
-	loader  otter.Loader[K, V]
-	invoked bool
+	loader   otter.Loader[K, V]
+	loaded   bool
+	reloaded bool
 }
 
 func (l *trackedLoader[K, V]) Load(ctx context.Context, key K) (V, error) {
 	val, err := l.loader.Load(ctx, key)
-	l.invoked = true
+	l.loaded = true
 	return val, err
 }
 
 func (l *trackedLoader[K, V]) Reload(ctx context.Context, key K, oldValue V) (V, error) {
 	val, err := l.loader.Reload(ctx, key, oldValue)
-	l.invoked = true
+	l.reloaded = true
 	return val, err
 }
 
@@ -67,7 +68,7 @@ func (c *observedCache[K, V]) Get(ctx context.Context, key K, loader otter.Loade
 	observedLoader := trackedLoader[K, V]{loader: loader}
 	val, err := c.Cache.Get(ctx, key, &observedLoader)
 	if err == nil {
-		if observedLoader.invoked {
+		if observedLoader.loaded {
 			if c.metrics.MissNumberCounter != nil {
 				c.metrics.MissNumberCounter.Inc()
 			}

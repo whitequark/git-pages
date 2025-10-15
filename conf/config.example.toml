@@ -34,6 +34,7 @@ max-size = "256MB"
 [storage.s3.site-cache]
 max-size = "16MB"
 max-age = "60s"
+max-stale = "1h"
 
 [limits]
 max-site-size = "128M"

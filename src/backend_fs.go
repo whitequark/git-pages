@@ -133,7 +133,7 @@ func (fs *FSBackend) DeleteBlob(ctx context.Context, name string) error {
 	return fs.blobRoot.Remove(blobPath)
 }
 
-func (fs *FSBackend) GetManifest(ctx context.Context, name string) (*Manifest, error) {
+func (fs *FSBackend) GetManifest(ctx context.Context, name string, opts GetManifestOptions) (*Manifest, error) {
 	data, err := fs.siteRoot.ReadFile(name)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf("%w: %s", errNotFound, err.(*os.PathError).Path)

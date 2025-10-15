@@ -14,6 +14,7 @@ require (
 	github.com/maypok86/otter/v2 v2.2.1
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/pelletier/go-toml/v2 v2.2.4
+	github.com/pquerna/cachecontrol v0.2.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/samber/slog-multi v1.5.0
 	github.com/tj/go-redirects v0.0.0-20200911105812-fd1ba1020b37

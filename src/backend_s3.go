@@ -121,8 +121,11 @@ func makeCacheOptions[K comparable, V any](
 		options.MaximumWeight = config.MaxSize.Bytes()
 		options.Weigher = weigher
 	}
-	if config.MaxAge != 0 {
-		options.ExpiryCalculator = otter.ExpiryWriting[K, V](time.Duration(config.MaxAge))
+	if config.MaxStale != 0 {
+		options.RefreshCalculator = otter.RefreshWriting[K, V](time.Duration(config.MaxAge))
+	}
+	if config.MaxAge != 0 || config.MaxStale != 0 {
+		options.ExpiryCalculator = otter.ExpiryWriting[K, V](time.Duration(config.MaxAge + config.MaxStale))
 	}
 	return options
 }
@@ -284,7 +287,7 @@ func stagedManifestObjectName(manifestData []byte) string {
 	return fmt.Sprintf("dirty/%x", sha256.Sum256(manifestData))
 }
 
-func (s3 *S3Backend) GetManifest(ctx context.Context, name string) (*Manifest, error) {
+func (s3 *S3Backend) GetManifest(ctx context.Context, name string, opts GetManifestOptions) (*Manifest, error) {
 	loader := func(ctx context.Context, name string) (*CachedManifest, error) {
 		manifest, size, err := func() (*Manifest, uint32, error) {
 			log.Printf("s3: get manifest %s\n", name)
@@ -319,6 +322,13 @@ func (s3 *S3Backend) GetManifest(ctx context.Context, name string) (*Manifest, e
 			}
 		} else {
 			return &CachedManifest{manifest, size, err}, nil
+		}
+	}
+
+	if opts.BypassCache {
+		entry, found := s3.siteCache.Cache.GetEntry(name)
+		if found && entry.RefreshableAt().Before(time.Now()) {
+			s3.siteCache.Cache.Invalidate(name)
 		}
 	}
 

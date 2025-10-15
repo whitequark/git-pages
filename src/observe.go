@@ -232,9 +232,16 @@ func (backend *observedBackend) DeleteBlob(ctx context.Context, name string) (er
 	return
 }
 
-func (backend *observedBackend) GetManifest(ctx context.Context, name string) (manifest *Manifest, err error) {
+func (backend *observedBackend) GetManifest(
+	ctx context.Context,
+	name string,
+	opts GetManifestOptions,
+) (
+	manifest *Manifest,
+	err error,
+) {
 	span, ctx := ObserveFunction(ctx, "GetManifest", "manifest.name", name)
-	if manifest, err = backend.inner.GetManifest(ctx, name); err == nil {
+	if manifest, err = backend.inner.GetManifest(ctx, name, opts); err == nil {
 		manifestsRetrievedCount.Inc()
 	}
 	span.Finish()

@@ -34,7 +34,7 @@ type Backend interface {
 	DeleteBlob(ctx context.Context, name string) error
 
 	// Retrieve a manifest.
-	GetManifest(ctx context.Context, name string) (*Manifest, error)
+	GetManifest(ctx context.Context, name string, opts GetManifestOptions) (*Manifest, error)
 
 	// Stage a manifest. This operation stores a new version of a manifest, locking any blobs
 	// referenced from it in place (for garbage collection purposes) but without any other side
@@ -50,6 +50,10 @@ type Backend interface {
 
 	// Check whether a domain has any deployments.
 	CheckDomain(ctx context.Context, domain string) (found bool, err error)
+}
+
+type GetManifestOptions struct {
+	BypassCache bool
 }
 
 var backend Backend

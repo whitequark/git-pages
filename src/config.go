@@ -59,8 +59,9 @@ type WildcardConfig struct {
 }
 
 type CacheConfig struct {
-	MaxSize datasize.ByteSize `toml:"max-size"`
-	MaxAge  Duration          `toml:"max-age"`
+	MaxSize  datasize.ByteSize `toml:"max-size"`
+	MaxAge   Duration          `toml:"max-age"`
+	MaxStale Duration          `toml:"max-stale"`
 }
 
 type StorageConfig struct {
@@ -81,7 +82,7 @@ type S3Config struct {
 	Region          string      `toml:"region"`
 	Bucket          string      `toml:"bucket"`
 	BlobCache       CacheConfig `toml:"blob-cache" default:"{\"MaxSize\":\"256MB\"}"`
-	SiteCache       CacheConfig `toml:"site-cache" default:"{\"MaxAge\":\"60s\",\"MaxSize\":\"16MB\"}"`
+	SiteCache       CacheConfig `toml:"site-cache" default:"{\"MaxAge\":\"60s\",\"MaxStale\":\"1h\",\"MaxSize\":\"16MB\"}"`
 }
 
 type LimitsConfig struct {

@@ -30,7 +30,7 @@ func Update(ctx context.Context, webRoot string, manifest *Manifest) UpdateResul
 	var err error
 
 	outcome := UpdateError
-	oldManifest, _ = backend.GetManifest(ctx, webRoot)
+	oldManifest, _ = backend.GetManifest(ctx, webRoot, GetManifestOptions{})
 	if IsManifestEmpty(manifest) {
 		newManifest, err = manifest, backend.DeleteManifest(ctx, webRoot)
 		if err == nil {

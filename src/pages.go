@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/pquerna/cachecontrol/cacheobject"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -70,6 +71,17 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	var sitePath string
 	var manifest *Manifest
 
+	cacheControl, err := cacheobject.ParseRequestCacheControl(r.Header.Get("Cache-Control"))
+	if err != nil {
+		cacheControl = &cacheobject.RequestCacheDirectives{
+			MaxAge:   -1,
+			MaxStale: -1,
+			MinFresh: -1,
+		}
+	}
+
+	bypassCache := cacheControl.NoCache || cacheControl.MaxAge == 0
+
 	host, err := GetHost(r)
 	if err != nil {
 		return err
@@ -77,13 +89,15 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 
 	sitePath = strings.TrimPrefix(r.URL.Path, "/")
 	if projectName, projectPath, found := strings.Cut(sitePath, "/"); found {
-		projectManifest, err := backend.GetManifest(r.Context(), makeWebRoot(host, projectName))
+		projectManifest, err := backend.GetManifest(r.Context(), makeWebRoot(host, projectName),
+			GetManifestOptions{BypassCache: bypassCache})
 		if err == nil {
 			sitePath, manifest = projectPath, projectManifest
 		}
 	}
 	if manifest == nil {
-		manifest, err = backend.GetManifest(r.Context(), makeWebRoot(host, ".index"))
+		manifest, err = backend.GetManifest(r.Context(), makeWebRoot(host, ".index"),
+			GetManifestOptions{BypassCache: bypassCache})
 		if manifest == nil {
 			if found, fallbackErr := HandleWildcardFallback(w, r); found {
 				return fallbackErr
