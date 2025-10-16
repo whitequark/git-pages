@@ -32,6 +32,8 @@ var (
 	manifestCacheHitsCount      prometheus.Counter
 	manifestCacheMissesCount    prometheus.Counter
 	manifestCacheEvictionsCount prometheus.Counter
+
+	s3GetObjectDurationSeconds *prometheus.HistogramVec
 )
 
 func initS3BackendMetrics() {
@@ -81,6 +83,15 @@ func initS3BackendMetrics() {
 		Name: "git_pages_manifest_cache_evictions_count",
 		Help: "Count of manifests evicted from the cache",
 	})
+
+	s3GetObjectDurationSeconds = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name: "git_pages_s3_get_object_duration_seconds",
+		Help: "Time to read a whole object from S3",
+
+		NativeHistogramBucketFactor:     1.1,
+		NativeHistogramMaxBucketNumber:  100,
+		NativeHistogramMinResetDuration: 10 * time.Minute,
+	}, []string{"kind"})
 }
 
 // Blobs can be safely cached indefinitely. They only need to be evicted to preserve memory.
@@ -209,6 +220,8 @@ func (s3 *S3Backend) GetBlob(
 	loader := func(ctx context.Context, name string) (*CachedBlob, error) {
 		log.Printf("s3: get blob %s\n", name)
 
+		startTime := time.Now()
+
 		object, err := s3.client.GetObject(ctx, s3.bucket, blobObjectName(name),
 			minio.GetObjectOptions{})
 		// Note that many errors (e.g. NoSuchKey) will be reported only after this point.
@@ -226,6 +239,10 @@ func (s3 *S3Backend) GetBlob(
 		if err != nil {
 			return nil, err
 		}
+
+		s3GetObjectDurationSeconds.
+			With(prometheus.Labels{"kind": "blob"}).
+			Observe(time.Since(startTime).Seconds())
 
 		return &CachedBlob{data, stat.LastModified}, nil
 	}
@@ -292,6 +309,8 @@ func (s3 *S3Backend) GetManifest(ctx context.Context, name string, opts GetManif
 		manifest, size, err := func() (*Manifest, uint32, error) {
 			log.Printf("s3: get manifest %s\n", name)
 
+			startTime := time.Now()
+
 			object, err := s3.client.GetObject(ctx, s3.bucket, manifestObjectName(name),
 				minio.GetObjectOptions{})
 			// Note that many errors (e.g. NoSuchKey) will be reported only after this point.
@@ -309,6 +328,10 @@ func (s3 *S3Backend) GetManifest(ctx context.Context, name string, opts GetManif
 			if err != nil {
 				return nil, 0, err
 			}
+
+			s3GetObjectDurationSeconds.
+				With(prometheus.Labels{"kind": "manifest"}).
+				Observe(time.Since(startTime).Seconds())
 
 			return manifest, uint32(len(data)), nil
 		}()
