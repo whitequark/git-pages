@@ -130,6 +130,12 @@ func FiniObservability() {
 	}
 }
 
+func ObserveError(err error) {
+	if hasSentry() {
+		go sentry.CaptureException(err)
+	}
+}
+
 type observedResponseWriter struct {
 	inner  http.ResponseWriter
 	status int

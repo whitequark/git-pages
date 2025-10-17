@@ -328,6 +328,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 
 	switch result.outcome {
 	case UpdateError:
+		ObserveError(result.err)
 		if errors.Is(result.err, ErrManifestTooLarge) {
 			w.WriteHeader(http.StatusRequestEntityTooLarge)
 		} else if errors.Is(result.err, errArchiveFormat) {
@@ -338,6 +339,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
 	case UpdateTimeout:
+		ObserveError(fmt.Errorf("update timeout"))
 		w.WriteHeader(http.StatusGatewayTimeout)
 	case UpdateNoChange:
 		w.Header().Add("X-Pages-Update", "no-change")
@@ -511,9 +513,11 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 
 	switch result.outcome {
 	case UpdateError:
+		ObserveError(result.err)
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprintf(w, "update error: %s\n", result.err)
 	case UpdateTimeout:
+		ObserveError(fmt.Errorf("update timeout"))
 		w.WriteHeader(http.StatusGatewayTimeout)
 		fmt.Fprintln(w, "update timeout")
 	case UpdateNoChange:
