@@ -82,7 +82,7 @@ func UpdateFromRepository(
 	webRoot string,
 	repoURL string,
 	branch string,
-) UpdateResult {
+) (result UpdateResult) {
 	span, ctx := ObserveFunction(ctx, "UpdateFromRepository", "repo.url", repoURL)
 	defer span.Finish()
 
@@ -90,12 +90,15 @@ func UpdateFromRepository(
 
 	manifest, err := FetchRepository(ctx, repoURL, branch)
 	if errors.Is(err, context.DeadlineExceeded) {
-		return UpdateResult{UpdateTimeout, nil, fmt.Errorf("update timeout")}
+		result = UpdateResult{UpdateTimeout, nil, fmt.Errorf("update timeout")}
 	} else if err != nil {
-		return UpdateResult{UpdateError, nil, err}
+		result = UpdateResult{UpdateError, nil, err}
 	} else {
-		return Update(ctx, webRoot, manifest)
+		result = Update(ctx, webRoot, manifest)
 	}
+
+	observeUpdateResult(result)
+	return result
 }
 
 var errArchiveFormat = errors.New("unsupported archive format")
@@ -105,7 +108,7 @@ func UpdateFromArchive(
 	webRoot string,
 	contentType string,
 	reader io.Reader,
-) UpdateResult {
+) (result UpdateResult) {
 	var manifest *Manifest
 	var err error
 
@@ -128,8 +131,17 @@ func UpdateFromArchive(
 
 	if err != nil {
 		log.Printf("update %s err: %s", webRoot, err)
-		return UpdateResult{UpdateError, nil, err}
+		result = UpdateResult{UpdateError, nil, err}
 	} else {
-		return Update(ctx, webRoot, manifest)
+		result = Update(ctx, webRoot, manifest)
+	}
+
+	observeUpdateResult(result)
+	return
+}
+
+func observeUpdateResult(result UpdateResult) {
+	if result.err != nil {
+		ObserveError(result.err)
 	}
 }
