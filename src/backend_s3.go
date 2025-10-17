@@ -85,8 +85,9 @@ func initS3BackendMetrics() {
 	})
 
 	s3GetObjectDurationSeconds = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name: "git_pages_s3_get_object_duration_seconds",
-		Help: "Time to read a whole object from S3",
+		Name:    "git_pages_s3_get_object_duration_seconds",
+		Help:    "Time to read a whole object from S3",
+		Buckets: []float64{.01, .025, .05, .1, .25, .5, .75, 1, 1.25, 1.5, 1.75, 2, 2.5, 5, 10},
 
 		NativeHistogramBucketFactor:     1.1,
 		NativeHistogramMaxBucketNumber:  100,
