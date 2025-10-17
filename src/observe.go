@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"log/slog"
@@ -23,6 +24,11 @@ import (
 )
 
 var (
+	httpRequestCount = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "git_pages_http_request_count",
+		Help: "Count of HTTP requests by method and response status code",
+	}, []string{"method", "code"})
+
 	httpRequestDurationSeconds = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "git_pages_http_request_duration_seconds",
 		Help:    "Time to respond to incoming HTTP requests",
@@ -124,6 +130,35 @@ func FiniObservability() {
 	}
 }
 
+type observedResponseWriter struct {
+	inner  http.ResponseWriter
+	status int
+}
+
+func newObservedResponseWriter(w http.ResponseWriter) observedResponseWriter {
+	return observedResponseWriter{
+		inner:  w,
+		status: 0,
+	}
+}
+
+func (w *observedResponseWriter) Unwrap() http.ResponseWriter {
+	return w.inner
+}
+
+func (w *observedResponseWriter) Header() http.Header {
+	return w.inner.Header()
+}
+
+func (w *observedResponseWriter) Write(data []byte) (int, error) {
+	return w.inner.Write(data)
+}
+
+func (w *observedResponseWriter) WriteHeader(statusCode int) {
+	w.status = statusCode
+	w.inner.WriteHeader(statusCode)
+}
+
 func ObserveHTTPHandler(handler http.Handler) http.Handler {
 	if hasSentry() {
 		handler = func(next http.Handler) http.Handler {
@@ -143,10 +178,15 @@ func ObserveHTTPHandler(handler http.Handler) http.Handler {
 
 	handler = func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ow := newObservedResponseWriter(w)
+
 			start := time.Now()
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(&ow, r)
 			duration := time.Since(start)
 
+			httpRequestCount.
+				With(prometheus.Labels{"method": r.Method, "code": fmt.Sprintf("%d", ow.status)}).
+				Inc()
 			httpRequestDurationSeconds.
 				With(prometheus.Labels{"method": r.Method}).
 				Observe(duration.Seconds())
