@@ -87,6 +87,13 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	indexManifestCh := make(chan *Manifest, 1)
+	go func() {
+		manifest, _ := backend.GetManifest(r.Context(), makeWebRoot(host, ".index"),
+			GetManifestOptions{BypassCache: bypassCache})
+		indexManifestCh <- manifest
+	}()
+
 	sitePath = strings.TrimPrefix(r.URL.Path, "/")
 	if projectName, projectPath, found := strings.Cut(sitePath, "/"); found {
 		projectManifest, err := backend.GetManifest(r.Context(), makeWebRoot(host, projectName),
@@ -96,8 +103,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 	if manifest == nil {
-		manifest, err = backend.GetManifest(r.Context(), makeWebRoot(host, ".index"),
-			GetManifestOptions{BypassCache: bypassCache})
+		manifest = <-indexManifestCh
 		if manifest == nil {
 			if found, fallbackErr := HandleWildcardFallback(w, r); found {
 				return fallbackErr
