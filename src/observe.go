@@ -24,8 +24,9 @@ import (
 
 var (
 	httpRequestDurationSeconds = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name: "git_pages_http_request_duration_seconds",
-		Help: "Time to respond to incoming HTTP requests",
+		Name:    "git_pages_http_request_duration_seconds",
+		Help:    "Time to respond to incoming HTTP requests",
+		Buckets: []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
 
 		NativeHistogramBucketFactor:     1.1,
 		NativeHistogramMaxBucketNumber:  100,
