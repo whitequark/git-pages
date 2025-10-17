@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"path"
 	"time"
 
@@ -110,6 +111,7 @@ func (c *CachedBlob) Weight() uint32 { return uint32(len(c.blob)) }
 type CachedManifest struct {
 	manifest *Manifest
 	weight   uint32
+	etag     string
 	err      error
 }
 
@@ -305,50 +307,72 @@ func stagedManifestObjectName(manifestData []byte) string {
 	return fmt.Sprintf("dirty/%x", sha256.Sum256(manifestData))
 }
 
-func (s3 *S3Backend) GetManifest(ctx context.Context, name string, opts GetManifestOptions) (*Manifest, error) {
-	loader := func(ctx context.Context, name string) (*CachedManifest, error) {
-		manifest, size, err := func() (*Manifest, uint32, error) {
-			log.Printf("s3: get manifest %s\n", name)
+type s3ManifestLoader struct {
+	s3 *S3Backend
+}
 
-			startTime := time.Now()
+func (l s3ManifestLoader) Load(ctx context.Context, key string) (*CachedManifest, error) {
+	return l.load(ctx, key, nil)
+}
 
-			object, err := s3.client.GetObject(ctx, s3.bucket, manifestObjectName(name),
-				minio.GetObjectOptions{})
-			// Note that many errors (e.g. NoSuchKey) will be reported only after this point.
-			if err != nil {
-				return nil, 0, err
-			}
-			defer object.Close()
+func (l s3ManifestLoader) Reload(ctx context.Context, key string, oldValue *CachedManifest) (*CachedManifest, error) {
+	return l.load(ctx, key, oldValue)
+}
 
-			data, err := io.ReadAll(object)
-			if err != nil {
-				return nil, 0, err
-			}
+func (l s3ManifestLoader) load(ctx context.Context, name string, oldManifest *CachedManifest) (*CachedManifest, error) {
+	manifest, size, etag, err := func() (*Manifest, uint32, string, error) {
+		log.Printf("s3: get manifest %s\n", name)
 
-			manifest, err := DecodeManifest(data)
-			if err != nil {
-				return nil, 0, err
-			}
+		startTime := time.Now()
 
-			s3GetObjectDurationSeconds.
-				With(prometheus.Labels{"kind": "manifest"}).
-				Observe(time.Since(startTime).Seconds())
-
-			return manifest, uint32(len(data)), nil
-		}()
-
-		if err != nil {
-			if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
-				err = fmt.Errorf("%w: %s", errNotFound, errResp.Key)
-				return &CachedManifest{nil, 1, err}, nil
-			} else {
-				return nil, err
-			}
-		} else {
-			return &CachedManifest{manifest, size, err}, nil
+		opts := minio.GetObjectOptions{}
+		if oldManifest != nil && oldManifest.etag != "" {
+			opts.SetMatchETagExcept(oldManifest.etag)
 		}
-	}
+		object, err := l.s3.client.GetObject(ctx, l.s3.bucket, manifestObjectName(name), opts)
+		// Note that many errors (e.g. NoSuchKey) will be reported only after this point.
+		if err != nil {
+			return nil, 0, "", err
+		}
+		defer object.Close()
 
+		stat, err := object.Stat()
+		if err != nil {
+			return nil, 0, "", err
+		}
+
+		data, err := io.ReadAll(object)
+		if err != nil {
+			return nil, 0, "", err
+		}
+
+		manifest, err := DecodeManifest(data)
+		if err != nil {
+			return nil, 0, "", err
+		}
+
+		s3GetObjectDurationSeconds.
+			With(prometheus.Labels{"kind": "manifest"}).
+			Observe(time.Since(startTime).Seconds())
+
+		return manifest, uint32(len(data)), stat.ETag, nil
+	}()
+
+	if err != nil {
+		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
+			err = fmt.Errorf("%w: %s", errNotFound, errResp.Key)
+			return &CachedManifest{nil, 1, etag, err}, nil
+		} else if errResp.StatusCode == http.StatusNotModified && oldManifest != nil {
+			return oldManifest, nil
+		} else {
+			return nil, err
+		}
+	} else {
+		return &CachedManifest{manifest, size, etag, err}, nil
+	}
+}
+
+func (s3 *S3Backend) GetManifest(ctx context.Context, name string, opts GetManifestOptions) (*Manifest, error) {
 	if opts.BypassCache {
 		entry, found := s3.siteCache.Cache.GetEntry(name)
 		if found && entry.RefreshableAt().Before(time.Now()) {
@@ -356,7 +380,7 @@ func (s3 *S3Backend) GetManifest(ctx context.Context, name string, opts GetManif
 		}
 	}
 
-	cached, err := s3.siteCache.Get(ctx, name, otter.LoaderFunc[string, *CachedManifest](loader))
+	cached, err := s3.siteCache.Get(ctx, name, s3ManifestLoader{s3})
 	if err != nil {
 		return nil, err
 	} else {
