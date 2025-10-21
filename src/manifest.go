@@ -15,11 +15,26 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/c2h5oh/datasize"
 	"github.com/klauspost/compress/zstd"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+)
+
+var (
+	siteCompressionSpaceSaving = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "git_pages_site_compression_space_saving",
+		Help:    "Reduction in site size after compression relative to the uncompressed size",
+		Buckets: []float64{.01, .025, .05, .1, .25, .5, .75, 1, 1.25, 1.5, 1.75, 2, 2.5, 5, 10},
+
+		NativeHistogramBucketFactor:     1.1,
+		NativeHistogramMaxBucketNumber:  100,
+		NativeHistogramMinResetDuration: 10 * time.Minute,
+	}, []string{})
 )
 
 func IsManifestEmpty(manifest *Manifest) bool {
@@ -166,11 +181,15 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 		}
 	}
 
+	spaceSaving := (float64(originalSize) - float64(transformedSize)) / float64(originalSize)
 	log.Printf("compress: saved %.2f%% (%s to %s)",
-		(float32(originalSize)-float32(transformedSize))/float32(originalSize)*100.0,
+		spaceSaving*100.0,
 		datasize.ByteSize(originalSize).HR(),
 		datasize.ByteSize(transformedSize).HR(),
 	)
+	siteCompressionSpaceSaving.
+		With(prometheus.Labels{}).
+		Observe(spaceSaving)
 }
 
 // Apply post-processing steps to the manifest.
