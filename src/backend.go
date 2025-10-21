@@ -7,7 +7,6 @@ import (
 	"io"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -55,42 +54,6 @@ type Backend interface {
 
 	// Check whether a domain has any deployments.
 	CheckDomain(ctx context.Context, domain string) (found bool, err error)
-}
-
-// Retrieve several manifests. This operation succeeds if all requested manifests could be
-// retrieved, and fails otherwise. The returned error is the first error that occurs.
-func GetManifests(
-	backend Backend, ctx context.Context, names []string, opts GetManifestOptions,
-) (
-	manifests map[string]*Manifest, err error,
-) {
-	type Result struct {
-		name     string
-		manifest *Manifest
-		err      error
-	}
-
-	wg := sync.WaitGroup{}
-	ch := make(chan Result, len(names))
-	for _, name := range names {
-		wg.Go(func() {
-			manifest, err := backend.GetManifest(ctx, name, opts)
-			ch <- Result{name, manifest, err}
-		})
-	}
-	wg.Wait()
-	close(ch)
-
-	manifests = make(map[string]*Manifest)
-	for result := range ch {
-		if result.err == nil {
-			manifests[result.name] = result.manifest
-		} else {
-			err = result.err
-			break
-		}
-	}
-	return
 }
 
 var backend Backend
