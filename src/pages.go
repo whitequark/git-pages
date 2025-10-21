@@ -223,7 +223,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		defer closer.Close()
 	}
 
-	switch entry.GetXfrm() {
+	switch entry.GetTransform() {
 	case Transform_None:
 		// nothing to do
 	case Transform_Zstandard:

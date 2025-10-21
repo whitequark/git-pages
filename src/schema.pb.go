@@ -144,7 +144,10 @@ type Entry struct {
 	Data []byte `protobuf:"bytes,3,opt,name=data" json:"data,omitempty"`
 	// Only present for `type == InlineFile` and `type == ExternalFile` that
 	// have been transformed.
-	Xfrm          *Transform `protobuf:"varint,4,opt,name=xfrm,enum=Transform" json:"xfrm,omitempty"`
+	Transform *Transform `protobuf:"varint,4,opt,name=transform,enum=Transform" json:"transform,omitempty"`
+	// Only present for `type == InlineFile` and `type == ExternalFile`.
+	// Currently, optional (not present on certain legacy manifests).
+	ContentType   *string `protobuf:"bytes,5,opt,name=content_type,json=contentType" json:"content_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -200,11 +203,18 @@ func (x *Entry) GetData() []byte {
 	return nil
 }
 
-func (x *Entry) GetXfrm() Transform {
-	if x != nil && x.Xfrm != nil {
-		return *x.Xfrm
+func (x *Entry) GetTransform() Transform {
+	if x != nil && x.Transform != nil {
+		return *x.Transform
 	}
 	return Transform_None
+}
+
+func (x *Entry) GetContentType() string {
+	if x != nil && x.ContentType != nil {
+		return *x.ContentType
+	}
+	return ""
 }
 
 // See https://docs.netlify.com/manage/routing/redirects/overview/ for details.
@@ -337,8 +347,8 @@ type Manifest struct {
 	Commit  *string `protobuf:"bytes,3,opt,name=commit" json:"commit,omitempty"`
 	// Contents
 	Contents   map[string]*Entry `protobuf:"bytes,4,rep,name=contents" json:"contents,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	TotalSize  *int64            `protobuf:"varint,5,opt,name=total_size,json=totalSize" json:"total_size,omitempty"`
-	StoredSize *int64            `protobuf:"varint,8,opt,name=stored_size,json=storedSize" json:"stored_size,omitempty"` // after deduplication
+	TotalSize  *int64            `protobuf:"varint,5,opt,name=total_size,json=totalSize" json:"total_size,omitempty"`    // simple sum of each `entry.size`
+	StoredSize *int64            `protobuf:"varint,8,opt,name=stored_size,json=storedSize" json:"stored_size,omitempty"` // external objects, after deduplication
 	// Netlify-style `_redirects`
 	Redirects []*Redirect `protobuf:"bytes,6,rep,name=redirects" json:"redirects,omitempty"`
 	// Diagnostics for non-fatal errors
@@ -437,13 +447,14 @@ var File_schema_proto protoreflect.FileDescriptor
 
 const file_schema_proto_rawDesc = "" +
 	"\n" +
-	"\fschema.proto\"j\n" +
+	"\fschema.proto\"\x97\x01\n" +
 	"\x05Entry\x12\x19\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x05.TypeR\x04type\x12\x12\n" +
 	"\x04size\x18\x02 \x01(\x03R\x04size\x12\x12\n" +
-	"\x04data\x18\x03 \x01(\fR\x04data\x12\x1e\n" +
-	"\x04xfrm\x18\x04 \x01(\x0e2\n" +
-	".TransformR\x04xfrm\"\\\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\x12(\n" +
+	"\ttransform\x18\x04 \x01(\x0e2\n" +
+	".TransformR\ttransform\x12!\n" +
+	"\fcontent_type\x18\x05 \x01(\tR\vcontentType\"\\\n" +
 	"\bRedirect\x12\x12\n" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\tR\x02to\x12\x16\n" +
@@ -502,7 +513,7 @@ var file_schema_proto_goTypes = []any{
 }
 var file_schema_proto_depIdxs = []int32{
 	0, // 0: Entry.type:type_name -> Type
-	1, // 1: Entry.xfrm:type_name -> Transform
+	1, // 1: Entry.transform:type_name -> Transform
 	6, // 2: Manifest.contents:type_name -> Manifest.ContentsEntry
 	3, // 3: Manifest.redirects:type_name -> Redirect
 	4, // 4: Manifest.problems:type_name -> Problem

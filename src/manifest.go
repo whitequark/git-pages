@@ -9,7 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"mime"
+	"net/http"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -122,6 +125,24 @@ again:
 	}
 }
 
+// Sniff content type using the same algorithm as `http.ServeContent`.
+func DetectContentType(manifest *Manifest) {
+	for path, entry := range manifest.Contents {
+		if entry.GetType() == Type_Directory || entry.GetType() == Type_Symlink {
+			// no Content-Type
+		} else if entry.GetType() == Type_InlineFile && entry.GetTransform() == Transform_None {
+			contentType := mime.TypeByExtension(filepath.Ext(path))
+			if contentType == "" {
+				contentType = http.DetectContentType(entry.Data[:512])
+			}
+			entry.ContentType = proto.String(contentType)
+		} else {
+			panic(fmt.Errorf("DetectContentType encountered invalid entry: %v, %v",
+				entry.GetType(), entry.GetTransform()))
+		}
+	}
+}
+
 // The `clauspost/compress/zstd` package recommends reusing a compressor to avoid repeated
 // allocations of internal buffers.
 var zstdEncoder, _ = zstd.NewWriter(nil, zstd.WithEncoderLevel(zstd.SpeedBetterCompression))
@@ -133,13 +154,13 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 
 	var originalSize, transformedSize int64
 	for _, entry := range manifest.Contents {
-		if entry.GetType() == Type_InlineFile && entry.GetXfrm() == Transform_None {
+		if entry.GetType() == Type_InlineFile && entry.GetTransform() == Transform_None {
 			originalSize += entry.GetSize()
 			compressedData := zstdEncoder.EncodeAll(entry.GetData(), make([]byte, 0, entry.GetSize()))
 			if len(compressedData) < int(*entry.Size) {
 				entry.Data = compressedData
 				entry.Size = proto.Int64(int64(len(entry.Data)))
-				entry.Xfrm = Transform_Zstandard.Enum()
+				entry.Transform = Transform_Zstandard.Enum()
 			}
 			transformedSize += entry.GetSize()
 		}
@@ -162,6 +183,8 @@ func PrepareManifest(ctx context.Context, manifest *Manifest) error {
 	} else if len(manifest.Redirects) > 0 {
 		log.Printf("redirects ok: %d rules\n", len(manifest.Redirects))
 	}
+
+	DetectContentType(manifest)
 
 	if config.Feature("compress") {
 		CompressFiles(ctx, manifest)
@@ -196,10 +219,11 @@ func StoreManifest(ctx context.Context, name string, manifest *Manifest) (*Manif
 		if cannotBeInlined {
 			dataHash := sha256.Sum256(entry.Data)
 			extManifest.Contents[name] = &Entry{
-				Type: Type_ExternalFile.Enum(),
-				Size: entry.Size,
-				Data: fmt.Appendf(nil, "sha256-%x", dataHash),
-				Xfrm: entry.Xfrm,
+				Type:        Type_ExternalFile.Enum(),
+				Size:        entry.Size,
+				Data:        fmt.Appendf(nil, "sha256-%x", dataHash),
+				Transform:   entry.Transform,
+				ContentType: entry.ContentType,
 			}
 			extObjectMap[string(dataHash[:])] = *entry.Size
 		} else {

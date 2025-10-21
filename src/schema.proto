@@ -36,7 +36,10 @@ message Entry {
 	bytes data = 3;
 	// Only present for `type == InlineFile` and `type == ExternalFile` that
 	// have been transformed.
-	Transform xfrm = 4;
+	Transform transform = 4;
+	// Only present for `type == InlineFile` and `type == ExternalFile`.
+	// Currently, optional (not present on certain legacy manifests).
+	string content_type = 5;
 }
 
 // See https://docs.netlify.com/manage/routing/redirects/overview/ for details.
