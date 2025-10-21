@@ -3,5 +3,11 @@
   "extends": [
     "group:all"
   ],
-  "abandonmentThreshold": null
+  "abandonmentThreshold": null,
+  "packageRules": [
+    {
+      "matchPackageNames": ["actions/buildah-simple"],
+      "enabled": false
+    }
+  ]
 }
