@@ -61,7 +61,8 @@ message Manifest {
 
 	// Contents
 	map<string, Entry> contents = 4;
-	int64 total_size = 5;
+	int64 total_size = 5; // simple sum of each `entry.size`
+	int64 stored_size = 8; // external objects, after deduplication
 
 	// Netlify-style `_redirects`
 	repeated Redirect redirects = 6;

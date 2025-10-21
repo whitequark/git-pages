@@ -180,28 +180,36 @@ func StoreManifest(ctx context.Context, name string, manifest *Manifest) (*Manif
 
 	// Replace inline files over certain size with references to external data.
 	extManifest := Manifest{
-		RepoUrl:   manifest.RepoUrl,
-		Branch:    manifest.Branch,
-		Commit:    manifest.Commit,
-		Contents:  make(map[string]*Entry),
-		Redirects: manifest.Redirects,
-		Problems:  manifest.Problems,
-		TotalSize: proto.Int64(0),
+		RepoUrl:    manifest.RepoUrl,
+		Branch:     manifest.Branch,
+		Commit:     manifest.Commit,
+		Contents:   make(map[string]*Entry),
+		Redirects:  manifest.Redirects,
+		Problems:   manifest.Problems,
+		TotalSize:  proto.Int64(0),
+		StoredSize: proto.Int64(0),
 	}
+	extObjectMap := make(map[string]int64)
 	for name, entry := range manifest.Contents {
 		cannotBeInlined := entry.GetType() == Type_InlineFile &&
 			entry.GetSize() > int64(config.Limits.MaxInlineFileSize.Bytes())
 		if cannotBeInlined {
+			dataHash := sha256.Sum256(entry.Data)
 			extManifest.Contents[name] = &Entry{
 				Type: Type_ExternalFile.Enum(),
 				Size: entry.Size,
-				Data: fmt.Appendf(nil, "sha256-%x", sha256.Sum256(entry.Data)),
+				Data: fmt.Appendf(nil, "sha256-%x", dataHash),
 				Xfrm: entry.Xfrm,
 			}
+			extObjectMap[string(dataHash[:])] = *entry.Size
 		} else {
 			extManifest.Contents[name] = entry
 		}
 		*extManifest.TotalSize += entry.GetSize()
+	}
+	// `extObjectMap` stores size once per object, deduplicating it
+	for _, storedSize := range extObjectMap {
+		*extManifest.StoredSize += storedSize
 	}
 
 	// Upload the resulting manifest and the blob it references.
