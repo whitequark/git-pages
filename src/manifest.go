@@ -170,6 +170,10 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 	var originalSize, transformedSize int64
 	for _, entry := range manifest.Contents {
 		if entry.GetType() == Type_InlineFile && entry.GetTransform() == Transform_None {
+			mtype := getMediaType(entry.GetContentType())
+			if strings.HasPrefix(mtype, "video/") || strings.HasPrefix(mtype, "audio/") {
+				continue
+			}
 			originalSize += entry.GetSize()
 			compressedData := zstdEncoder.EncodeAll(entry.GetData(), make([]byte, 0, entry.GetSize()))
 			if len(compressedData) < int(*entry.Size) {
