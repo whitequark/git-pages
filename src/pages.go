@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -229,21 +230,44 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		defer closer.Close()
 	}
 
+	acceptedEncodings := parseHTTPEncodings(r.Header.Get("Accept-Encoding"))
+	negotiatedEncoding := true
+
 	switch entry.GetTransform() {
 	case Transform_None:
-		// nothing to do
-	case Transform_Zstandard:
-		// Ideally, we would serve zstd-compressed data to a client that indicates support with
-		// an `Accept-Encoding: zstd` header. Unfortunately we can't because we rely on MIME
-		// type detection done in `http.ServeContent`.
-		compressedData, _ := io.ReadAll(reader)
-		decompressedData, err := zstdDecoder.DecodeAll(compressedData, []byte{})
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "internal server error: %s\n", err)
-			return err
+		if acceptedEncodings.Negotiate("identity") != "identity" {
+			negotiatedEncoding = false
 		}
-		reader = bytes.NewReader(decompressedData)
+	case Transform_Zstandard:
+		supported := []string{"zstd", "identity"}
+		if entry.ContentType == nil {
+			// If Content-Type is unset, `http.ServeContent` will try to sniff
+			// the file contents. That won't work if it's compressed.
+			supported = []string{"identity"}
+		}
+		switch acceptedEncodings.Negotiate(supported...) {
+		case "zstd":
+			// Set Content-Length ourselves since `http.ServeContent` only sets
+			// it if Content-Encoding is unset or if it's a range request.
+			w.Header().Set("Content-Length", strconv.FormatInt(*entry.Size, 10))
+			w.Header().Set("Content-Encoding", "zstd")
+		case "identity":
+			compressedData, _ := io.ReadAll(reader)
+			decompressedData, err := zstdDecoder.DecodeAll(compressedData, []byte{})
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, "internal server error: %s\n", err)
+				return err
+			}
+			reader = bytes.NewReader(decompressedData)
+		default:
+			negotiatedEncoding = false
+		}
+	}
+	if !negotiatedEncoding {
+		w.WriteHeader(http.StatusNotAcceptable)
+		return fmt.Errorf("no supported content encodings (accept-encoding: %q)",
+			r.Header.Get("Accept-Encoding"))
 	}
 
 	// decide on the HTTP status
@@ -253,6 +277,11 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			io.Copy(w, reader)
 		}
 	} else {
+		if entry.ContentType != nil {
+			// don't let http.ServeContent mime-sniff compressed data
+			w.Header().Set("Content-Type", *entry.ContentType)
+		}
+
 		// allow the use of multi-threading in WebAssembly
 		w.Header().Set("Cross-Origin-Embedder-Policy", "credentialless")
 		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
@@ -265,7 +294,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Cache-Control", "max-age=60, stale-while-revalidate=3600")
 		// see https://web.dev/articles/stale-while-revalidate for details
 
-		// http.ServeContent handles content type and caching
+		// http.ServeContent handles conditional requests and range requests
 		http.ServeContent(w, r, entryPath, mtime, reader)
 	}
 	return nil
