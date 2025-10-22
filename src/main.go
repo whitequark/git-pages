@@ -1,4 +1,4 @@
-package main
+package git_pages
 
 import (
 	"context"
@@ -69,7 +69,7 @@ func serve(listener net.Listener, handler http.Handler) {
 	}
 }
 
-func main() {
+func Main() {
 	printConfigEnvVars := flag.Bool("print-config-env-vars", false,
 		"print every recognized configuration environment variable and exit")
 	printConfig := flag.Bool("print-config", false,

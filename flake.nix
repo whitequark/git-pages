@@ -27,6 +27,7 @@
             include = [
               "go.mod"
               "go.sum"
+              "main.go"
 
               (nix-filter.lib.inDirectory "src")
             ];
@@ -43,11 +44,6 @@
           ];
 
           vendorHash = "sha256-8maDQA0RHvCzJCkMtCbHtQuT7emVwuiNqoKBm5+TeeQ=";
-
-          fixupPhase = ''
-            # Apparently `go install` doesn't support renaming the binary, so country girls make do.
-            mv $out/bin/{src,git-pages}
-          '';
         };
       in
       {

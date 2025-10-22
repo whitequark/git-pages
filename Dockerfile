@@ -22,7 +22,7 @@ WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
 COPY src/ ./src/
-RUN go build -ldflags "-s -w" -o git-pages ./src
+RUN go build -ldflags "-s -w" -o git-pages .
 
 # Compose git-pages and Caddy.
 FROM docker.io/library/busybox:1.37.0-musl

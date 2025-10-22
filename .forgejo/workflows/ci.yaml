@@ -25,10 +25,10 @@ jobs:
           apt-get -y install ca-certificates
       - name: Build service
         run: |
-          go build -o bin/git-pages ./src
+          go build -o bin/git-pages .
       - name: Run static analysis
         run: |
-          go vet ./src
+          go vet .
 
   package:
     needs: [check]

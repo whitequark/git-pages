@@ -1,4 +1,4 @@
-package main
+package git_pages
 
 import (
 	"crypto/sha256"

@@ -1,6 +1,6 @@
 //go:generate protoc --go_out=. --go_opt=paths=source_relative schema.proto
 
-package main
+package git_pages
 
 import (
 	"bytes"
