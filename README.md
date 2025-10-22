@@ -18,7 +18,7 @@ You will need [Go](https://go.dev/) 1.25 or newer. Run:
 ```console
 $ mkdir -p data
 $ cp conf/config.example.toml config.toml
-$ PAGES_INSECURE=1 go run ./src
+$ PAGES_INSECURE=1 go run .
 ```
 
 These commands starts an HTTP server on `0.0.0.0:3000` and use the `data` directory for persistence. **Authentication is disabled via `PAGES_INSECURE=1`** to avoid the need to set up a DNS server as well; never enable `PAGES_INSECURE=1` in production.
@@ -41,7 +41,7 @@ The first-party container supports running _git-pages_ either standalone or toge
 To run _git-pages_ standalone and use the filesystem to store site data:
 
 ```console
-$ docker run -u $(id -u):$(id -g)--mount type=bind,src=$(pwd)/data,dst=/app/data -p 3000:3000 codeberg.org/git-pages/git-pages:latest
+$ docker run -u $(id -u):$(id -g) --mount type=bind,src=$(pwd)/data,dst=/app/data -p 3000:3000 codeberg.org/git-pages/git-pages:latest
 ```
 
 To run _git-pages_ with Caddy and use an S3-compatible endpoint to store site data and TLS key material:
