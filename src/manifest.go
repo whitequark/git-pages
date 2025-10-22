@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	siteCompressionSpaceSaving = promauto.NewHistogramVec(prometheus.HistogramOpts{
+	siteCompressionSpaceSaving = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name:    "git_pages_site_compression_space_saving",
 		Help:    "Reduction in site size after compression relative to the uncompressed size",
 		Buckets: []float64{.01, .025, .05, .1, .25, .5, .75, 1, 1.25, 1.5, 1.75, 2, 2.5, 5, 10},
@@ -34,7 +34,7 @@ var (
 		NativeHistogramBucketFactor:     1.1,
 		NativeHistogramMaxBucketNumber:  100,
 		NativeHistogramMinResetDuration: 10 * time.Minute,
-	}, []string{})
+	})
 )
 
 func IsManifestEmpty(manifest *Manifest) bool {
@@ -188,7 +188,6 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 		datasize.ByteSize(transformedSize).HR(),
 	)
 	siteCompressionSpaceSaving.
-		With(prometheus.Labels{}).
 		Observe(spaceSaving)
 }
 
