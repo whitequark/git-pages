@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -282,9 +281,12 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			w.Header().Set("Content-Type", *entry.ContentType)
 		}
 
-		// allow the use of multi-threading in WebAssembly
-		w.Header().Set("Cross-Origin-Embedder-Policy", "credentialless")
-		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+		contentType := getMediaType(entry.GetContentType())
+		if contentType == "" || contentType == "text/html" || contentType == "application/xhtml+xml" {
+			// allow the use of multi-threading in WebAssembly
+			w.Header().Set("Cross-Origin-Embedder-Policy", "credentialless")
+			w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+		}
 
 		// consider content fresh for 60 seconds (the same as the freshness interval of
 		// manifests in the S3 backend), and use stale content anyway as long as it's not
@@ -315,14 +317,10 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 
 	webRoot := makeWebRoot(host, projectName)
 
-	contentType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	if err != nil {
-		http.Error(w, "malformed content type", http.StatusUnsupportedMediaType)
-		return fmt.Errorf("content type: %w", err)
-	}
-
 	updateCtx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
 	defer cancel()
+
+	contentType := getMediaType(r.Header.Get("Content-Type"))
 
 	if contentType == "application/x-www-form-urlencoded" {
 		auth, err := AuthorizeUpdateFromRepository(r)

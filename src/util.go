@@ -79,3 +79,9 @@ func (e *prettyJoinError) Pretty() string {
 func (e *prettyJoinError) Unwrap() []error {
 	return e.errs
 }
+
+func getMediaType(mimeType string) (mediaType string) {
+	mediaType, _, _ = strings.Cut(mimeType, ";")
+	mediaType = strings.TrimSpace(strings.ToLower(mediaType))
+	return
+}
