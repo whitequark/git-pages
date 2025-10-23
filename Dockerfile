@@ -21,6 +21,7 @@ RUN apk --no-cache add git
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
+COPY *.go ./
 COPY src/ ./src/
 RUN go build -ldflags "-s -w" -o git-pages .
 
