@@ -9,5 +9,9 @@
       "matchPackageNames": ["actions/buildah-simple"],
       "enabled": false
     }
-  ]
+  ],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true
+  }
 }
