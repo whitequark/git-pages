@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -282,8 +283,12 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		contentType := getMediaType(entry.GetContentType())
-		if contentType == "" || contentType == "text/html" || contentType == "application/xhtml+xml" {
-			// allow the use of multi-threading in WebAssembly
+		if slices.Contains(
+			[]string{"", "text/html", "application/xhtml+xml", "text/javascript"},
+			contentType,
+		) {
+			// allow the use of multi-threading in WebAssembly;
+			// note that a Web Worker is considered a type of frame for COEP purposes
 			w.Header().Set("Cross-Origin-Embedder-Policy", "credentialless")
 			w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
 		}
