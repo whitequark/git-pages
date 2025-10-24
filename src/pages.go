@@ -277,6 +277,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			io.Copy(w, reader)
 		}
 	} else {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 		if entry.ContentType != nil {
 			// don't let http.ServeContent mime-sniff compressed data
 			w.Header().Set("Content-Type", *entry.ContentType)
