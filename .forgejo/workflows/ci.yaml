@@ -2,9 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -31,6 +29,7 @@ jobs:
           go vet .
 
   package:
+    if: ${{ forge.ref == 'refs/heads/main' }}
     needs: [check]
     runs-on: codeberg-small-lazy
     container:
