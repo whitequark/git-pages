@@ -225,14 +225,12 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		}
 		break
 	}
-
 	if closer, ok := reader.(io.Closer); ok {
 		defer closer.Close()
 	}
 
 	acceptedEncodings := parseHTTPEncodings(r.Header.Get("Accept-Encoding"))
 	negotiatedEncoding := true
-
 	switch entry.GetTransform() {
 	case Transform_None:
 		if acceptedEncodings.Negotiate("identity") != "identity" {
@@ -270,6 +268,21 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			r.Header.Get("Accept-Encoding"))
 	}
 
+	if entry.ContentType != nil {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Content-Type", *entry.ContentType)
+		mediaType := getMediaType(*entry.ContentType)
+		if slices.Contains(
+			[]string{"", "text/html", "application/xhtml+xml", "text/javascript"},
+			mediaType,
+		) {
+			// allow the use of multi-threading in WebAssembly;
+			// note that a Web Worker is considered a type of frame for COEP purposes
+			w.Header().Set("Cross-Origin-Embedder-Policy", "credentialless")
+			w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+		}
+	}
+
 	// decide on the HTTP status
 	if status != 200 {
 		w.WriteHeader(status)
@@ -277,23 +290,6 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			io.Copy(w, reader)
 		}
 	} else {
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		if entry.ContentType != nil {
-			// don't let http.ServeContent mime-sniff compressed data
-			w.Header().Set("Content-Type", *entry.ContentType)
-		}
-
-		contentType := getMediaType(entry.GetContentType())
-		if slices.Contains(
-			[]string{"", "text/html", "application/xhtml+xml", "text/javascript"},
-			contentType,
-		) {
-			// allow the use of multi-threading in WebAssembly;
-			// note that a Web Worker is considered a type of frame for COEP purposes
-			w.Header().Set("Cross-Origin-Embedder-Policy", "credentialless")
-			w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
-		}
-
 		// consider content fresh for 60 seconds (the same as the freshness interval of
 		// manifests in the S3 backend), and use stale content anyway as long as it's not
 		// older than a hour; while it is cheap to handle If-Modified-Since queries
