@@ -268,7 +268,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			r.Header.Get("Accept-Encoding"))
 	}
 
-	if entry.ContentType != nil {
+	if entry != nil && entry.ContentType != nil {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Content-Type", *entry.ContentType)
 		mediaType := getMediaType(*entry.ContentType)
