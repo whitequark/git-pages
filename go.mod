@@ -3,13 +3,13 @@ module codeberg.org/git-pages/git-pages
 go 1.25.0
 
 require (
-	github.com/KimMachineGun/automemlimit v0.7.4
+	github.com/KimMachineGun/automemlimit v0.7.5
 	github.com/c2h5oh/datasize v0.0.0-20231215233829-aa82cc1e6500
 	github.com/creasty/defaults v1.8.0
 	github.com/getsentry/sentry-go v0.36.1
 	github.com/getsentry/sentry-go/slog v0.36.1
-	github.com/go-git/go-billy/v6 v6.0.0-20251016063423-4289a4e54aa4
-	github.com/go-git/go-git/v6 v6.0.0-20251021092831-91c33c9361ce
+	github.com/go-git/go-billy/v6 v6.0.0-20251026101908-623011986e70
+	github.com/go-git/go-git/v6 v6.0.0-20251026103747-8aed58b04473
 	github.com/klauspost/compress v1.18.1
 	github.com/maypok86/otter/v2 v2.2.1
 	github.com/minio/minio-go/v7 v7.0.95
