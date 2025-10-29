@@ -186,7 +186,7 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 	}
 
 	spaceSaving := (float64(originalSize) - float64(transformedSize)) / float64(originalSize)
-	log.Printf("compress: saved %.2f%% (%s to %s)",
+	log.Printf("compress: saved %.2f percent (%s to %s)",
 		spaceSaving*100.0,
 		datasize.ByteSize(originalSize).HR(),
 		datasize.ByteSize(transformedSize).HR(),
