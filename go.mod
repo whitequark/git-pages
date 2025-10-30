@@ -6,10 +6,10 @@ require (
 	github.com/KimMachineGun/automemlimit v0.7.5
 	github.com/c2h5oh/datasize v0.0.0-20231215233829-aa82cc1e6500
 	github.com/creasty/defaults v1.8.0
-	github.com/getsentry/sentry-go v0.36.1
-	github.com/getsentry/sentry-go/slog v0.36.1
+	github.com/getsentry/sentry-go v0.36.2
+	github.com/getsentry/sentry-go/slog v0.36.2
 	github.com/go-git/go-billy/v6 v6.0.0-20251026101908-623011986e70
-	github.com/go-git/go-git/v6 v6.0.0-20251026103747-8aed58b04473
+	github.com/go-git/go-git/v6 v6.0.0-20251029213217-0bbfc0875edd
 	github.com/klauspost/compress v1.18.1
 	github.com/maypok86/otter/v2 v2.2.1
 	github.com/minio/minio-go/v7 v7.0.95
