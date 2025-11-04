@@ -1,6 +1,7 @@
 package git_pages
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net/http"
@@ -17,6 +18,7 @@ type WildcardPattern struct {
 	CloneURL    *fasttemplate.Template
 	IndexRepos  []*fasttemplate.Template
 	FallbackURL *url.URL
+	Insecure    bool
 }
 
 var wildcardPatterns []*WildcardPattern
@@ -61,6 +63,11 @@ func HandleWildcardFallback(w http.ResponseWriter, r *http.Request) (bool, error
 					r.Out.Host = r.In.Host
 					r.Out.Header["X-Forwarded-For"] = r.In.Header["X-Forwarded-For"]
 				},
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{
+						InsecureSkipVerify: pattern.Insecure,
+					},
+				},
 			}).ServeHTTP(w, r)
 
 			return true, nil
@@ -99,6 +106,7 @@ func ConfigureWildcards(configs []WildcardConfig) error {
 			CloneURL:    cloneURLTemplate,
 			IndexRepos:  indexRepoTemplates,
 			FallbackURL: fallbackURL,
+			Insecure:    config.FallbackInsecure,
 		})
 	}
 	return nil

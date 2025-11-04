@@ -52,10 +52,11 @@ type ServerConfig struct {
 }
 
 type WildcardConfig struct {
-	Domain          string   `toml:"domain"`
-	CloneURL        string   `toml:"clone-url"`
-	IndexRepos      []string `toml:"index-repos" default:"[]"`
-	FallbackProxyTo string   `toml:"fallback-proxy-to"`
+	Domain           string   `toml:"domain"`
+	CloneURL         string   `toml:"clone-url"`
+	IndexRepos       []string `toml:"index-repos" default:"[]"`
+	FallbackProxyTo  string   `toml:"fallback-proxy-to"`
+	FallbackInsecure bool     `toml:"fallback-insecure"`
 }
 
 type CacheConfig struct {
