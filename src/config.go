@@ -105,7 +105,7 @@ type LimitsConfig struct {
 	// Soft limit on Go heap size, expressed as a fraction of total available RAM.
 	MaxHeapSizeRatio float64 `toml:"max-heap-size-ratio" default:"0.5"`
 	// List of domains unconditionally forbidden for uploads.
-	ForbiddenDomains []string `toml:"forbidden-domains"`
+	ForbiddenDomains []string `toml:"forbidden-domains" default:"[]"`
 	// List of allowed repository URL prefixes. Setting this option prohibits uploading archives.
 	AllowedRepositoryURLPrefixes []string `toml:"allowed-repository-url-prefixes"`
 }
