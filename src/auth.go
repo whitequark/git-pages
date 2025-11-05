@@ -229,6 +229,7 @@ func authorizeWildcardMatchSite(r *http.Request, pattern *WildcardPattern) (*Aut
 
 	if userName, found := pattern.Matches(host); found {
 		var repoURLs []string
+		var branch string
 		repoURLTemplate := pattern.CloneURL
 		if projectName == ".index" {
 			for _, indexRepoTemplate := range pattern.IndexRepos {
@@ -238,16 +239,15 @@ func authorizeWildcardMatchSite(r *http.Request, pattern *WildcardPattern) (*Aut
 					"project": indexRepo,
 				}))
 			}
+			branch = pattern.IndexBranch
 		} else {
 			repoURLs = append(repoURLs, repoURLTemplate.ExecuteString(map[string]any{
 				"user":    userName,
 				"project": projectName,
 			}))
+			branch = "pages"
 		}
-		return &Authorization{
-			repoURLs: repoURLs,
-			branch:   "pages",
-		}, nil
+		return &Authorization{repoURLs, branch}, nil
 	} else {
 		return nil, AuthError{
 			http.StatusUnauthorized,

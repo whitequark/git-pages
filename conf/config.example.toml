@@ -13,6 +13,7 @@ metrics = "tcp/:3002"
 domain = "codeberg.page"
 clone-url = "https://codeberg.org/<user>/<project>.git"
 index-repos = ["<user>.codeberg.page", "pages"]
+index-repo-branch = "main"
 fallback-proxy-to = "https://codeberg.page"
 
 [storage]

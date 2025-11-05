@@ -17,6 +17,7 @@ type WildcardPattern struct {
 	Domain      []string
 	CloneURL    *fasttemplate.Template
 	IndexRepos  []*fasttemplate.Template
+	IndexBranch string
 	FallbackURL *url.URL
 	Fallback    http.Handler
 }
@@ -71,6 +72,7 @@ func ConfigureWildcards(configs []WildcardConfig) error {
 		}
 
 		var indexRepoTemplates []*fasttemplate.Template
+		var indexRepoBranch string = config.IndexRepoBranch
 		for _, indexRepo := range config.IndexRepos {
 			indexRepoTemplate, err := fasttemplate.NewTemplate(indexRepo, "<", ">")
 			if err != nil {
@@ -105,6 +107,7 @@ func ConfigureWildcards(configs []WildcardConfig) error {
 			Domain:      strings.Split(config.Domain, "."),
 			CloneURL:    cloneURLTemplate,
 			IndexRepos:  indexRepoTemplates,
+			IndexBranch: indexRepoBranch,
 			FallbackURL: fallbackURL,
 			Fallback:    fallback,
 		})

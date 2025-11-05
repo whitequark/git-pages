@@ -55,6 +55,7 @@ type WildcardConfig struct {
 	Domain           string   `toml:"domain"`
 	CloneURL         string   `toml:"clone-url"`
 	IndexRepos       []string `toml:"index-repos" default:"[]"`
+	IndexRepoBranch  string   `toml:"index-repo-branch" default:"pages"`
 	FallbackProxyTo  string   `toml:"fallback-proxy-to"`
 	FallbackInsecure bool     `toml:"fallback-insecure"`
 }
@@ -273,6 +274,12 @@ func Configure(tomlPath string) (config *Config, err error) {
 		}
 		return nil
 	})
+
+	// defaults for wildcards aren't set by `defaults.MustSet` call above because the structs
+	// for them haven't been created yet
+	for i := range config.Wildcard {
+		defaults.MustSet(&config.Wildcard[i])
+	}
 
 	return
 }
