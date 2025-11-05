@@ -18,7 +18,7 @@ type WildcardPattern struct {
 	CloneURL    *fasttemplate.Template
 	IndexRepos  []*fasttemplate.Template
 	FallbackURL *url.URL
-	Insecure    bool
+	Fallback    http.Handler
 }
 
 var wildcardPatterns []*WildcardPattern
@@ -40,7 +40,7 @@ func (pattern *WildcardPattern) Matches(host string) (string, bool) {
 }
 
 func (pattern *WildcardPattern) IsFallbackFor(host string) bool {
-	if pattern.FallbackURL == nil {
+	if pattern.Fallback == nil {
 		return false
 	}
 	_, found := pattern.Matches(host)
@@ -56,24 +56,10 @@ func HandleWildcardFallback(w http.ResponseWriter, r *http.Request) (bool, error
 	for _, pattern := range wildcardPatterns {
 		if pattern.IsFallbackFor(host) {
 			log.Printf("proxy: %s via %s", pattern.GetHost(), pattern.FallbackURL)
-
-			(&httputil.ReverseProxy{
-				Rewrite: func(r *httputil.ProxyRequest) {
-					r.SetURL(pattern.FallbackURL)
-					r.Out.Host = r.In.Host
-					r.Out.Header["X-Forwarded-For"] = r.In.Header["X-Forwarded-For"]
-				},
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: pattern.Insecure,
-					},
-				},
-			}).ServeHTTP(w, r)
-
+			pattern.Fallback.ServeHTTP(w, r)
 			return true, nil
 		}
 	}
-
 	return false, nil
 }
 
@@ -94,10 +80,24 @@ func ConfigureWildcards(configs []WildcardConfig) error {
 		}
 
 		var fallbackURL *url.URL
+		var fallback http.Handler
 		if config.FallbackProxyTo != "" {
 			fallbackURL, err = url.Parse(config.FallbackProxyTo)
 			if err != nil {
 				return fmt.Errorf("wildcard pattern: fallback URL: %w", err)
+			}
+
+			fallback = &httputil.ReverseProxy{
+				Rewrite: func(r *httputil.ProxyRequest) {
+					r.SetURL(fallbackURL)
+					r.Out.Host = r.In.Host
+					r.Out.Header["X-Forwarded-For"] = r.In.Header["X-Forwarded-For"]
+				},
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{
+						InsecureSkipVerify: config.FallbackInsecure,
+					},
+				},
 			}
 		}
 
@@ -106,7 +106,7 @@ func ConfigureWildcards(configs []WildcardConfig) error {
 			CloneURL:    cloneURLTemplate,
 			IndexRepos:  indexRepoTemplates,
 			FallbackURL: fallbackURL,
-			Insecure:    config.FallbackInsecure,
+			Fallback:    fallback,
 		})
 	}
 	return nil
