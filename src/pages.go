@@ -88,24 +88,31 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	indexManifestCh := make(chan *Manifest, 1)
+	type indexManifestResult struct {
+		manifest *Manifest
+		err      error
+	}
+	indexManifestCh := make(chan indexManifestResult, 1)
 	go func() {
-		manifest, _ := backend.GetManifest(r.Context(), makeWebRoot(host, ".index"),
+		manifest, err := backend.GetManifest(r.Context(), makeWebRoot(host, ".index"),
 			GetManifestOptions{BypassCache: bypassCache})
-		indexManifestCh <- manifest
+		indexManifestCh <- (indexManifestResult{manifest, err})
 	}()
 
+	err = nil
 	sitePath = strings.TrimPrefix(r.URL.Path, "/")
 	if projectName, projectPath, found := strings.Cut(sitePath, "/"); found {
-		projectManifest, err := backend.GetManifest(r.Context(), makeWebRoot(host, projectName),
+		var projectManifest *Manifest
+		projectManifest, err = backend.GetManifest(r.Context(), makeWebRoot(host, projectName),
 			GetManifestOptions{BypassCache: bypassCache})
 		if err == nil {
 			sitePath, manifest = projectPath, projectManifest
 		}
 	}
-	if manifest == nil {
-		manifest = <-indexManifestCh
-		if manifest == nil {
+	if manifest == nil && (err == nil || errors.Is(err, ObjectNotFoundError)) {
+		result := <-indexManifestCh
+		manifest, err = result.manifest, result.err
+		if manifest == nil && errors.Is(err, ObjectNotFoundError) {
 			if found, fallbackErr := HandleWildcardFallback(w, r); found {
 				return fallbackErr
 			} else {
@@ -114,6 +121,12 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				return err
 			}
 		}
+	}
+	if err != nil {
+		ObserveError(err) // all storage errors must be reported
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "internal server error (%s)\n", err)
+		return err
 	}
 
 	if r.Header.Get("Origin") != "" {

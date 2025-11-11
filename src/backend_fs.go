@@ -100,7 +100,7 @@ func (fs *FSBackend) GetBlob(
 	blobPath := filepath.Join(splitBlobName(name)...)
 	stat, err := fs.blobRoot.Stat(blobPath)
 	if errors.Is(err, os.ErrNotExist) {
-		err = fmt.Errorf("%w: %s", errNotFound, err.(*os.PathError).Path)
+		err = fmt.Errorf("%w: %s", ObjectNotFoundError, err.(*os.PathError).Path)
 		return
 	} else if err != nil {
 		err = fmt.Errorf("stat: %w", err)
@@ -171,7 +171,7 @@ func (b *FSBackend) ListManifests(ctx context.Context) (manifests []string, err 
 func (fs *FSBackend) GetManifest(ctx context.Context, name string, opts GetManifestOptions) (*Manifest, error) {
 	data, err := fs.siteRoot.ReadFile(name)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, fmt.Errorf("%w: %s", errNotFound, err.(*os.PathError).Path)
+		return nil, fmt.Errorf("%w: %s", ObjectNotFoundError, err.(*os.PathError).Path)
 	} else if err != nil {
 		return nil, err
 	}

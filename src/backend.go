@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var errNotFound = errors.New("not found")
+var ObjectNotFoundError = errors.New("not found")
 
 func splitBlobName(name string) []string {
 	algo, hash, found := strings.Cut(name, "-")
