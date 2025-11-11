@@ -13,7 +13,6 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -285,18 +284,6 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	if entry != nil && entry.ContentType != nil {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Content-Type", *entry.ContentType)
-		// <DEPRECATED issue="35">
-		mediaType := getMediaType(*entry.ContentType)
-		if slices.Contains(
-			[]string{"", "text/html", "application/xhtml+xml", "text/javascript"},
-			mediaType,
-		) {
-			// allow the use of multi-threading in WebAssembly;
-			// note that a Web Worker is considered a type of frame for COEP purposes
-			w.Header().Set("Cross-Origin-Embedder-Policy", "credentialless")
-			w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
-		}
-		// </DEPRECATED>
 	}
 
 	customHeaders, err := ApplyHeaderRules(manifest, &url.URL{Path: entryPath})
