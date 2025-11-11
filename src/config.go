@@ -112,7 +112,7 @@ type LimitsConfig struct {
 	// List of allowed custom headers. Header name must be in the MIME canonical form,
 	// e.g. `Foo-Bar`. Setting this option permits including this custom header in `_headers`,
 	// unless it is fundamentally unsafe.
-	AllowedCustomHeaders []string `toml:"allowed-custom-headers" default:"[]"`
+	AllowedCustomHeaders []string `toml:"allowed-custom-headers" default:"[\"X-Clacks-Overhead\"]"`
 }
 
 type ObservabilityConfig struct {
