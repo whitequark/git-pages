@@ -278,12 +278,12 @@ func (s3 *S3Backend) GetBlob(
 		}
 		defer object.Close()
 
-		stat, err := object.Stat()
+		data, err := io.ReadAll(object)
 		if err != nil {
 			return nil, err
 		}
 
-		data, err := io.ReadAll(object)
+		stat, err := object.Stat()
 		if err != nil {
 			return nil, err
 		}
@@ -409,12 +409,12 @@ func (l s3ManifestLoader) load(ctx context.Context, name string, oldManifest *Ca
 		}
 		defer object.Close()
 
-		stat, err := object.Stat()
+		data, err := io.ReadAll(object)
 		if err != nil {
 			return nil, 0, "", err
 		}
 
-		data, err := io.ReadAll(object)
+		stat, err := object.Stat()
 		if err != nil {
 			return nil, 0, "", err
 		}
