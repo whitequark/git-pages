@@ -299,7 +299,7 @@ func (s3 *S3Backend) GetBlob(
 	cached, err = s3.blobCache.Get(ctx, name, otter.LoaderFunc[string, *CachedBlob](loader))
 	if err != nil {
 		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
-			err = fmt.Errorf("%w: %s", ObjectNotFoundError, errResp.Key)
+			err = fmt.Errorf("%w: %s", ErrObjectNotFound, errResp.Key)
 		}
 	} else {
 		reader = bytes.NewReader(cached.blob)
@@ -433,7 +433,7 @@ func (l s3ManifestLoader) load(ctx context.Context, name string, oldManifest *Ca
 
 	if err != nil {
 		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
-			err = fmt.Errorf("%w: %s", ObjectNotFoundError, errResp.Key)
+			err = fmt.Errorf("%w: %s", ErrObjectNotFound, errResp.Key)
 			return &CachedManifest{nil, 1, etag, err}, nil
 		} else if errResp.StatusCode == http.StatusNotModified && oldManifest != nil {
 			return oldManifest, nil

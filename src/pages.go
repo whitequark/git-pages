@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -109,10 +110,10 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			sitePath, manifest = projectPath, projectManifest
 		}
 	}
-	if manifest == nil && (err == nil || errors.Is(err, ObjectNotFoundError)) {
+	if manifest == nil && (err == nil || errors.Is(err, ErrObjectNotFound)) {
 		result := <-indexManifestCh
 		manifest, err = result.manifest, result.err
-		if manifest == nil && errors.Is(err, ObjectNotFoundError) {
+		if manifest == nil && errors.Is(err, ErrObjectNotFound) {
 			if found, fallbackErr := HandleWildcardFallback(w, r); found {
 				return fallbackErr
 			} else {
@@ -181,7 +182,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				redirectKind = RedirectForce
 			}
 			originalURL := (&url.URL{Host: r.Host}).ResolveReference(r.URL)
-			redirectURL, redirectStatus := ApplyRedirects(manifest, originalURL, redirectKind)
+			redirectURL, redirectStatus := ApplyRedirectRules(manifest, originalURL, redirectKind)
 			if Is3xxHTTPStatus(redirectStatus) {
 				w.Header().Set("Location", redirectURL.String())
 				w.WriteHeader(int(redirectStatus))
@@ -284,6 +285,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	if entry != nil && entry.ContentType != nil {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Content-Type", *entry.ContentType)
+		// <DEPRECATED issue="35">
 		mediaType := getMediaType(*entry.ContentType)
 		if slices.Contains(
 			[]string{"", "text/html", "application/xhtml+xml", "text/javascript"},
@@ -294,6 +296,27 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			w.Header().Set("Cross-Origin-Embedder-Policy", "credentialless")
 			w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
 		}
+		// </DEPRECATED>
+	}
+
+	customHeaders, err := ApplyHeaderRules(manifest, &url.URL{Path: entryPath})
+	if err != nil {
+		// This is an "internal server error" from an HTTP point of view, but also
+		// either an issue with the site or a misconfiguration from our point of view.
+		// Since it's not a problem with the server we don't observe the error.
+		//
+		// Note that this behavior is different from a site upload with a malformed
+		// `_headers` file (where it is semantically ignored); this is because a broken
+		// upload is something the uploader can notice and fix, but a change in server
+		// configuration is something they are unaware of and won't be notified of.
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "%s\n", err)
+		return err
+	} else {
+		// If the header has passed all of our stringent, deny-by-default checks, it means
+		// it's good enough to overwrite whatever was our builtin option (if any).
+		maps.Copy(w.Header(), customHeaders)
 	}
 
 	// decide on the HTTP status

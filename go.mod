@@ -3,6 +3,7 @@ module codeberg.org/git-pages/git-pages
 go 1.25.0
 
 require (
+	codeberg.org/git-pages/go-headers v1.0.0
 	github.com/KimMachineGun/automemlimit v0.7.5
 	github.com/c2h5oh/datasize v0.0.0-20231215233829-aa82cc1e6500
 	github.com/creasty/defaults v1.8.0
@@ -10,6 +11,7 @@ require (
 	github.com/getsentry/sentry-go/slog v0.36.2
 	github.com/go-git/go-billy/v6 v6.0.0-20251026101908-623011986e70
 	github.com/go-git/go-git/v6 v6.0.0-20251029213217-0bbfc0875edd
+	github.com/honeycombio/otel-config-go v1.17.0
 	github.com/klauspost/compress v1.18.1
 	github.com/maypok86/otter/v2 v2.2.1
 	github.com/minio/minio-go/v7 v7.0.95
@@ -19,6 +21,11 @@ require (
 	github.com/samber/slog-multi v1.5.0
 	github.com/tj/go-redirects v0.0.0-20200911105812-fd1ba1020b37
 	github.com/valyala/fasttemplate v1.2.2
+	go.opentelemetry.io/contrib/bridges/otelslog v0.13.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0
+	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.14.0
+	go.opentelemetry.io/otel/log v0.14.0
+	go.opentelemetry.io/otel/sdk/log v0.14.0
 	google.golang.org/protobuf v1.36.10
 )
 

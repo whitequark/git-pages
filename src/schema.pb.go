@@ -220,7 +220,7 @@ func (x *Entry) GetContentType() string {
 
 // See https://docs.netlify.com/manage/routing/redirects/overview/ for details.
 // Only a subset of the Netlify specification is representable here.
-type Redirect struct {
+type RedirectRule struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	From          *string                `protobuf:"bytes,1,opt,name=from" json:"from,omitempty"`
 	To            *string                `protobuf:"bytes,2,opt,name=to" json:"to,omitempty"`
@@ -230,20 +230,20 @@ type Redirect struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Redirect) Reset() {
-	*x = Redirect{}
+func (x *RedirectRule) Reset() {
+	*x = RedirectRule{}
 	mi := &file_schema_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Redirect) String() string {
+func (x *RedirectRule) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Redirect) ProtoMessage() {}
+func (*RedirectRule) ProtoMessage() {}
 
-func (x *Redirect) ProtoReflect() protoreflect.Message {
+func (x *RedirectRule) ProtoReflect() protoreflect.Message {
 	mi := &file_schema_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -255,37 +255,142 @@ func (x *Redirect) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Redirect.ProtoReflect.Descriptor instead.
-func (*Redirect) Descriptor() ([]byte, []int) {
+// Deprecated: Use RedirectRule.ProtoReflect.Descriptor instead.
+func (*RedirectRule) Descriptor() ([]byte, []int) {
 	return file_schema_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *Redirect) GetFrom() string {
+func (x *RedirectRule) GetFrom() string {
 	if x != nil && x.From != nil {
 		return *x.From
 	}
 	return ""
 }
 
-func (x *Redirect) GetTo() string {
+func (x *RedirectRule) GetTo() string {
 	if x != nil && x.To != nil {
 		return *x.To
 	}
 	return ""
 }
 
-func (x *Redirect) GetStatus() uint32 {
+func (x *RedirectRule) GetStatus() uint32 {
 	if x != nil && x.Status != nil {
 		return *x.Status
 	}
 	return 0
 }
 
-func (x *Redirect) GetForce() bool {
+func (x *RedirectRule) GetForce() bool {
 	if x != nil && x.Force != nil {
 		return *x.Force
 	}
 	return false
+}
+
+// See https://docs.netlify.com/manage/routing/headers/ for details.
+type Header struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          *string                `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	Values        []string               `protobuf:"bytes,2,rep,name=values" json:"values,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Header) Reset() {
+	*x = Header{}
+	mi := &file_schema_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Header) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Header) ProtoMessage() {}
+
+func (x *Header) ProtoReflect() protoreflect.Message {
+	mi := &file_schema_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Header.ProtoReflect.Descriptor instead.
+func (*Header) Descriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *Header) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
+	}
+	return ""
+}
+
+func (x *Header) GetValues() []string {
+	if x != nil {
+		return x.Values
+	}
+	return nil
+}
+
+type HeaderRule struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          *string                `protobuf:"bytes,1,opt,name=path" json:"path,omitempty"`
+	HeaderMap     []*Header              `protobuf:"bytes,2,rep,name=header_map,json=headerMap" json:"header_map,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HeaderRule) Reset() {
+	*x = HeaderRule{}
+	mi := &file_schema_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HeaderRule) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HeaderRule) ProtoMessage() {}
+
+func (x *HeaderRule) ProtoReflect() protoreflect.Message {
+	mi := &file_schema_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HeaderRule.ProtoReflect.Descriptor instead.
+func (*HeaderRule) Descriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *HeaderRule) GetPath() string {
+	if x != nil && x.Path != nil {
+		return *x.Path
+	}
+	return ""
+}
+
+func (x *HeaderRule) GetHeaderMap() []*Header {
+	if x != nil {
+		return x.HeaderMap
+	}
+	return nil
 }
 
 type Problem struct {
@@ -298,7 +403,7 @@ type Problem struct {
 
 func (x *Problem) Reset() {
 	*x = Problem{}
-	mi := &file_schema_proto_msgTypes[2]
+	mi := &file_schema_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -310,7 +415,7 @@ func (x *Problem) String() string {
 func (*Problem) ProtoMessage() {}
 
 func (x *Problem) ProtoReflect() protoreflect.Message {
-	mi := &file_schema_proto_msgTypes[2]
+	mi := &file_schema_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -323,7 +428,7 @@ func (x *Problem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Problem.ProtoReflect.Descriptor instead.
 func (*Problem) Descriptor() ([]byte, []int) {
-	return file_schema_proto_rawDescGZIP(), []int{2}
+	return file_schema_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Problem) GetPath() string {
@@ -350,8 +455,9 @@ type Manifest struct {
 	Contents   map[string]*Entry `protobuf:"bytes,4,rep,name=contents" json:"contents,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	TotalSize  *int64            `protobuf:"varint,5,opt,name=total_size,json=totalSize" json:"total_size,omitempty"`    // simple sum of each `entry.size`
 	StoredSize *int64            `protobuf:"varint,8,opt,name=stored_size,json=storedSize" json:"stored_size,omitempty"` // external objects, after deduplication
-	// Netlify-style `_redirects`
-	Redirects []*Redirect `protobuf:"bytes,6,rep,name=redirects" json:"redirects,omitempty"`
+	// Netlify-style `_redirects` and `_headers`
+	Redirects []*RedirectRule `protobuf:"bytes,6,rep,name=redirects" json:"redirects,omitempty"`
+	Headers   []*HeaderRule   `protobuf:"bytes,9,rep,name=headers" json:"headers,omitempty"`
 	// Diagnostics for non-fatal errors
 	Problems      []*Problem `protobuf:"bytes,7,rep,name=problems" json:"problems,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -360,7 +466,7 @@ type Manifest struct {
 
 func (x *Manifest) Reset() {
 	*x = Manifest{}
-	mi := &file_schema_proto_msgTypes[3]
+	mi := &file_schema_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -372,7 +478,7 @@ func (x *Manifest) String() string {
 func (*Manifest) ProtoMessage() {}
 
 func (x *Manifest) ProtoReflect() protoreflect.Message {
-	mi := &file_schema_proto_msgTypes[3]
+	mi := &file_schema_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -385,7 +491,7 @@ func (x *Manifest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Manifest.ProtoReflect.Descriptor instead.
 func (*Manifest) Descriptor() ([]byte, []int) {
-	return file_schema_proto_rawDescGZIP(), []int{3}
+	return file_schema_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Manifest) GetRepoUrl() string {
@@ -430,9 +536,16 @@ func (x *Manifest) GetStoredSize() int64 {
 	return 0
 }
 
-func (x *Manifest) GetRedirects() []*Redirect {
+func (x *Manifest) GetRedirects() []*RedirectRule {
 	if x != nil {
 		return x.Redirects
+	}
+	return nil
+}
+
+func (x *Manifest) GetHeaders() []*HeaderRule {
+	if x != nil {
+		return x.Headers
 	}
 	return nil
 }
@@ -455,15 +568,23 @@ const file_schema_proto_rawDesc = "" +
 	"\x04data\x18\x03 \x01(\fR\x04data\x12(\n" +
 	"\ttransform\x18\x04 \x01(\x0e2\n" +
 	".TransformR\ttransform\x12!\n" +
-	"\fcontent_type\x18\x05 \x01(\tR\vcontentType\"\\\n" +
-	"\bRedirect\x12\x12\n" +
+	"\fcontent_type\x18\x05 \x01(\tR\vcontentType\"`\n" +
+	"\fRedirectRule\x12\x12\n" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\tR\x02to\x12\x16\n" +
 	"\x06status\x18\x03 \x01(\rR\x06status\x12\x14\n" +
-	"\x05force\x18\x04 \x01(\bR\x05force\"3\n" +
+	"\x05force\x18\x04 \x01(\bR\x05force\"4\n" +
+	"\x06Header\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
+	"\x06values\x18\x02 \x03(\tR\x06values\"H\n" +
+	"\n" +
+	"HeaderRule\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12&\n" +
+	"\n" +
+	"header_map\x18\x02 \x03(\v2\a.HeaderR\theaderMap\"3\n" +
 	"\aProblem\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x14\n" +
-	"\x05cause\x18\x02 \x01(\tR\x05cause\"\xde\x02\n" +
+	"\x05cause\x18\x02 \x01(\tR\x05cause\"\x89\x03\n" +
 	"\bManifest\x12\x19\n" +
 	"\brepo_url\x18\x01 \x01(\tR\arepoUrl\x12\x16\n" +
 	"\x06branch\x18\x02 \x01(\tR\x06branch\x12\x16\n" +
@@ -472,8 +593,9 @@ const file_schema_proto_rawDesc = "" +
 	"\n" +
 	"total_size\x18\x05 \x01(\x03R\ttotalSize\x12\x1f\n" +
 	"\vstored_size\x18\b \x01(\x03R\n" +
-	"storedSize\x12'\n" +
-	"\tredirects\x18\x06 \x03(\v2\t.RedirectR\tredirects\x12$\n" +
+	"storedSize\x12+\n" +
+	"\tredirects\x18\x06 \x03(\v2\r.RedirectRuleR\tredirects\x12%\n" +
+	"\aheaders\x18\t \x03(\v2\v.HeaderRuleR\aheaders\x12$\n" +
 	"\bproblems\x18\a \x03(\v2\b.ProblemR\bproblems\x1aC\n" +
 	"\rContentsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x1c\n" +
@@ -502,28 +624,32 @@ func file_schema_proto_rawDescGZIP() []byte {
 }
 
 var file_schema_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_schema_proto_goTypes = []any{
-	(Type)(0),        // 0: Type
-	(Transform)(0),   // 1: Transform
-	(*Entry)(nil),    // 2: Entry
-	(*Redirect)(nil), // 3: Redirect
-	(*Problem)(nil),  // 4: Problem
-	(*Manifest)(nil), // 5: Manifest
-	nil,              // 6: Manifest.ContentsEntry
+	(Type)(0),            // 0: Type
+	(Transform)(0),       // 1: Transform
+	(*Entry)(nil),        // 2: Entry
+	(*RedirectRule)(nil), // 3: RedirectRule
+	(*Header)(nil),       // 4: Header
+	(*HeaderRule)(nil),   // 5: HeaderRule
+	(*Problem)(nil),      // 6: Problem
+	(*Manifest)(nil),     // 7: Manifest
+	nil,                  // 8: Manifest.ContentsEntry
 }
 var file_schema_proto_depIdxs = []int32{
 	0, // 0: Entry.type:type_name -> Type
 	1, // 1: Entry.transform:type_name -> Transform
-	6, // 2: Manifest.contents:type_name -> Manifest.ContentsEntry
-	3, // 3: Manifest.redirects:type_name -> Redirect
-	4, // 4: Manifest.problems:type_name -> Problem
-	2, // 5: Manifest.ContentsEntry.value:type_name -> Entry
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	4, // 2: HeaderRule.header_map:type_name -> Header
+	8, // 3: Manifest.contents:type_name -> Manifest.ContentsEntry
+	3, // 4: Manifest.redirects:type_name -> RedirectRule
+	5, // 5: Manifest.headers:type_name -> HeaderRule
+	6, // 6: Manifest.problems:type_name -> Problem
+	2, // 7: Manifest.ContentsEntry.value:type_name -> Entry
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_schema_proto_init() }
@@ -537,7 +663,7 @@ func file_schema_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_schema_proto_rawDesc), len(file_schema_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   5,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -109,6 +109,10 @@ type LimitsConfig struct {
 	ForbiddenDomains []string `toml:"forbidden-domains" default:"[]"`
 	// List of allowed repository URL prefixes. Setting this option prohibits uploading archives.
 	AllowedRepositoryURLPrefixes []string `toml:"allowed-repository-url-prefixes"`
+	// List of allowed custom headers. Header name must be in the MIME canonical form,
+	// e.g. `Foo-Bar`. Setting this option permits including this custom header in `_headers`,
+	// unless it is fundamentally unsafe.
+	AllowedCustomHeaders []string `toml:"allowed-custom-headers" default:"[]"`
 }
 
 type ObservabilityConfig struct {

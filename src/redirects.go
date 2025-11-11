@@ -11,7 +11,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const redirectsFile string = "_redirects"
+const redirectsFileName string = "_redirects"
 
 func unparseRule(rule redirects.Rule) string {
 	var statusPart string
@@ -49,7 +49,7 @@ func Is3xxHTTPStatus(status uint) bool {
 	return status >= 300 && status <= 399
 }
 
-func validateRule(rule redirects.Rule) error {
+func validateRedirectRule(rule redirects.Rule) error {
 	if len(rule.Params) > 0 {
 		return fmt.Errorf("rules with parameters are not supported")
 	}
@@ -84,28 +84,28 @@ func validateRule(rule redirects.Rule) error {
 }
 
 // Parses redirects file and injects rules into the manifest.
-func ProcessRedirects(manifest *Manifest) error {
-	redirectsEntry := manifest.Contents[redirectsFile]
-	delete(manifest.Contents, redirectsFile)
+func ProcessRedirectsFile(manifest *Manifest) error {
+	redirectsEntry := manifest.Contents[redirectsFileName]
+	delete(manifest.Contents, redirectsFileName)
 	if redirectsEntry == nil {
 		return nil
 	} else if redirectsEntry.GetType() != Type_InlineFile {
-		return AddProblem(manifest, redirectsFile,
+		return AddProblem(manifest, redirectsFileName,
 			"not a regular file")
 	}
 
 	rules, err := redirects.ParseString(string(redirectsEntry.GetData()))
 	if err != nil {
-		return AddProblem(manifest, redirectsFile,
+		return AddProblem(manifest, redirectsFileName,
 			"syntax error: %s", err)
 	}
 
 	for index, rule := range rules {
-		if err := validateRule(rule); err != nil {
-			return AddProblem(manifest, redirectsFile,
+		if err := validateRedirectRule(rule); err != nil {
+			return AddProblem(manifest, redirectsFileName,
 				"rule #%d %q: %s", index+1, unparseRule(rule), err)
 		}
-		manifest.Redirects = append(manifest.Redirects, &Redirect{
+		manifest.Redirects = append(manifest.Redirects, &RedirectRule{
 			From:   proto.String(rule.From),
 			To:     proto.String(rule.To),
 			Status: proto.Uint32(uint32(rule.Status)),
@@ -134,7 +134,7 @@ const (
 	RedirectForce
 )
 
-func ApplyRedirects(
+func ApplyRedirectRules(
 	manifest *Manifest, fromURL *url.URL, kind RedirectKind,
 ) (
 	toURL *url.URL, status uint,
@@ -146,7 +146,7 @@ next:
 			continue
 		}
 		// check if the rule matches fromURL
-		ruleFromURL, _ := url.Parse(*rule.From) // pre-validated in `validateRule`
+		ruleFromURL, _ := url.Parse(*rule.From) // pre-validated in `validateRedirectRule`
 		if ruleFromURL.Scheme != "" && fromURL.Scheme != ruleFromURL.Scheme {
 			continue
 		}

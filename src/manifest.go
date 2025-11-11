@@ -200,10 +200,17 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 // (Perhaps in the future they could be exposed at `.git-pages/status.txt`?)
 func PrepareManifest(ctx context.Context, manifest *Manifest) error {
 	// Parse Netlify-style `_redirects`
-	if err := ProcessRedirects(manifest); err != nil {
+	if err := ProcessRedirectsFile(manifest); err != nil {
 		log.Printf("redirects err: %s\n", err)
 	} else if len(manifest.Redirects) > 0 {
 		log.Printf("redirects ok: %d rules\n", len(manifest.Redirects))
+	}
+
+	// Parse Netlify-style `_headers`
+	if err := ProcessHeadersFile(manifest); err != nil {
+		log.Printf("headers err: %s\n", err)
+	} else if len(manifest.Headers) > 0 {
+		log.Printf("headers ok: %d rules\n", len(manifest.Headers))
 	}
 
 	DetectContentType(manifest)
@@ -230,6 +237,7 @@ func StoreManifest(ctx context.Context, name string, manifest *Manifest) (*Manif
 		Commit:     manifest.Commit,
 		Contents:   make(map[string]*Entry),
 		Redirects:  manifest.Redirects,
+		Headers:    manifest.Headers,
 		Problems:   manifest.Problems,
 		TotalSize:  proto.Int64(0),
 		StoredSize: proto.Int64(0),

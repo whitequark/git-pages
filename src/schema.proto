@@ -44,11 +44,22 @@ message Entry {
 
 // See https://docs.netlify.com/manage/routing/redirects/overview/ for details.
 // Only a subset of the Netlify specification is representable here.
-message Redirect {
+message RedirectRule {
 	string from = 1;
 	string to = 2;
 	uint32 status = 3;
 	bool force = 4;
+}
+
+// See https://docs.netlify.com/manage/routing/headers/ for details.
+message Header {
+	string name = 1;
+	repeated string values = 2;
+}
+
+message HeaderRule {
+	string path = 1;
+	repeated Header header_map = 2;
 }
 
 message Problem {
@@ -67,8 +78,9 @@ message Manifest {
 	int64 total_size = 5; // simple sum of each `entry.size`
 	int64 stored_size = 8; // external objects, after deduplication
 
-	// Netlify-style `_redirects`
-	repeated Redirect redirects = 6;
+	// Netlify-style `_redirects` and `_headers`
+	repeated RedirectRule redirects = 6;
+	repeated HeaderRule headers = 9;
 
 	// Diagnostics for non-fatal errors
 	repeated Problem problems = 7;
