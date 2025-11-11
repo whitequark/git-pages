@@ -103,8 +103,9 @@ func ProcessHeadersFile(manifest *Manifest) error {
 
 	for index, rule := range rules {
 		if err := validateHeaderRule(rule); err != nil {
-			return AddProblem(manifest, headersFileName,
+			AddProblem(manifest, headersFileName,
 				"rule #%d %q: %s", index+1, rule.Path, err)
+			continue
 		}
 		headerMap := []*Header{}
 		for header, values := range rule.Headers {

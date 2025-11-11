@@ -102,8 +102,9 @@ func ProcessRedirectsFile(manifest *Manifest) error {
 
 	for index, rule := range rules {
 		if err := validateRedirectRule(rule); err != nil {
-			return AddProblem(manifest, redirectsFileName,
+			AddProblem(manifest, redirectsFileName,
 				"rule #%d %q: %s", index+1, unparseRule(rule), err)
+			continue
 		}
 		manifest.Redirects = append(manifest.Redirects, &RedirectRule{
 			From:   proto.String(rule.From),
