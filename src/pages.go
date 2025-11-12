@@ -365,7 +365,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		branch := "pages"
-		if customBranch := r.Header.Get("X-Pages-Branch"); customBranch != "" {
+		if customBranch := r.Header.Get("Branch"); customBranch != "" {
 			branch = customBranch
 		}
 		if err := AuthorizeBranch(branch, auth); err != nil {
