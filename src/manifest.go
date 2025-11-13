@@ -213,11 +213,11 @@ func PrepareManifest(ctx context.Context, manifest *Manifest) error {
 		log.Printf("headers ok: %d rules\n", len(manifest.Headers))
 	}
 
+	// Sniff content type like `http.ServeContent`
 	DetectContentType(manifest)
 
-	if config.Feature("compress") {
-		CompressFiles(ctx, manifest)
-	}
+	// Opportunistically compress blobs (must be done last)
+	CompressFiles(ctx, manifest)
 
 	return nil
 }
