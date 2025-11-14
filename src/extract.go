@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/c2h5oh/datasize"
@@ -144,7 +145,11 @@ func ExtractZip(reader io.Reader) (*Manifest, error) {
 				return nil, fmt.Errorf("zip: %s: %w", file.Name, err)
 			}
 
-			manifestEntry.Type = Type_InlineFile.Enum()
+			if file.Mode()&os.ModeSymlink != 0 {
+				manifestEntry.Type = Type_Symlink.Enum()
+			} else {
+				manifestEntry.Type = Type_InlineFile.Enum()
+			}
 			manifestEntry.Size = proto.Int64(int64(file.UncompressedSize64))
 			manifestEntry.Data = fileData
 		} else {
