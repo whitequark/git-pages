@@ -55,7 +55,7 @@
           ];
 
           packages = with pkgs; [
-            flyctl
+            caddy
           ];
         };
 
