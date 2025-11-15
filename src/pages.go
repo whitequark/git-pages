@@ -141,15 +141,17 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 	if metadataPath, found := strings.CutPrefix(sitePath, ".git-pages/"); found {
-		// metadata requests require authorization to avoid making pushes from private
-		// repositories enumerable
-		_, err := AuthorizeMetadataRetrieval(r)
-		if err != nil {
-			return err
-		}
-
 		switch metadataPath {
+		case "health":
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, "ok\n")
 		case "manifest.json":
+			// metadata requests require authorization to avoid making pushes from private
+			// repositories enumerable
+			_, err := AuthorizeMetadataRetrieval(r)
+			if err != nil {
+				return err
+			}
 			w.Header().Add("Content-Type", "application/json; charset=utf-8")
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(ManifestDebugJSON(manifest)))
@@ -297,7 +299,6 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		// `_headers` file (where it is semantically ignored); this is because a broken
 		// upload is something the uploader can notice and fix, but a change in server
 		// configuration is something they are unaware of and won't be notified of.
-		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "%s\n", err)
 		return err
