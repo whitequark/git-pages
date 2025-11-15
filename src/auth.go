@@ -52,6 +52,7 @@ func GetHost(r *http.Request) (string, error) {
 		return "", AuthError{http.StatusBadRequest,
 			fmt.Sprintf("host name %q is reserved", host)}
 	}
+	host = strings.TrimSuffix(host, ".")
 	return host, nil
 }
 
