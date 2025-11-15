@@ -202,6 +202,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				entryPath = notFoundPage
 				continue
 			} else {
+				reader = bytes.NewReader([]byte("not found\n"))
 				break
 			}
 		} else if entry.GetType() == Type_InlineFile {
