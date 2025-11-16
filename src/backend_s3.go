@@ -36,6 +36,7 @@ var (
 	manifestCacheEvictionsCount prometheus.Counter
 
 	s3GetObjectDurationSeconds *prometheus.HistogramVec
+	s3GetObjectErrorsCount     *prometheus.CounterVec
 )
 
 func initS3BackendMetrics() {
@@ -95,6 +96,10 @@ func initS3BackendMetrics() {
 		NativeHistogramMaxBucketNumber:  100,
 		NativeHistogramMinResetDuration: 10 * time.Minute,
 	}, []string{"kind"})
+	s3GetObjectErrorsCount = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "git_pages_s3_get_object_errors_count",
+		Help: "Count of s3:GetObject errors",
+	}, []string{"object_kind"})
 }
 
 // Blobs can be safely cached indefinitely. They only need to be evicted to preserve memory.
@@ -299,6 +304,7 @@ func (s3 *S3Backend) GetBlob(
 	cached, err = s3.blobCache.Get(ctx, name, otter.LoaderFunc[string, *CachedBlob](loader))
 	if err != nil {
 		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
+			s3GetObjectErrorsCount.With(prometheus.Labels{"object_kind": "blob"}).Inc()
 			err = fmt.Errorf("%w: %s", ErrObjectNotFound, errResp.Key)
 		}
 	} else {
@@ -433,6 +439,7 @@ func (l s3ManifestLoader) load(ctx context.Context, name string, oldManifest *Ca
 
 	if err != nil {
 		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
+			s3GetObjectErrorsCount.With(prometheus.Labels{"object_kind": "manifest"}).Inc()
 			err = fmt.Errorf("%w: %s", ErrObjectNotFound, errResp.Key)
 			return &CachedManifest{nil, 1, etag, err}, nil
 		} else if errResp.StatusCode == http.StatusNotModified && oldManifest != nil {
