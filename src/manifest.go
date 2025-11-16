@@ -167,7 +167,7 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 	span, _ := ObserveFunction(ctx, "CompressFiles")
 	defer span.Finish()
 
-	var originalSize, transformedSize int64
+	var originalSize, compressedSize int64
 	for _, entry := range manifest.Contents {
 		if entry.GetType() == Type_InlineFile && entry.GetTransform() == Transform_None {
 			mtype := getMediaType(entry.GetContentType())
@@ -181,15 +181,17 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 				entry.Size = proto.Int64(int64(len(entry.Data)))
 				entry.Transform = Transform_Zstandard.Enum()
 			}
-			transformedSize += entry.GetSize()
+			compressedSize += entry.GetSize()
 		}
 	}
+	manifest.OriginalSize = proto.Int64(originalSize)
+	manifest.CompressedSize = proto.Int64(compressedSize)
 
-	spaceSaving := (float64(originalSize) - float64(transformedSize)) / float64(originalSize)
+	spaceSaving := (float64(originalSize) - float64(compressedSize)) / float64(originalSize)
 	log.Printf("compress: saved %.2f percent (%s to %s)",
 		spaceSaving*100.0,
 		datasize.ByteSize(originalSize).HR(),
-		datasize.ByteSize(transformedSize).HR(),
+		datasize.ByteSize(compressedSize).HR(),
 	)
 	siteCompressionSpaceSaving.
 		Observe(spaceSaving)
@@ -232,17 +234,18 @@ func StoreManifest(ctx context.Context, name string, manifest *Manifest) (*Manif
 
 	// Replace inline files over certain size with references to external data.
 	extManifest := Manifest{
-		RepoUrl:    manifest.RepoUrl,
-		Branch:     manifest.Branch,
-		Commit:     manifest.Commit,
-		Contents:   make(map[string]*Entry),
-		Redirects:  manifest.Redirects,
-		Headers:    manifest.Headers,
-		Problems:   manifest.Problems,
-		TotalSize:  proto.Int64(0),
-		StoredSize: proto.Int64(0),
+		RepoUrl:        manifest.RepoUrl,
+		Branch:         manifest.Branch,
+		Commit:         manifest.Commit,
+		Contents:       make(map[string]*Entry),
+		Redirects:      manifest.Redirects,
+		Headers:        manifest.Headers,
+		Problems:       manifest.Problems,
+		OriginalSize:   manifest.OriginalSize,
+		CompressedSize: manifest.CompressedSize,
+		StoredSize:     proto.Int64(0),
 	}
-	extObjectMap := make(map[string]int64)
+	extObjectSizes := make(map[string]int64)
 	for name, entry := range manifest.Contents {
 		cannotBeInlined := entry.GetType() == Type_InlineFile &&
 			entry.GetSize() > int64(config.Limits.MaxInlineFileSize.Bytes())
@@ -255,14 +258,13 @@ func StoreManifest(ctx context.Context, name string, manifest *Manifest) (*Manif
 				Transform:   entry.Transform,
 				ContentType: entry.ContentType,
 			}
-			extObjectMap[string(dataHash[:])] = *entry.Size
+			extObjectSizes[string(dataHash[:])] = entry.GetSize()
 		} else {
 			extManifest.Contents[name] = entry
 		}
-		*extManifest.TotalSize += entry.GetSize()
 	}
 	// `extObjectMap` stores size once per object, deduplicating it
-	for _, storedSize := range extObjectMap {
+	for _, storedSize := range extObjectSizes {
 		*extManifest.StoredSize += storedSize
 	}
 

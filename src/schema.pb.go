@@ -7,12 +7,11 @@
 package git_pages
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -452,9 +451,10 @@ type Manifest struct {
 	Branch  *string `protobuf:"bytes,2,opt,name=branch" json:"branch,omitempty"`
 	Commit  *string `protobuf:"bytes,3,opt,name=commit" json:"commit,omitempty"`
 	// Contents
-	Contents   map[string]*Entry `protobuf:"bytes,4,rep,name=contents" json:"contents,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	TotalSize  *int64            `protobuf:"varint,5,opt,name=total_size,json=totalSize" json:"total_size,omitempty"`    // simple sum of each `entry.size`
-	StoredSize *int64            `protobuf:"varint,8,opt,name=stored_size,json=storedSize" json:"stored_size,omitempty"` // external objects, after deduplication
+	Contents       map[string]*Entry `protobuf:"bytes,4,rep,name=contents" json:"contents,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	OriginalSize   *int64            `protobuf:"varint,10,opt,name=original_size,json=originalSize" json:"original_size,omitempty"`      // total size of entries before compression
+	CompressedSize *int64            `protobuf:"varint,5,opt,name=compressed_size,json=compressedSize" json:"compressed_size,omitempty"` // simple sum of each `entry.size`
+	StoredSize     *int64            `protobuf:"varint,8,opt,name=stored_size,json=storedSize" json:"stored_size,omitempty"`             // total size of (deduplicated) external objects
 	// Netlify-style `_redirects` and `_headers`
 	Redirects []*RedirectRule `protobuf:"bytes,6,rep,name=redirects" json:"redirects,omitempty"`
 	Headers   []*HeaderRule   `protobuf:"bytes,9,rep,name=headers" json:"headers,omitempty"`
@@ -522,9 +522,16 @@ func (x *Manifest) GetContents() map[string]*Entry {
 	return nil
 }
 
-func (x *Manifest) GetTotalSize() int64 {
-	if x != nil && x.TotalSize != nil {
-		return *x.TotalSize
+func (x *Manifest) GetOriginalSize() int64 {
+	if x != nil && x.OriginalSize != nil {
+		return *x.OriginalSize
+	}
+	return 0
+}
+
+func (x *Manifest) GetCompressedSize() int64 {
+	if x != nil && x.CompressedSize != nil {
+		return *x.CompressedSize
 	}
 	return 0
 }
@@ -584,14 +591,15 @@ const file_schema_proto_rawDesc = "" +
 	"header_map\x18\x02 \x03(\v2\a.HeaderR\theaderMap\"3\n" +
 	"\aProblem\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x14\n" +
-	"\x05cause\x18\x02 \x01(\tR\x05cause\"\x89\x03\n" +
+	"\x05cause\x18\x02 \x01(\tR\x05cause\"\xb8\x03\n" +
 	"\bManifest\x12\x19\n" +
 	"\brepo_url\x18\x01 \x01(\tR\arepoUrl\x12\x16\n" +
 	"\x06branch\x18\x02 \x01(\tR\x06branch\x12\x16\n" +
 	"\x06commit\x18\x03 \x01(\tR\x06commit\x123\n" +
-	"\bcontents\x18\x04 \x03(\v2\x17.Manifest.ContentsEntryR\bcontents\x12\x1d\n" +
-	"\n" +
-	"total_size\x18\x05 \x01(\x03R\ttotalSize\x12\x1f\n" +
+	"\bcontents\x18\x04 \x03(\v2\x17.Manifest.ContentsEntryR\bcontents\x12#\n" +
+	"\roriginal_size\x18\n" +
+	" \x01(\x03R\foriginalSize\x12'\n" +
+	"\x0fcompressed_size\x18\x05 \x01(\x03R\x0ecompressedSize\x12\x1f\n" +
 	"\vstored_size\x18\b \x01(\x03R\n" +
 	"storedSize\x12+\n" +
 	"\tredirects\x18\x06 \x03(\v2\r.RedirectRuleR\tredirects\x12%\n" +
@@ -609,7 +617,7 @@ const file_schema_proto_rawDesc = "" +
 	"\aSymlink\x10\x04*$\n" +
 	"\tTransform\x12\b\n" +
 	"\x04None\x10\x00\x12\r\n" +
-	"\tZstandard\x10\x01B'Z%codeberg.org/git-pages/git-pages/mainb\beditionsp\xe8\a"
+	"\tZstandard\x10\x01B,Z*codeberg.org/git-pages/git-pages/git_pagesb\beditionsp\xe8\a"
 
 var (
 	file_schema_proto_rawDescOnce sync.Once

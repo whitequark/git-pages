@@ -1,6 +1,6 @@
 edition = "2023";
 
-option go_package = "codeberg.org/git-pages/git-pages/main";
+option go_package = "codeberg.org/git-pages/git-pages/git_pages";
 
 enum Type {
 	// Invalid entry.
@@ -75,8 +75,9 @@ message Manifest {
 
 	// Contents
 	map<string, Entry> contents = 4;
-	int64 total_size = 5; // simple sum of each `entry.size`
-	int64 stored_size = 8; // external objects, after deduplication
+	int64 original_size = 10; // total size of entries before compression
+	int64 compressed_size = 5; // simple sum of each `entry.size`
+	int64 stored_size = 8; // total size of (deduplicated) external objects
 
 	// Netlify-style `_redirects` and `_headers`
 	repeated RedirectRule redirects = 6;
