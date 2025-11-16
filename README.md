@@ -23,7 +23,7 @@ $ PAGES_INSECURE=1 go run .
 
 These commands starts an HTTP server on `0.0.0.0:3000` and use the `data` directory for persistence. **Authentication is disabled via `PAGES_INSECURE=1`** to avoid the need to set up a DNS server as well; never enable `PAGES_INSECURE=1` in production.
 
-To publish a site, run the following commands:
+To publish a site, run the following commands (consider also using the [git-pages-cli] tool):
 
 ```console
 $ curl http://localhost:3000/ -X PUT --data https://codeberg.org/git-pages/git-pages.git
@@ -31,6 +31,8 @@ b70644b523c4aaf4efd206a588087a1d406cb047
 ```
 
 The `pages` branch of the repository is now available at http://localhost:3000/!
+
+[git-pages-cli]: https://codeberg.org/git-pages/git-pages-cli
 
 
 Deployment
