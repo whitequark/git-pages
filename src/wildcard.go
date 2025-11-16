@@ -34,10 +34,27 @@ func (pattern *WildcardPattern) GetHost() string {
 // corresponding to the * in the domain pattern.
 func (pattern *WildcardPattern) Matches(host string) (string, bool) {
 	hostParts := strings.Split(host, ".")
-	if len(hostParts) != 1+len(pattern.Domain) || !slices.Equal(hostParts[1:], pattern.Domain) {
+	hostLen := len(hostParts)
+	patternLen := len(pattern.Domain)
+
+	// host must have at least one more part than the pattern domain
+	if hostLen <= patternLen {
 		return "", false
 	}
-	return hostParts[0], true
+
+	// break the host parts into <subdomain parts> and <domain parts>
+	mid := hostLen - patternLen
+	prefix := hostParts[:mid]
+	suffix := hostParts[mid:]
+
+	// check if the suffix matches the domain
+	if !slices.Equal(suffix, pattern.Domain) {
+		return "", false
+	}
+
+	// return all the subdomain parts
+	subdomain := strings.Join(prefix, ".")
+	return subdomain, true
 }
 
 func (pattern *WildcardPattern) IsFallbackFor(host string) bool {
