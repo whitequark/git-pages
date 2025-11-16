@@ -132,7 +132,7 @@ func FiniObservability() {
 
 func ObserveError(err error) {
 	if hasSentry() {
-		go sentry.CaptureException(err)
+		sentry.CaptureException(err)
 	}
 }
 
