@@ -446,6 +446,7 @@ func deletePage(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
+		w.Header().Add("Update-Result", "deleted")
 		w.WriteHeader(http.StatusOK)
 	}
 	if err != nil {
