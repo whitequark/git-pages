@@ -74,11 +74,13 @@ func validateRedirectRule(rule redirects.Rule) error {
 	if err != nil {
 		return fmt.Errorf("malformed 'to' URL")
 	}
-	if !strings.HasPrefix(toURL.Path, "/") {
-		return fmt.Errorf("'to' URL path must start with a /")
-	}
-	if toURL.Host != "" && !Is3xxHTTPStatus(uint(rule.Status)) {
-		return fmt.Errorf("'to' URL may only include a hostname for 3xx status rules")
+	if !Is3xxHTTPStatus(uint(rule.Status)) {
+		if !strings.HasPrefix(toURL.Path, "/") {
+			return fmt.Errorf("'to' URL path must start with a / for non-3xx status rules")
+		}
+		if toURL.Host != "" {
+			return fmt.Errorf("'to' URL may only include a hostname for 3xx status rules")
+		}
 	}
 	return nil
 }
