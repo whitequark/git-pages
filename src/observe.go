@@ -2,6 +2,7 @@ package git_pages
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -131,6 +132,12 @@ func FiniObservability() {
 }
 
 func ObserveError(err error) {
+	if errors.Is(err, context.Canceled) {
+		// Something has explicitly requested cancellation.
+		// Timeout results in a different error.
+		return
+	}
+
 	if hasSentry() {
 		sentry.CaptureException(err)
 	}
