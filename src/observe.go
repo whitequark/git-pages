@@ -331,7 +331,10 @@ func (backend *observedBackend) GetManifest(
 	manifest *Manifest,
 	err error,
 ) {
-	span, ctx := ObserveFunction(ctx, "GetManifest", "manifest.name", name)
+	span, ctx := ObserveFunction(ctx, "GetManifest",
+		"manifest.name", name,
+		"manifest.bypass_cache", opts.BypassCache,
+	)
 	if manifest, err = backend.inner.GetManifest(ctx, name, opts); err == nil {
 		manifestsRetrievedCount.Inc()
 	}
