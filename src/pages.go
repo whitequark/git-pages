@@ -107,11 +107,15 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 
 	err = nil
 	sitePath = strings.TrimPrefix(r.URL.Path, "/")
-	if projectName, projectPath, found := strings.Cut(sitePath, "/"); found {
+	if projectName, projectPath, hasProjectSlash := strings.Cut(sitePath, "/"); projectName != "" {
 		var projectManifest *Manifest
 		projectManifest, err = backend.GetManifest(r.Context(), makeWebRoot(host, projectName),
 			GetManifestOptions{BypassCache: bypassCache})
 		if err == nil {
+			if !hasProjectSlash {
+				writeRedirect(w, http.StatusFound, r.URL.Path+"/")
+				return nil
+			}
 			sitePath, manifest = projectPath, projectManifest
 		}
 	}
