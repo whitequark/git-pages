@@ -31,7 +31,7 @@ func unparseRule(rule redirects.Rule) string {
 	return strings.Join(parts, " ")
 }
 
-var validRedirectHTTPStatuses []uint = []uint{
+var validRedirectHTTPStatuses []int = []int{
 	http.StatusOK,
 	http.StatusMovedPermanently,
 	http.StatusFound,
@@ -45,7 +45,7 @@ var validRedirectHTTPStatuses []uint = []uint{
 	http.StatusUnavailableForLegalReasons,
 }
 
-func Is3xxHTTPStatus(status uint) bool {
+func Is3xxHTTPStatus(status int) bool {
 	return status >= 300 && status <= 399
 }
 
@@ -53,7 +53,7 @@ func validateRedirectRule(rule redirects.Rule) error {
 	if len(rule.Params) > 0 {
 		return fmt.Errorf("rules with parameters are not supported")
 	}
-	if !slices.Contains(validRedirectHTTPStatuses, uint(rule.Status)) {
+	if !slices.Contains(validRedirectHTTPStatuses, rule.Status) {
 		return fmt.Errorf("rule cannot use status %d: must be %v",
 			rule.Status, validRedirectHTTPStatuses)
 	}
@@ -74,7 +74,7 @@ func validateRedirectRule(rule redirects.Rule) error {
 	if err != nil {
 		return fmt.Errorf("malformed 'to' URL")
 	}
-	if !Is3xxHTTPStatus(uint(rule.Status)) {
+	if !Is3xxHTTPStatus(rule.Status) {
 		if !strings.HasPrefix(toURL.Path, "/") {
 			return fmt.Errorf("'to' URL path must start with a / for non-3xx status rules")
 		}
@@ -140,7 +140,7 @@ const (
 func ApplyRedirectRules(
 	manifest *Manifest, fromURL *url.URL, kind RedirectKind,
 ) (
-	toURL *url.URL, status uint,
+	toURL *url.URL, status int,
 ) {
 	fromSegments := pathSegments(fromURL.Path)
 next:
@@ -191,7 +191,7 @@ next:
 			Path:     "/" + strings.Join(toSegments, "/"),
 			RawQuery: fromURL.RawQuery,
 		}
-		status = uint(*rule.Status)
+		status = int(*rule.Status)
 		break
 	}
 	// no redirect found

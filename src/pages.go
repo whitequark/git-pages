@@ -40,10 +40,6 @@ var (
 	}, []string{"cause"})
 )
 
-func makeWebRoot(host string, projectName string) string {
-	return fmt.Sprintf("%s/%s", strings.ToLower(host), projectName)
-}
-
 func reportSiteUpdate(via string, result *UpdateResult) {
 	siteUpdatesCount.With(prometheus.Labels{"via": via}).Inc()
 
@@ -61,6 +57,16 @@ func reportSiteUpdate(via string, result *UpdateResult) {
 	case UpdateDeleted:
 		siteUpdateOkCount.With(prometheus.Labels{"outcome": "deleted"}).Inc()
 	}
+}
+
+func makeWebRoot(host string, projectName string) string {
+	return fmt.Sprintf("%s/%s", strings.ToLower(host), projectName)
+}
+
+func writeRedirect(w http.ResponseWriter, code int, path string) {
+	w.Header().Set("Location", path)
+	w.WriteHeader(code)
+	fmt.Fprintf(w, "see %s\n", path)
 }
 
 // The `clauspost/compress/zstd` package recommends reusing a decompressor to avoid repeated
@@ -185,9 +191,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			originalURL := (&url.URL{Host: r.Host}).ResolveReference(r.URL)
 			redirectURL, redirectStatus := ApplyRedirectRules(manifest, originalURL, redirectKind)
 			if Is3xxHTTPStatus(redirectStatus) {
-				w.Header().Set("Location", redirectURL.String())
-				w.WriteHeader(int(redirectStatus))
-				fmt.Fprintf(w, "see %s\n", redirectURL.String())
+				writeRedirect(w, redirectStatus, redirectURL.String())
 				return nil
 			} else if redirectURL != nil {
 				entryPath = strings.TrimPrefix(redirectURL.Path, "/")
@@ -232,9 +236,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				// redirect from `dir` to `dir/`, otherwise when `dir/index.html` is served,
 				// links in it will have the wrong base URL
 				newPath := r.URL.Path + "/"
-				w.Header().Set("Location", newPath)
-				w.WriteHeader(http.StatusFound)
-				fmt.Fprintf(w, "see %s\n", newPath)
+				writeRedirect(w, http.StatusFound, newPath)
 				return nil
 			}
 		} else if entry.GetType() == Type_Symlink {
