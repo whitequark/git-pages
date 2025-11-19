@@ -229,25 +229,7 @@ func authorizeWildcardMatchSite(r *http.Request, pattern *WildcardPattern) (*Aut
 	}
 
 	if userName, found := pattern.Matches(host); found {
-		var repoURLs []string
-		var branch string
-		repoURLTemplate := pattern.CloneURL
-		if projectName == ".index" {
-			for _, indexRepoTemplate := range pattern.IndexRepos {
-				indexRepo := indexRepoTemplate.ExecuteString(map[string]any{"user": userName})
-				repoURLs = append(repoURLs, repoURLTemplate.ExecuteString(map[string]any{
-					"user":    userName,
-					"project": indexRepo,
-				}))
-			}
-			branch = pattern.IndexBranch
-		} else {
-			repoURLs = append(repoURLs, repoURLTemplate.ExecuteString(map[string]any{
-				"user":    userName,
-				"project": projectName,
-			}))
-			branch = "pages"
-		}
+		repoURLs, branch := pattern.ApplyTemplate(userName, projectName)
 		return &Authorization{repoURLs, branch}, nil
 	} else {
 		return nil, AuthError{
@@ -441,37 +423,12 @@ func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 	return nil, joinErrors(causes...)
 }
 
-var repoURLSchemeAllowlist []string = []string{"ssh", "http", "https"}
-
-func AuthorizeRepository(rawRepoURL string, auth *Authorization) error {
-	// Regardless of any other authorization, only the allowlisted URL schemes
-	// may ever be cloned from, so this check has to come first.
-	repoURL, err := url.Parse(rawRepoURL)
-	if err != nil {
-		if strings.HasPrefix(rawRepoURL, "git@") {
-			return AuthError{http.StatusBadRequest, "malformed clone URL; use ssh:// scheme"}
-		} else {
-			return AuthError{http.StatusBadRequest, "malformed clone URL"}
-		}
-	}
-	if !slices.Contains(repoURLSchemeAllowlist, repoURL.Scheme) {
-		return AuthError{
-			http.StatusUnauthorized,
-			fmt.Sprintf("clone URL scheme not in allowlist %v",
-				repoURLSchemeAllowlist),
-		}
-	}
-
-	if auth.repoURLs == nil {
-		return nil // any
-	}
-
-	rawRepoURL = strings.ToLower(rawRepoURL)
-
+func checkAllowedURLPrefix(repoURL string) error {
 	if config.Limits.AllowedRepositoryURLPrefixes != nil {
 		allowedPrefix := false
+		repoURL = strings.ToLower(repoURL)
 		for _, allowedRepoURLPrefix := range config.Limits.AllowedRepositoryURLPrefixes {
-			if strings.HasPrefix(rawRepoURL, strings.ToLower(allowedRepoURLPrefix)) {
+			if strings.HasPrefix(repoURL, strings.ToLower(allowedRepoURLPrefix)) {
 				allowedPrefix = true
 				break
 			}
@@ -485,9 +442,42 @@ func AuthorizeRepository(rawRepoURL string, auth *Authorization) error {
 		}
 	}
 
+	return nil
+}
+
+var repoURLSchemeAllowlist []string = []string{"ssh", "http", "https"}
+
+func AuthorizeRepository(repoURL string, auth *Authorization) error {
+	// Regardless of any other authorization, only the allowlisted URL schemes
+	// may ever be cloned from, so this check has to come first.
+	parsedRepoURL, err := url.Parse(repoURL)
+	if err != nil {
+		if strings.HasPrefix(repoURL, "git@") {
+			return AuthError{http.StatusBadRequest, "malformed clone URL; use ssh:// scheme"}
+		} else {
+			return AuthError{http.StatusBadRequest, "malformed clone URL"}
+		}
+	}
+	if !slices.Contains(repoURLSchemeAllowlist, parsedRepoURL.Scheme) {
+		return AuthError{
+			http.StatusUnauthorized,
+			fmt.Sprintf("clone URL scheme not in allowlist %v",
+				repoURLSchemeAllowlist),
+		}
+	}
+
+	if auth.repoURLs == nil {
+		return nil // any
+	}
+
+	if err = checkAllowedURLPrefix(repoURL); err != nil {
+		return err
+	}
+
 	allowed := false
+	repoURL = strings.ToLower(repoURL)
 	for _, allowedRepoURL := range auth.repoURLs {
-		if rawRepoURL == strings.ToLower(allowedRepoURL) {
+		if repoURL == strings.ToLower(allowedRepoURL) {
 			allowed = true
 			break
 		}

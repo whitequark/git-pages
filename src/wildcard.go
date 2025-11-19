@@ -57,6 +57,29 @@ func (pattern *WildcardPattern) Matches(host string) (string, bool) {
 	return subdomain, true
 }
 
+func (pattern *WildcardPattern) ApplyTemplate(userName string, projectName string) ([]string, string) {
+	var repoURLs []string
+	var branch string
+	repoURLTemplate := pattern.CloneURL
+	if projectName == ".index" {
+		for _, indexRepoTemplate := range pattern.IndexRepos {
+			indexRepo := indexRepoTemplate.ExecuteString(map[string]any{"user": userName})
+			repoURLs = append(repoURLs, repoURLTemplate.ExecuteString(map[string]any{
+				"user":    userName,
+				"project": indexRepo,
+			}))
+		}
+		branch = pattern.IndexBranch
+	} else {
+		repoURLs = append(repoURLs, repoURLTemplate.ExecuteString(map[string]any{
+			"user":    userName,
+			"project": projectName,
+		}))
+		branch = "pages"
+	}
+	return repoURLs, branch
+}
+
 func (pattern *WildcardPattern) IsFallbackFor(host string) bool {
 	if pattern.Fallback == nil {
 		return false
