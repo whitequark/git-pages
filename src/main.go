@@ -160,7 +160,7 @@ func Main() {
 			webRoot += "/.index"
 		}
 
-		manifest, err := backend.GetManifest(context.Background(), webRoot, GetManifestOptions{})
+		manifest, _, err := backend.GetManifest(context.Background(), webRoot, GetManifestOptions{})
 		if err != nil {
 			log.Fatalln(err)
 		}

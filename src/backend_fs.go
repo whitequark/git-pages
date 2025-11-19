@@ -89,13 +89,9 @@ func (fs *FSBackend) EnableFeature(ctx context.Context, feature BackendFeature) 
 }
 
 func (fs *FSBackend) GetBlob(
-	ctx context.Context,
-	name string,
+	ctx context.Context, name string,
 ) (
-	reader io.ReadSeeker,
-	size uint64,
-	mtime time.Time,
-	err error,
+	reader io.ReadSeeker, size uint64, mtime time.Time, err error,
 ) {
 	blobPath := filepath.Join(splitBlobName(name)...)
 	stat, err := fs.blobRoot.Stat(blobPath)
@@ -168,15 +164,29 @@ func (b *FSBackend) ListManifests(ctx context.Context) (manifests []string, err 
 	return
 }
 
-func (fs *FSBackend) GetManifest(ctx context.Context, name string, opts GetManifestOptions) (*Manifest, error) {
-	data, err := fs.siteRoot.ReadFile(name)
+func (fs *FSBackend) GetManifest(
+	ctx context.Context, name string, opts GetManifestOptions,
+) (
+	manifest *Manifest, mtime time.Time, err error,
+) {
+	stat, err := fs.siteRoot.Stat(name)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, fmt.Errorf("%w: %s", ErrObjectNotFound, err.(*os.PathError).Path)
+		err = fmt.Errorf("%w: %s", ErrObjectNotFound, err.(*os.PathError).Path)
+		return
 	} else if err != nil {
-		return nil, err
+		err = fmt.Errorf("stat: %w", err)
+		return
 	}
-
-	return DecodeManifest(data)
+	data, err := fs.siteRoot.ReadFile(name)
+	if err != nil {
+		err = fmt.Errorf("read: %w", err)
+		return
+	}
+	manifest, err = DecodeManifest(data)
+	if err != nil {
+		return
+	}
+	return manifest, stat.ModTime(), nil
 }
 
 func stagedManifestName(manifestData []byte) string {

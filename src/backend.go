@@ -39,7 +39,9 @@ type Backend interface {
 	EnableFeature(ctx context.Context, feature BackendFeature) error
 
 	// Retrieve a blob. Returns `reader, size, mtime, err`.
-	GetBlob(ctx context.Context, name string) (reader io.ReadSeeker, size uint64, mtime time.Time, err error)
+	GetBlob(ctx context.Context, name string) (
+		reader io.ReadSeeker, size uint64, mtime time.Time, err error,
+	)
 
 	// Store a blob. If a blob called `name` already exists, this function returns `nil` without
 	// regards to the old or new contents. It is expected that blobs are content-addressed, i.e.
@@ -50,7 +52,9 @@ type Backend interface {
 	DeleteBlob(ctx context.Context, name string) error
 
 	// Retrieve a manifest.
-	GetManifest(ctx context.Context, name string, opts GetManifestOptions) (*Manifest, error)
+	GetManifest(ctx context.Context, name string, opts GetManifestOptions) (
+		manifest *Manifest, mtime time.Time, err error,
+	)
 
 	// Stage a manifest. This operation stores a new version of a manifest, locking any blobs
 	// referenced from it in place (for garbage collection purposes) but without any other side

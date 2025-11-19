@@ -288,13 +288,9 @@ func (backend *observedBackend) EnableFeature(ctx context.Context, feature Backe
 }
 
 func (backend *observedBackend) GetBlob(
-	ctx context.Context,
-	name string,
+	ctx context.Context, name string,
 ) (
-	reader io.ReadSeeker,
-	size uint64,
-	mtime time.Time,
-	err error,
+	reader io.ReadSeeker, size uint64, mtime time.Time, err error,
 ) {
 	span, ctx := ObserveFunction(ctx, "GetBlob", "blob.name", name)
 	if reader, size, mtime, err = backend.inner.GetBlob(ctx, name); err == nil {
@@ -331,18 +327,15 @@ func (backend *observedBackend) ListManifests(ctx context.Context) (manifests []
 }
 
 func (backend *observedBackend) GetManifest(
-	ctx context.Context,
-	name string,
-	opts GetManifestOptions,
+	ctx context.Context, name string, opts GetManifestOptions,
 ) (
-	manifest *Manifest,
-	err error,
+	manifest *Manifest, mtime time.Time, err error,
 ) {
 	span, ctx := ObserveFunction(ctx, "GetManifest",
 		"manifest.name", name,
 		"manifest.bypass_cache", opts.BypassCache,
 	)
-	if manifest, err = backend.inner.GetManifest(ctx, name, opts); err == nil {
+	if manifest, mtime, err = backend.inner.GetManifest(ctx, name, opts); err == nil {
 		manifestsRetrievedCount.Inc()
 	}
 	span.Finish()

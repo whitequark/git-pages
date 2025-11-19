@@ -117,6 +117,7 @@ func (c *CachedBlob) Weight() uint32 { return uint32(len(c.blob)) }
 type CachedManifest struct {
 	manifest *Manifest
 	weight   uint32
+	mtime    time.Time
 	etag     string
 	err      error
 }
@@ -262,13 +263,9 @@ func (s3 *S3Backend) EnableFeature(ctx context.Context, feature BackendFeature) 
 }
 
 func (s3 *S3Backend) GetBlob(
-	ctx context.Context,
-	name string,
+	ctx context.Context, name string,
 ) (
-	reader io.ReadSeeker,
-	size uint64,
-	mtime time.Time,
-	err error,
+	reader io.ReadSeeker, size uint64, mtime time.Time, err error,
 ) {
 	loader := func(ctx context.Context, name string) (*CachedBlob, error) {
 		log.Printf("s3: get blob %s\n", name)
@@ -434,7 +431,7 @@ func (l s3ManifestLoader) load(ctx context.Context, name string, oldManifest *Ca
 			With(prometheus.Labels{"kind": "manifest"}).
 			Observe(time.Since(startTime).Seconds())
 
-		return &CachedManifest{manifest, uint32(len(data)), stat.ETag, nil}, nil
+		return &CachedManifest{manifest, uint32(len(data)), stat.LastModified, stat.ETag, nil}, nil
 	}
 
 	var cached *CachedManifest
@@ -443,7 +440,7 @@ func (l s3ManifestLoader) load(ctx context.Context, name string, oldManifest *Ca
 		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
 			s3GetObjectErrorsCount.With(prometheus.Labels{"object_kind": "manifest"}).Inc()
 			err = fmt.Errorf("%w: %s", ErrObjectNotFound, errResp.Key)
-			return &CachedManifest{nil, 1, "", err}, nil
+			return &CachedManifest{nil, 1, time.Time{}, "", err}, nil
 		} else if errResp.StatusCode == http.StatusNotModified && oldManifest != nil {
 			return oldManifest, nil
 		} else {
@@ -457,7 +454,7 @@ func (l s3ManifestLoader) load(ctx context.Context, name string, oldManifest *Ca
 func (s3 *S3Backend) GetManifest(
 	ctx context.Context, name string, opts GetManifestOptions,
 ) (
-	manifest *Manifest, err error,
+	manifest *Manifest, mtime time.Time, err error,
 ) {
 	if opts.BypassCache {
 		entry, found := s3.siteCache.Cache.GetEntry(name)
@@ -471,8 +468,8 @@ func (s3 *S3Backend) GetManifest(
 	if err != nil {
 		return
 	} else {
-		// This could be `manifest, nil` or `nil, ErrObjectNotFound`.
-		manifest, err = cached.manifest, cached.err
+		// This could be `manifest, mtime, nil` or `nil, time.Time{}, ErrObjectNotFound`.
+		manifest, mtime, err = cached.manifest, cached.mtime, cached.err
 		return
 	}
 }
