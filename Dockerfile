@@ -8,12 +8,14 @@ RUN apk --no-cache add git
 WORKDIR /build
 RUN git clone https://github.com/ochinchina/supervisord . && \
     git checkout 16cb640325b3a4962b2ba17d68fb5c2b1e1b6b3c
-RUN GOBIN=/usr/bin go install -ldflags "-s -w"
+RUN GOBIN=/usr/bin go install -ldflags "-s -w" && \
+    go clean -cache -modcache
 
 # Build Caddy with S3 storage backend.
 FROM docker.io/library/caddy:2.10.2-builder@sha256:53f91ad7c5f1ab9a607953199b7c1e10920c570ae002aef913d68ed7464fb19f AS caddy-builder
 RUN xcaddy build ${CADDY_VERSION} \
-    --with=github.com/ss098/certmagic-s3@v0.0.0-20250922022452-8af482af5f39
+    --with=github.com/ss098/certmagic-s3@v0.0.0-20250922022452-8af482af5f39 && \
+    go clean -cache -modcache
 
 # Build git-pages.
 FROM docker.io/library/golang:1.25-alpine@sha256:aee43c3ccbf24fdffb7295693b6e33b21e01baec1b2a55acc351fde345e9ec34 AS git-pages-builder
@@ -23,7 +25,8 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY *.go ./
 COPY src/ ./src/
-RUN go build -ldflags "-s -w" -o git-pages .
+RUN go build -ldflags "-s -w" -o git-pages . && \
+    go clean -cache -modcache
 
 # Compose git-pages and Caddy.
 FROM docker.io/library/busybox:1.37.0-musl@sha256:ef13e7482851632be3faf5bd1d28d4727c0810901d564b35416f309975a12a30
