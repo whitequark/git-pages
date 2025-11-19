@@ -399,11 +399,11 @@ func (l s3ManifestLoader) Reload(ctx context.Context, key string, oldValue *Cach
 }
 
 func (l s3ManifestLoader) load(ctx context.Context, name string, oldManifest *CachedManifest) (*CachedManifest, error) {
-	log.Printf("s3: get manifest %s\n", name)
+	loader := func() (*CachedManifest, error) {
+		log.Printf("s3: get manifest %s\n", name)
 
-	startTime := time.Now()
+		startTime := time.Now()
 
-	manifest, size, etag, err := func() (*Manifest, uint32, string, error) {
 		opts := minio.GetObjectOptions{}
 		if oldManifest != nil && oldManifest.etag != "" {
 			opts.SetMatchETagExcept(oldManifest.etag)
@@ -411,48 +411,54 @@ func (l s3ManifestLoader) load(ctx context.Context, name string, oldManifest *Ca
 		object, err := l.s3.client.GetObject(ctx, l.s3.bucket, manifestObjectName(name), opts)
 		// Note that many errors (e.g. NoSuchKey) will be reported only after this point.
 		if err != nil {
-			return nil, 0, "", err
+			return nil, err
 		}
 		defer object.Close()
 
 		data, err := io.ReadAll(object)
 		if err != nil {
-			return nil, 0, "", err
+			return nil, err
 		}
 
 		stat, err := object.Stat()
 		if err != nil {
-			return nil, 0, "", err
+			return nil, err
 		}
 
 		manifest, err := DecodeManifest(data)
 		if err != nil {
-			return nil, 0, "", err
+			return nil, err
 		}
 
-		return manifest, uint32(len(data)), stat.ETag, nil
-	}()
+		s3GetObjectDurationSeconds.
+			With(prometheus.Labels{"kind": "manifest"}).
+			Observe(time.Since(startTime).Seconds())
 
-	s3GetObjectDurationSeconds.
-		With(prometheus.Labels{"kind": "manifest"}).
-		Observe(time.Since(startTime).Seconds())
+		return &CachedManifest{manifest, uint32(len(data)), stat.ETag, nil}, nil
+	}
 
+	var cached *CachedManifest
+	cached, err := loader()
 	if err != nil {
 		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
 			s3GetObjectErrorsCount.With(prometheus.Labels{"object_kind": "manifest"}).Inc()
 			err = fmt.Errorf("%w: %s", ErrObjectNotFound, errResp.Key)
-			return &CachedManifest{nil, 1, etag, err}, nil
+			return &CachedManifest{nil, 1, "", err}, nil
 		} else if errResp.StatusCode == http.StatusNotModified && oldManifest != nil {
 			return oldManifest, nil
 		} else {
 			return nil, err
 		}
 	} else {
-		return &CachedManifest{manifest, size, etag, err}, nil
+		return cached, nil
 	}
 }
 
-func (s3 *S3Backend) GetManifest(ctx context.Context, name string, opts GetManifestOptions) (*Manifest, error) {
+func (s3 *S3Backend) GetManifest(
+	ctx context.Context, name string, opts GetManifestOptions,
+) (
+	manifest *Manifest, err error,
+) {
 	if opts.BypassCache {
 		entry, found := s3.siteCache.Cache.GetEntry(name)
 		if found && entry.RefreshableAt().Before(time.Now()) {
@@ -460,11 +466,14 @@ func (s3 *S3Backend) GetManifest(ctx context.Context, name string, opts GetManif
 		}
 	}
 
-	cached, err := s3.siteCache.Get(ctx, name, s3ManifestLoader{s3})
+	var cached *CachedManifest
+	cached, err = s3.siteCache.Get(ctx, name, s3ManifestLoader{s3})
 	if err != nil {
-		return nil, err
+		return
 	} else {
-		return cached.manifest, cached.err
+		// This could be `manifest, nil` or `nil, ErrObjectNotFound`.
+		manifest, err = cached.manifest, cached.err
+		return
 	}
 }
 
