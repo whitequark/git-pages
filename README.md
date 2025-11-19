@@ -82,16 +82,17 @@ The authorization flow for content updates (`PUT`, `DELETE`, `POST` requests) pr
     - **`Pages` scheme:** Request includes an `Authorization: Pages <token>` header.
     - **`Basic` scheme:** Request includes an `Authorization: Basic <basic>` header, where `<basic>` is equal to `Base64("Pages:<token>")`. (Useful for non-Forgejo forges.)
 3. **DNS Allowlist:** If the method is `PUT` or `POST`, and a TXT record lookup at `_git-pages-repository.<host>` returns a set of well-formed absolute URLs, and (for `PUT` requests) the body contains a repository URL, and the requested clone URLs is contained in this set of URLs, the request is authorized.
-4. **Wildcard Match (Site):** If the method is `POST`, and a `[[wildcard]]` configuration section exists where the suffix of a hostname (compared label-wise) is equal to `[[wildcard]].domain`, and (for `PUT` requests) the body contains a repository URL, and the requested clone URL is a *matching* clone URL, the request is authorized.
+4. **Wildcard Match (Webhook):** If the method is `POST`, and a `[[wildcard]]` configuration section exists where the suffix of a hostname (compared label-wise) is equal to `[[wildcard]].domain`, and (for `PUT` requests) the body contains a repository URL, and the requested clone URL is a *matching* clone URL, the request is authorized.
     - **Index repository:** If the request URL is `scheme://<user>.<host>/`, a *matching* clone URL is computed by templating `[[wildcard]].clone-url` with `<user>` and `<project>`, where `<project>` is computed by templating each element of `[[wildcard]].index-repos` with `<user>`, and `[[wildcard]]` is the section where the match occurred.
     - **Project repository:** If the request URL is `scheme://<user>.<host>/<project>/`, a *matching* clone URL is computed by templating `[[wildcard]].clone-url` with `<user>` and `<project>`, and `[[wildcard]]` is the section where the match occurred.
+5. **Forge Authorization:** If the method is `PUT`, and the body contains an archive, and a `[[wildcard]]` configuration section exists where the suffix of a hostname (compared label-wise) is equal to `[[wildcard]].domain`, and `[[wildcard]].authorization` is non-empty, and the request includes a `Forge-Authorization:` header, and the header grants push permissions to a repository at the *matching* clone URL (as defined above) as determined by an API call to the forge, the request is authorized.
 5. **Default Deny:** Otherwise, the request is not authorized.
 
 The authorization flow for metadata retrieval (`GET` requests with site paths starting with `.git-pages/`) in the following order, with the first of multiple applicable rule taking precedence:
 
 1. **Development Mode:** Same as for content updates.
 2. **DNS Challenge:** Same as for content updates.
-3. **Wildcard Match (Domain):** If a `[[wildcard]]` configuration section exists where the suffix of a hostname (compared label-wise) is equal to `[[wildcard]].domain`, the request is authorized.
+3. **Wildcard Match (Metadata):** If a `[[wildcard]]` configuration section exists where the suffix of a hostname (compared label-wise) is equal to `[[wildcard]].domain`, the request is authorized.
 4. **Default Deny:** Otherwise, the request is not authorized.
 
 

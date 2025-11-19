@@ -3,6 +3,7 @@ package git_pages
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -11,6 +12,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"time"
 )
 
 type AuthError struct {
@@ -511,6 +513,118 @@ func AuthorizeBranch(branch string, auth *Authorization) error {
 	}
 }
 
+// Gogs, Gitea, and Forgejo all support the same API here.
+func checkGogsRepositoryPushPermission(baseURL *url.URL, authorization string) error {
+	ownerAndRepo := strings.TrimSuffix(strings.TrimPrefix(baseURL.Path, "/"), ".git")
+	request, err := http.NewRequest("GET", baseURL.ResolveReference(&url.URL{
+		Path: fmt.Sprintf("/api/v1/repos/%s", ownerAndRepo),
+	}).String(), nil)
+	if err != nil {
+		panic(err) // misconfiguration
+	}
+	request.Header.Set("Accept", "application/json")
+	request.Header.Set("Authorization", authorization)
+
+	httpClient := http.Client{Timeout: 5 * time.Second}
+	response, err := httpClient.Do(request)
+	if err != nil {
+		return AuthError{
+			http.StatusServiceUnavailable,
+			fmt.Sprintf("cannot check repository permissions: %s", err),
+		}
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode == http.StatusNotFound {
+		return AuthError{
+			http.StatusNotFound,
+			fmt.Sprintf("no repository %s", ownerAndRepo),
+		}
+	} else if response.StatusCode != http.StatusOK {
+		return AuthError{
+			http.StatusServiceUnavailable,
+			fmt.Sprintf(
+				"cannot check repository permissions: GET %s returned %s",
+				request.URL,
+				response.Status,
+			),
+		}
+	}
+	decoder := json.NewDecoder(response.Body)
+
+	var repositoryInfo struct{ Permissions struct{ Push bool } }
+	if err = decoder.Decode(&repositoryInfo); err != nil {
+		return errors.Join(AuthError{
+			http.StatusServiceUnavailable,
+			fmt.Sprintf(
+				"cannot check repository permissions: GET %s returned malformed JSON",
+				request.URL,
+			),
+		}, err)
+	}
+
+	if !repositoryInfo.Permissions.Push {
+		return AuthError{
+			http.StatusUnauthorized,
+			fmt.Sprintf("no push permission for %s", ownerAndRepo),
+		}
+	}
+
+	// this token authorizes pushing to the repo, yay!
+	return nil
+}
+
+func authorizeForgeWithToken(r *http.Request) (*Authorization, error) {
+	authorization := r.Header.Get("Forge-Authorization")
+	if authorization == "" {
+		return nil, AuthError{http.StatusUnauthorized, "missing Forge-Authorization header"}
+	}
+
+	host, err := GetHost(r)
+	if err != nil {
+		return nil, err
+	}
+
+	projectName, err := GetProjectName(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var errs []error
+	for _, pattern := range wildcardPatterns {
+		if !pattern.Authorization {
+			continue
+		}
+
+		if userName, found := pattern.Matches(host); found {
+			repoURLs, branch := pattern.ApplyTemplate(userName, projectName)
+			for _, repoURL := range repoURLs {
+				parsedRepoURL, err := url.Parse(repoURL)
+				if err != nil {
+					panic(err) // misconfiguration
+				}
+
+				if err = checkGogsRepositoryPushPermission(parsedRepoURL, authorization); err != nil {
+					errs = append(errs, err)
+					continue
+				}
+
+				// This will actually be ignored by the caller of AuthorizeUpdateFromArchive,
+				// but we return this information as it makes sense to do contextually here.
+				return &Authorization{
+					[]string{repoURL},
+					branch,
+				}, nil
+			}
+		}
+	}
+
+	errs = append([]error{
+		AuthError{http.StatusUnauthorized, "not authorized by forge"},
+	}, errs...)
+	return nil, joinErrors(errs...)
+}
+
 func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
@@ -523,19 +637,30 @@ func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
 		return auth, nil
 	}
 
-	if config.Limits.AllowedRepositoryURLPrefixes != nil {
-		return nil, AuthError{http.StatusUnauthorized, "updating from archive not allowed"}
-	}
-
-	// DNS challenge gives absolute authority.
-	auth, err := authorizeDNSChallenge(r)
+	// Token authorization allows updating a site on a wildcard domain from an archive.
+	auth, err := authorizeForgeWithToken(r)
 	if err != nil && IsUnauthorized(err) {
 		causes = append(causes, err)
 	} else if err != nil { // bad request
 		return nil, err
 	} else {
-		log.Println("auth: DNS challenge")
+		log.Printf("auth: forge token: allow\n")
 		return auth, nil
+	}
+
+	if config.Limits.AllowedRepositoryURLPrefixes != nil {
+		causes = append(causes, AuthError{http.StatusUnauthorized, "DNS challenge not allowed"})
+	} else {
+		// DNS challenge gives absolute authority.
+		auth, err = authorizeDNSChallenge(r)
+		if err != nil && IsUnauthorized(err) {
+			causes = append(causes, err)
+		} else if err != nil { // bad request
+			return nil, err
+		} else {
+			log.Println("auth: DNS challenge")
+			return auth, nil
+		}
 	}
 
 	return nil, joinErrors(causes...)

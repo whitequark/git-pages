@@ -56,6 +56,7 @@ type WildcardConfig struct {
 	CloneURL         string   `toml:"clone-url"`
 	IndexRepos       []string `toml:"index-repos" default:"[]"`
 	IndexRepoBranch  string   `toml:"index-repo-branch" default:"pages"`
+	Authorization    string   `toml:"authorization"`
 	FallbackProxyTo  string   `toml:"fallback-proxy-to"`
 	FallbackInsecure bool     `toml:"fallback-insecure"`
 }

@@ -14,12 +14,13 @@ import (
 )
 
 type WildcardPattern struct {
-	Domain      []string
-	CloneURL    *fasttemplate.Template
-	IndexRepos  []*fasttemplate.Template
-	IndexBranch string
-	FallbackURL *url.URL
-	Fallback    http.Handler
+	Domain        []string
+	CloneURL      *fasttemplate.Template
+	IndexRepos    []*fasttemplate.Template
+	IndexBranch   string
+	Authorization bool
+	FallbackURL   *url.URL
+	Fallback      http.Handler
 }
 
 var wildcardPatterns []*WildcardPattern
@@ -121,6 +122,20 @@ func ConfigureWildcards(configs []WildcardConfig) error {
 			indexRepoTemplates = append(indexRepoTemplates, indexRepoTemplate)
 		}
 
+		authorization := false
+		if config.Authorization != "" {
+			if slices.Contains([]string{"gogs", "gitea", "forgejo"}, config.Authorization) {
+				// Currently these are the only supported forges, and the authorization mechanism
+				// is the same for all of them.
+				authorization = true
+			} else {
+				return fmt.Errorf(
+					"wildcard pattern: unknown authorization mechanism: %s",
+					config.Authorization,
+				)
+			}
+		}
+
 		var fallbackURL *url.URL
 		var fallback http.Handler
 		if config.FallbackProxyTo != "" {
@@ -144,12 +159,13 @@ func ConfigureWildcards(configs []WildcardConfig) error {
 		}
 
 		wildcardPatterns = append(wildcardPatterns, &WildcardPattern{
-			Domain:      strings.Split(config.Domain, "."),
-			CloneURL:    cloneURLTemplate,
-			IndexRepos:  indexRepoTemplates,
-			IndexBranch: indexRepoBranch,
-			FallbackURL: fallbackURL,
-			Fallback:    fallback,
+			Domain:        strings.Split(config.Domain, "."),
+			CloneURL:      cloneURLTemplate,
+			IndexRepos:    indexRepoTemplates,
+			IndexBranch:   indexRepoBranch,
+			Authorization: authorization,
+			FallbackURL:   fallbackURL,
+			Fallback:      fallback,
 		})
 	}
 	return nil
