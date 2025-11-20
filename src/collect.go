@@ -1,0 +1,126 @@
+package git_pages
+
+import (
+	"archive/tar"
+	"context"
+	"fmt"
+	"io"
+	"time"
+)
+
+type Flusher interface {
+	Flush() error
+}
+
+// Inverse of `ExtractTar`.
+func CollectTar(
+	context context.Context, writer io.Writer, manifest *Manifest, manifestMtime time.Time,
+) (
+	err error,
+) {
+	archive := tar.NewWriter(writer)
+
+	appendFile := func(header *tar.Header, data []byte, transform Transform) (err error) {
+		switch transform {
+		case Transform_None:
+		case Transform_Zstandard:
+			data, err = zstdDecoder.DecodeAll(data, []byte{})
+			if err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unexpected transform")
+		}
+		header.Size = int64(len(data))
+
+		err = archive.WriteHeader(header)
+		if err != nil {
+			return
+		}
+		_, err = archive.Write(data)
+		return
+	}
+
+	for fileName, entry := range manifest.Contents {
+		var header tar.Header
+		if fileName == "" {
+			continue
+		}
+		header.Name = fileName
+
+		switch entry.GetType() {
+		case Type_Directory:
+			header.Typeflag = tar.TypeDir
+			header.Mode = 0755
+			header.ModTime = manifestMtime
+			err = appendFile(&header, nil, Transform_None)
+
+		case Type_InlineFile:
+			header.Typeflag = tar.TypeReg
+			header.Mode = 0644
+			header.ModTime = manifestMtime
+			err = appendFile(&header, entry.GetData(), entry.GetTransform())
+
+		case Type_ExternalFile:
+			var blobReader io.Reader
+			var blobMtime time.Time
+			var blobData []byte
+			blobReader, _, blobMtime, err = backend.GetBlob(context, string(entry.Data))
+			if err != nil {
+				return
+			}
+			blobData, _ = io.ReadAll(blobReader)
+			header.Typeflag = tar.TypeReg
+			header.Mode = 0644
+			header.ModTime = blobMtime
+			err = appendFile(&header, blobData, entry.GetTransform())
+
+		case Type_Symlink:
+			header.Typeflag = tar.TypeSymlink
+			header.Mode = 0644
+			header.ModTime = manifestMtime
+			err = appendFile(&header, entry.GetData(), Transform_None)
+
+		default:
+			return fmt.Errorf("unexpected entry type")
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	if redirects := CollectRedirectsFile(manifest); redirects != "" {
+		err = appendFile(&tar.Header{
+			Name:     RedirectsFileName,
+			Typeflag: tar.TypeReg,
+			Mode:     0644,
+			ModTime:  manifestMtime,
+		}, []byte(redirects), Transform_None)
+		if err != nil {
+			return err
+		}
+	}
+
+	if headers := CollectHeadersFile(manifest); headers != "" {
+		err = appendFile(&tar.Header{
+			Name:     HeadersFileName,
+			Typeflag: tar.TypeReg,
+			Mode:     0644,
+			ModTime:  manifestMtime,
+		}, []byte(headers), Transform_None)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = archive.Flush()
+	if err != nil {
+		return err
+	}
+
+	flusher, ok := writer.(Flusher)
+	if ok {
+		err = flusher.Flush()
+	}
+	return err
+}

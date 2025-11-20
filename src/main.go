@@ -69,6 +69,18 @@ func serve(listener net.Listener, handler http.Handler) {
 	}
 }
 
+func webRootArg(arg string) string {
+	switch strings.Count(arg, "/") {
+	case 0:
+		return arg + "/.index"
+	case 1:
+		return arg
+	default:
+		log.Fatalf("webroot argument must be either 'domain.tld' or 'domain.tld/dir")
+		return ""
+	}
+}
+
 func Main() {
 	printConfigEnvVars := flag.Bool("print-config-env-vars", false,
 		"print every recognized configuration environment variable and exit")
@@ -80,16 +92,28 @@ func Main() {
 		"run without configuration file (configure via environment variables)")
 	runMigration := flag.String("run-migration", "",
 		"run a specific store migration (available: \"create-domain-markers\")")
-	getManifest := flag.String("get-manifest", "",
-		"write manifest for `webroot` (either 'domain.tld' or 'domain.tld/dir') to stdout as ProtoJSON")
 	getBlob := flag.String("get-blob", "",
-		"write `blob` ('sha256-xxxxxxx...xxx') to stdout")
+		"write contents of `blob-ref` ('sha256-xxxxxxx...xxx') to stdout")
+	getManifest := flag.String("get-manifest", "",
+		"write manifest for `site-name` (either 'domain.tld' or 'domain.tld/dir') to stdout as ProtoJSON")
+	getArchive := flag.String("get-archive", "",
+		"write archive for `site-name` (either 'domain.tld' or 'domain.tld/dir') to stdout in tar format")
 	updateSite := flag.String("update-site", "",
-		"update site for `webroot` (either 'domain.tld' or 'domain.tld/dir') from archive or repository URL")
+		"update site for `site-name` (either 'domain.tld' or 'domain.tld/dir') from archive or repository URL")
 	flag.Parse()
 
-	if *getManifest != "" && *getBlob != "" {
-		log.Fatalln("-get-manifest and -get-blob are mutually exclusive")
+	var cliOperations int
+	if *getBlob != "" {
+		cliOperations += 1
+	}
+	if *getManifest != "" {
+		cliOperations += 1
+	}
+	if *getArchive != "" {
+		cliOperations += 1
+	}
+	if cliOperations > 1 {
+		log.Fatalln("-get-blob, -get-manifest, and -get-archive are mutually exclusive")
 	}
 
 	if *configTomlPath != "" && *noConfig {
@@ -150,22 +174,6 @@ func Main() {
 			log.Fatalln(err)
 		}
 
-	case *getManifest != "":
-		if err := ConfigureBackend(&config.Storage); err != nil {
-			log.Fatalln(err)
-		}
-
-		webRoot := *getManifest
-		if !strings.Contains(webRoot, "/") {
-			webRoot += "/.index"
-		}
-
-		manifest, _, err := backend.GetManifest(context.Background(), webRoot, GetManifestOptions{})
-		if err != nil {
-			log.Fatalln(err)
-		}
-		fmt.Println(ManifestDebugJSON(manifest))
-
 	case *getBlob != "":
 		if err := ConfigureBackend(&config.Storage); err != nil {
 			log.Fatalln(err)
@@ -177,6 +185,31 @@ func Main() {
 		}
 
 		io.Copy(os.Stdout, reader)
+
+	case *getManifest != "":
+		if err := ConfigureBackend(&config.Storage); err != nil {
+			log.Fatalln(err)
+		}
+
+		webRoot := webRootArg(*getManifest)
+		manifest, _, err := backend.GetManifest(context.Background(), webRoot, GetManifestOptions{})
+		if err != nil {
+			log.Fatalln(err)
+		}
+		fmt.Println(ManifestDebugJSON(manifest))
+
+	case *getArchive != "":
+		if err := ConfigureBackend(&config.Storage); err != nil {
+			log.Fatalln(err)
+		}
+
+		webRoot := webRootArg(*getArchive)
+		manifest, manifestMtime, err :=
+			backend.GetManifest(context.Background(), webRoot, GetManifestOptions{})
+		if err != nil {
+			log.Fatalln(err)
+		}
+		CollectTar(context.Background(), os.Stdout, manifest, manifestMtime)
 
 	case *updateSite != "":
 		if err := ConfigureBackend(&config.Storage); err != nil {

@@ -11,7 +11,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const redirectsFileName string = "_redirects"
+const RedirectsFileName string = "_redirects"
 
 func unparseRule(rule redirects.Rule) string {
 	var statusPart string
@@ -87,24 +87,24 @@ func validateRedirectRule(rule redirects.Rule) error {
 
 // Parses redirects file and injects rules into the manifest.
 func ProcessRedirectsFile(manifest *Manifest) error {
-	redirectsEntry := manifest.Contents[redirectsFileName]
-	delete(manifest.Contents, redirectsFileName)
+	redirectsEntry := manifest.Contents[RedirectsFileName]
+	delete(manifest.Contents, RedirectsFileName)
 	if redirectsEntry == nil {
 		return nil
 	} else if redirectsEntry.GetType() != Type_InlineFile {
-		return AddProblem(manifest, redirectsFileName,
+		return AddProblem(manifest, RedirectsFileName,
 			"not a regular file")
 	}
 
 	rules, err := redirects.ParseString(string(redirectsEntry.GetData()))
 	if err != nil {
-		return AddProblem(manifest, redirectsFileName,
+		return AddProblem(manifest, RedirectsFileName,
 			"syntax error: %s", err)
 	}
 
 	for index, rule := range rules {
 		if err := validateRedirectRule(rule); err != nil {
-			AddProblem(manifest, redirectsFileName,
+			AddProblem(manifest, RedirectsFileName,
 				"rule #%d %q: %s", index+1, unparseRule(rule), err)
 			continue
 		}
@@ -116,6 +116,19 @@ func ProcessRedirectsFile(manifest *Manifest) error {
 		})
 	}
 	return nil
+}
+
+func CollectRedirectsFile(manifest *Manifest) string {
+	var rules []string
+	for _, rule := range manifest.GetRedirects() {
+		rules = append(rules, unparseRule(redirects.Rule{
+			From:   rule.GetFrom(),
+			To:     rule.GetTo(),
+			Status: int(rule.GetStatus()),
+			Force:  rule.GetForce(),
+		})+"\n")
+	}
+	return strings.Join(rules, "")
 }
 
 func pathSegments(path string) []string {

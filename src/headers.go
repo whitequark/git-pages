@@ -15,7 +15,7 @@ import (
 
 var ErrHeaderNotAllowed = errors.New("custom header not allowed")
 
-const headersFileName string = "_headers"
+const HeadersFileName string = "_headers"
 
 // Lifted from https://docs.netlify.com/manage/routing/headers/, except for `Set-Cookie`
 // the rationale for which does not apply in our environment.
@@ -86,24 +86,24 @@ func validateHeaderRule(rule headers.Rule) error {
 
 // Parses redirects file and injects rules into the manifest.
 func ProcessHeadersFile(manifest *Manifest) error {
-	headersEntry := manifest.Contents[headersFileName]
-	delete(manifest.Contents, headersFileName)
+	headersEntry := manifest.Contents[HeadersFileName]
+	delete(manifest.Contents, HeadersFileName)
 	if headersEntry == nil {
 		return nil
 	} else if headersEntry.GetType() != Type_InlineFile {
-		return AddProblem(manifest, headersFileName,
+		return AddProblem(manifest, HeadersFileName,
 			"not a regular file")
 	}
 
 	rules, err := headers.ParseString(string(headersEntry.GetData()))
 	if err != nil {
-		return AddProblem(manifest, headersFileName,
+		return AddProblem(manifest, HeadersFileName,
 			"syntax error: %s", err)
 	}
 
 	for index, rule := range rules {
 		if err := validateHeaderRule(rule); err != nil {
-			AddProblem(manifest, headersFileName,
+			AddProblem(manifest, HeadersFileName,
 				"rule #%d %q: %s", index+1, rule.Path, err)
 			continue
 		}
@@ -120,6 +120,21 @@ func ProcessHeadersFile(manifest *Manifest) error {
 		})
 	}
 	return nil
+}
+
+func CollectHeadersFile(manifest *Manifest) string {
+	var headersRules []headers.Rule
+	for _, manifestRule := range manifest.GetHeaders() {
+		headersRule := headers.Rule{
+			Path:    manifestRule.GetPath(),
+			Headers: http.Header{},
+		}
+		for _, manifestHeader := range manifestRule.GetHeaderMap() {
+			headersRule.Headers[manifestHeader.GetName()] = manifestHeader.GetValues()
+		}
+		headersRules = append(headersRules, headersRule)
+	}
+	return headers.Must(headers.UnparseString(headersRules))
 }
 
 func ApplyHeaderRules(manifest *Manifest, url *url.URL) (headers http.Header, err error) {

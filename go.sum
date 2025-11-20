@@ -1,5 +1,7 @@
 codeberg.org/git-pages/go-headers v1.0.0 h1:hvGU97hQdXaT5HwCpZJWQdg7akvtOBCSUNL4u2a5uTs=
 codeberg.org/git-pages/go-headers v1.0.0/go.mod h1:N4gwH0U3YPwmuyxqH7xBA8j44fTPX+vOEP7ejJVBPts=
+codeberg.org/git-pages/go-headers v1.1.0 h1:rk7/SOSsn+XuL7PUQZFYUaWKHEaj6K8mXmUV9rF2VxE=
+codeberg.org/git-pages/go-headers v1.1.0/go.mod h1:N4gwH0U3YPwmuyxqH7xBA8j44fTPX+vOEP7ejJVBPts=
 github.com/KimMachineGun/automemlimit v0.7.5 h1:RkbaC0MwhjL1ZuBKunGDjE/ggwAX43DwZrJqVwyveTk=
 github.com/KimMachineGun/automemlimit v0.7.5/go.mod h1:QZxpHaGOQoYvFhv/r4u3U0JTC2ZcOwbSr11UZF46UBM=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=

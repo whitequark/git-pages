@@ -310,6 +310,7 @@ func authorizeCodebergPagesV2(r *http.Request) (*Authorization, error) {
 	}
 }
 
+// Checks whether an operation that enables enumerating site contents is allowed.
 func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 

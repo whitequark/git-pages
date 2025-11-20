@@ -2,6 +2,7 @@ package git_pages
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -159,13 +160,14 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	}
 	if metadataPath, found := strings.CutPrefix(sitePath, ".git-pages/"); found {
 		lastModified := manifestMtime.UTC().Format(http.TimeFormat)
-		switch metadataPath {
-		case "health":
+		switch {
+		case metadataPath == "health":
 			w.Header().Add("Last-Modified", lastModified)
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, "ok\n")
+			return nil
 
-		case "manifest.json":
+		case metadataPath == "manifest.json":
 			// metadata requests require authorization to avoid making pushes from private
 			// repositories enumerable
 			_, err := AuthorizeMetadataRetrieval(r)
@@ -177,12 +179,42 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			w.Header().Add("Last-Modified", lastModified)
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(ManifestDebugJSON(manifest)))
+			return nil
+
+		case metadataPath == "archive.tar" && config.Feature("archive-site"):
+			// same as above
+			_, err := AuthorizeMetadataRetrieval(r)
+			if err != nil {
+				return err
+			}
+
+			// we only offer `/.git-pages/archive.tar` and not the `.tar.gz`/`.tar.zst` variants
+			// because HTTP can already request compression using the `Content-Encoding` mechanism
+			acceptedEncodings := parseHTTPEncodings(r.Header.Get("Accept-Encoding"))
+			negotiated := acceptedEncodings.Negotiate("zstd", "gzip", "identity")
+			if negotiated != "" {
+				w.Header().Set("Content-Encoding", negotiated)
+			}
+			w.Header().Add("Content-Type", "application/x-tar")
+			w.Header().Add("Last-Modified", lastModified)
+			w.Header().Add("Transfer-Encoding", "chunked")
+			w.WriteHeader(http.StatusOK)
+			var iow io.Writer
+			switch negotiated {
+			case "", "identity":
+				iow = w
+			case "gzip":
+				iow = gzip.NewWriter(w)
+			case "zstd":
+				iow, _ = zstd.NewWriter(w)
+			}
+			return CollectTar(r.Context(), iow, manifest, manifestMtime)
 
 		default:
 			w.WriteHeader(http.StatusNotFound)
 			fmt.Fprintf(w, "not found\n")
+			return nil
 		}
-		return nil
 	}
 
 	entryPath := sitePath
@@ -297,6 +329,8 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		default:
 			negotiatedEncoding = false
 		}
+	default:
+		return fmt.Errorf("unexpected transform")
 	}
 	if !negotiatedEncoding {
 		w.WriteHeader(http.StatusNotAcceptable)
