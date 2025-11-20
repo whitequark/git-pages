@@ -94,13 +94,27 @@ func fileOutputArg() (writer io.WriteCloser) {
 	return
 }
 
+func usage() {
+	fmt.Fprintf(os.Stderr, "Usage:\n")
+	fmt.Fprintf(os.Stderr, "(server) "+
+		"git-pages [-config <file>|-no-config]\n")
+	fmt.Fprintf(os.Stderr, "(admin)  "+
+		"git-pages {-run-migration <name>}\n")
+	fmt.Fprintf(os.Stderr, "(info)   "+
+		"git-pages {-print-config-env-vars|-print-config}\n")
+	fmt.Fprintf(os.Stderr, "(cli)    "+
+		"git-pages {-get-blob|-get-manifest|-get-archive|-update-site} <ref> [file]\n")
+	flag.PrintDefaults()
+}
+
 func Main() {
+	flag.Usage = usage
 	printConfigEnvVars := flag.Bool("print-config-env-vars", false,
 		"print every recognized configuration environment variable and exit")
 	printConfig := flag.Bool("print-config", false,
 		"print configuration as JSON and exit")
 	configTomlPath := flag.String("config", "",
-		"load configuration from `filename`")
+		"load configuration from `filename` (default: 'config.toml')")
 	noConfig := flag.Bool("no-config", false,
 		"run without configuration file (configure via environment variables)")
 	runMigration := flag.String("run-migration", "",
