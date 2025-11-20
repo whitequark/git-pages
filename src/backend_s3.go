@@ -396,11 +396,9 @@ func (l s3ManifestLoader) Reload(ctx context.Context, key string, oldValue *Cach
 }
 
 func (l s3ManifestLoader) load(ctx context.Context, name string, oldManifest *CachedManifest) (*CachedManifest, error) {
+	log.Printf("s3: get manifest %s\n", name)
+
 	loader := func() (*CachedManifest, error) {
-		log.Printf("s3: get manifest %s\n", name)
-
-		startTime := time.Now()
-
 		opts := minio.GetObjectOptions{}
 		if oldManifest != nil && oldManifest.etag != "" {
 			opts.SetMatchETagExcept(oldManifest.etag)
@@ -427,17 +425,18 @@ func (l s3ManifestLoader) load(ctx context.Context, name string, oldManifest *Ca
 			return nil, err
 		}
 
-		s3GetObjectDurationSeconds.
-			With(prometheus.Labels{"kind": "manifest"}).
-			Observe(time.Since(startTime).Seconds())
-
 		return &CachedManifest{manifest, uint32(len(data)), stat.LastModified, stat.ETag, nil}, nil
 	}
 
-	var cached *CachedManifest
+	startTime := time.Now()
 	cached, err := loader()
+	s3GetObjectDurationSeconds.
+		With(prometheus.Labels{"kind": "manifest"}).
+		Observe(time.Since(startTime).Seconds())
+
 	if err != nil {
-		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
+		errResp := minio.ToErrorResponse(err)
+		if errResp.Code == "NoSuchKey" {
 			s3GetObjectErrorsCount.With(prometheus.Labels{"object_kind": "manifest"}).Inc()
 			err = fmt.Errorf("%w: %s", ErrObjectNotFound, errResp.Key)
 			return &CachedManifest{nil, 1, time.Time{}, "", err}, nil
