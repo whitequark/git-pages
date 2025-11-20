@@ -187,14 +187,16 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 	manifest.OriginalSize = proto.Int64(originalSize)
 	manifest.CompressedSize = proto.Int64(compressedSize)
 
-	spaceSaving := (float64(originalSize) - float64(compressedSize)) / float64(originalSize)
-	log.Printf("compress: saved %.2f percent (%s to %s)",
-		spaceSaving*100.0,
-		datasize.ByteSize(originalSize).HR(),
-		datasize.ByteSize(compressedSize).HR(),
-	)
-	siteCompressionSpaceSaving.
-		Observe(spaceSaving)
+	if originalSize != 0 {
+		spaceSaving := (float64(originalSize) - float64(compressedSize)) / float64(originalSize)
+		log.Printf("compress: saved %.2f percent (%s to %s)",
+			spaceSaving*100.0,
+			datasize.ByteSize(originalSize).HR(),
+			datasize.ByteSize(compressedSize).HR(),
+		)
+		siteCompressionSpaceSaving.
+			Observe(spaceSaving)
+	}
 }
 
 // Apply post-processing steps to the manifest.
