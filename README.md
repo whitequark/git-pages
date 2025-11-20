@@ -56,24 +56,34 @@ $ docker run -e PAGES_STORAGE_TYPE -e PAGES_STORAGE_S3_ENDPOINT -e PAGES_STORAGE
 Features
 --------
 
-* In response to a `GET` or `HEAD` request, the server selects an appropriate site and responds with files from it. A site is a combination of the hostname and (optionally) the project name. The site is selected as follows:
-    - If the URL matches `https://<hostname>/<project-name>/...` and a site was published at `<project-name>`, this project-specific site is selected.
-    - If the URL matches `https://<hostname>/...` and the previous rule did not apply, the index site is selected.
-    - Site paths starting with `.git-pages/...` are reserved.
-        - The `.git-pages/manifest.json` path returns a [ProtoJSON](https://protobuf.dev/programming-guides/json/) representation of the deployed site manifest. It enumerates site structure, redirect rules, and errors that were not severe enough to abort publishing.
-* In response to a `PUT` or `POST` request, the server retrieves updates a site with new content. The URL of the request must be the root URL of the site that is being published.
+* In response to a `GET` or `HEAD` request, the server selects an appropriate site and responds with files from it. A site is a combination of the hostname and (optionally) the project name.
+    - The site is selected as follows:
+        - If the URL matches `https://<hostname>/<project-name>/...` and a site was published at `<project-name>`, this project-specific site is selected.
+        - If the URL matches `https://<hostname>/...` and the previous rule did not apply, the index site is selected.
+    - Site URLs that have a path starting with `.git-pages/...` are reserved for _git-pages_ itself.
+        - The `.git-pages/health` URL returns `ok` with the `Last-Modified:` header set to the manifest modification time.
+        - The `.git-pages/manifest.json` URL returns a [ProtoJSON](https://protobuf.dev/programming-guides/json/) representation of the deployed site manifest with the `Last-Modified:` header set to the manifest modification time. It enumerates site structure, redirect rules, and errors that were not severe enough to abort publishing. Note that **the manifest JSON format is not stable and will change without notice**.
+        - **With feature `archive-site`:** The `.git-pages/archive.tar` URL returns a tar archive of all site contents, including `_redirects` and `_headers` files (reconstructed from the manifest), with the `Last-Modified:` header set to the manifest modification time. Compression can be enabled using the `Accept-Encoding:` HTTP header (only).
+* In response to a `PUT` or `POST` request, the server updates a site with new content. The URL of the request must be the root URL of the site that is being published.
     - If the `PUT` method receives an `application/x-www-form-urlencoded` body, it contains a repository URL to be shallowly cloned. The `Branch` header contains the branch to be checked out; the `pages` branch is used if the header is absent.
     - If the `PUT` method receives an `application/x-tar`, `application/x-tar+gzip`, `application/x-tar+zstd`, or `application/zip` body, it contains an archive to be extracted.
     - The `POST` method requires an `application/json` body containing a Forgejo/Gitea/Gogs/GitHub webhook event payload. Requests where the `ref` key contains anything other than `refs/heads/pages` are ignored, and only the `pages` branch is used. The `repository.clone_url` key contains a repository URL to be shallowly cloned.
     - If the received contents is empty, performs the same action as `DELETE`.
 * In response to a `DELETE` request, the server unpublishes a site. The URL of the request must be the root URL of the site that is being unpublished. Site data remains stored for an indeterminate period of time, but becomes completely inaccessible.
 * All updates to site content are atomic (subject to consistency guarantees of the storage backend). That is, there is an instantaneous moment during an update before which the server will return the old content and after which it will return the new content.
+* Files with a certain name, when placed in the root of a site, have special functions:
+    - [Netlify `_redirects`][_redirects] file can be used to specify HTTP redirect and rewrite rules. The _git-pages_ implementation currently does not support placeholders, query parameters, or conditions, and may differ from Netlify in other minor ways. If you find that a supported `_redirects` file feature does not work the same as on Netlify, please file an issue. (Note that _git-pages_ does not perform URL normalization; `/foo` and `/foo/` are *not* the same, unlike with Netlify.)
+    - [Netlify `_headers`][_headers] file can be used to specify custom HTTP response headers (if allowlisted by configuration). In particular, this is useful to enable [CORS requests][cors]. The _git-pages_ implementation may differ from Netlify in minor ways; if you find that a `_headers` file feature does not work the same as on Netlify, please file an issue.
+
+[_redirects]: https://docs.netlify.com/manage/routing/redirects/overview/
+[_headers]: https://docs.netlify.com/manage/routing/headers/
+[cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS
 
 
 Authorization
 -------------
 
-DNS is used for authorization, either via TXT records or by pattern matching.
+DNS is the primary authorization method, using either TXT records or wildcard matching. In certain cases, git forge authorization is used in addition to DNS.
 
 The authorization flow for content updates (`PUT`, `DELETE`, `POST` requests) proceeds sequentially in the following order, with the first of multiple applicable rule taking precedence:
 
@@ -82,17 +92,17 @@ The authorization flow for content updates (`PUT`, `DELETE`, `POST` requests) pr
     - **`Pages` scheme:** Request includes an `Authorization: Pages <token>` header.
     - **`Basic` scheme:** Request includes an `Authorization: Basic <basic>` header, where `<basic>` is equal to `Base64("Pages:<token>")`. (Useful for non-Forgejo forges.)
 3. **DNS Allowlist:** If the method is `PUT` or `POST`, and a TXT record lookup at `_git-pages-repository.<host>` returns a set of well-formed absolute URLs, and (for `PUT` requests) the body contains a repository URL, and the requested clone URLs is contained in this set of URLs, the request is authorized.
-4. **Wildcard Match (Webhook):** If the method is `POST`, and a `[[wildcard]]` configuration section exists where the suffix of a hostname (compared label-wise) is equal to `[[wildcard]].domain`, and (for `PUT` requests) the body contains a repository URL, and the requested clone URL is a *matching* clone URL, the request is authorized.
+4. **Wildcard Match (content):** If the method is `POST`, and a `[[wildcard]]` configuration section exists where the suffix of a hostname (compared label-wise) is equal to `[[wildcard]].domain`, and (for `PUT` requests) the body contains a repository URL, and the requested clone URL is a *matching* clone URL, the request is authorized.
     - **Index repository:** If the request URL is `scheme://<user>.<host>/`, a *matching* clone URL is computed by templating `[[wildcard]].clone-url` with `<user>` and `<project>`, where `<project>` is computed by templating each element of `[[wildcard]].index-repos` with `<user>`, and `[[wildcard]]` is the section where the match occurred.
     - **Project repository:** If the request URL is `scheme://<user>.<host>/<project>/`, a *matching* clone URL is computed by templating `[[wildcard]].clone-url` with `<user>` and `<project>`, and `[[wildcard]]` is the section where the match occurred.
-5. **Forge Authorization:** If the method is `PUT`, and the body contains an archive, and a `[[wildcard]]` configuration section exists where the suffix of a hostname (compared label-wise) is equal to `[[wildcard]].domain`, and `[[wildcard]].authorization` is non-empty, and the request includes a `Forge-Authorization:` header, and the header grants push permissions to a repository at the *matching* clone URL (as defined above) as determined by an API call to the forge, the request is authorized.
+5. **Forge Authorization:** If the method is `PUT`, and the body contains an archive, and a `[[wildcard]]` configuration section exists where the suffix of a hostname (compared label-wise) is equal to `[[wildcard]].domain`, and `[[wildcard]].authorization` is non-empty, and the request includes a `Forge-Authorization:` header, and the header (when forwarded as `Authorization:`) grants push permissions to a repository at the *matching* clone URL (as defined above) as determined by an API call to the forge, the request is authorized. (This enables publishing a site for a private repository.)
 5. **Default Deny:** Otherwise, the request is not authorized.
 
 The authorization flow for metadata retrieval (`GET` requests with site paths starting with `.git-pages/`) in the following order, with the first of multiple applicable rule taking precedence:
 
 1. **Development Mode:** Same as for content updates.
 2. **DNS Challenge:** Same as for content updates.
-3. **Wildcard Match (Metadata):** If a `[[wildcard]]` configuration section exists where the suffix of a hostname (compared label-wise) is equal to `[[wildcard]].domain`, the request is authorized.
+3. **Wildcard Match (metadata):** If a `[[wildcard]]` configuration section exists where the suffix of a hostname (compared label-wise) is equal to `[[wildcard]].domain`, the request is authorized.
 4. **Default Deny:** Otherwise, the request is not authorized.
 
 
