@@ -81,6 +81,19 @@ func webRootArg(arg string) string {
 	}
 }
 
+func fileOutputArg() (writer io.WriteCloser) {
+	var err error
+	if flag.NArg() == 0 {
+		writer = os.Stdout
+	} else {
+		writer, err = os.Create(flag.Arg(0))
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}
+	return
+}
+
 func Main() {
 	printConfigEnvVars := flag.Bool("print-config-env-vars", false,
 		"print every recognized configuration environment variable and exit")
@@ -91,15 +104,15 @@ func Main() {
 	noConfig := flag.Bool("no-config", false,
 		"run without configuration file (configure via environment variables)")
 	runMigration := flag.String("run-migration", "",
-		"run a specific store migration (available: \"create-domain-markers\")")
+		"run a store `migration` (one of: create-domain-markers)")
 	getBlob := flag.String("get-blob", "",
-		"write contents of `blob-ref` ('sha256-xxxxxxx...xxx') to stdout")
+		"write contents of `blob` ('sha256-xxxxxxx...xxx')")
 	getManifest := flag.String("get-manifest", "",
-		"write manifest for `site-name` (either 'domain.tld' or 'domain.tld/dir') to stdout as ProtoJSON")
+		"write manifest for `site` (either 'domain.tld' or 'domain.tld/dir') as ProtoJSON")
 	getArchive := flag.String("get-archive", "",
-		"write archive for `site-name` (either 'domain.tld' or 'domain.tld/dir') to stdout in tar format")
+		"write archive for `site` (either 'domain.tld' or 'domain.tld/dir') in tar format")
 	updateSite := flag.String("update-site", "",
-		"update site for `site-name` (either 'domain.tld' or 'domain.tld/dir') from archive or repository URL")
+		"update `site` (either 'domain.tld' or 'domain.tld/dir') from archive or repository URL")
 	flag.Parse()
 
 	var cliOperations int
@@ -183,8 +196,7 @@ func Main() {
 		if err != nil {
 			log.Fatalln(err)
 		}
-
-		io.Copy(os.Stdout, reader)
+		io.Copy(fileOutputArg(), reader)
 
 	case *getManifest != "":
 		if err := ConfigureBackend(&config.Storage); err != nil {
@@ -196,7 +208,7 @@ func Main() {
 		if err != nil {
 			log.Fatalln(err)
 		}
-		fmt.Println(ManifestDebugJSON(manifest))
+		fmt.Fprintln(fileOutputArg(), ManifestDebugJSON(manifest))
 
 	case *getArchive != "":
 		if err := ConfigureBackend(&config.Storage); err != nil {
@@ -209,21 +221,20 @@ func Main() {
 		if err != nil {
 			log.Fatalln(err)
 		}
-		CollectTar(context.Background(), os.Stdout, manifest, manifestMtime)
+		CollectTar(context.Background(), fileOutputArg(), manifest, manifestMtime)
 
 	case *updateSite != "":
 		if err := ConfigureBackend(&config.Storage); err != nil {
 			log.Fatalln(err)
 		}
 
-		sourceURL, _ := url.Parse(flag.Arg(0))
-		if sourceURL == nil || *sourceURL == (url.URL{}) {
-			log.Fatalln("update source must be provided as an argument")
+		if flag.NArg() != 1 {
+			log.Fatalln("update source must be provided as the argument")
 		}
 
-		webRoot := *updateSite
-		if !strings.Contains(webRoot, "/") {
-			webRoot += "/.index"
+		sourceURL, err := url.Parse(flag.Arg(0))
+		if err != nil {
+			log.Fatalln(err)
 		}
 
 		var result UpdateResult
@@ -232,6 +243,7 @@ func Main() {
 			if err != nil {
 				log.Fatalln(err)
 			}
+			defer file.Close()
 
 			var contentType string
 			switch {
@@ -247,12 +259,15 @@ func Main() {
 				log.Fatalf("cannot determine content type from filename %q\n", sourceURL)
 			}
 
+			webRoot := webRootArg(*updateSite)
 			result = UpdateFromArchive(context.Background(), webRoot, contentType, file)
 		} else {
 			branch := "pages"
 			if sourceURL.Fragment != "" {
 				branch, sourceURL.Fragment = sourceURL.Fragment, ""
 			}
+
+			webRoot := webRootArg(*updateSite)
 			result = UpdateFromRepository(context.Background(), webRoot, sourceURL.String(), branch)
 		}
 
