@@ -38,6 +38,7 @@ type Config struct {
 	Insecure      bool                `toml:"-" env:"insecure"`
 	Features      []string            `toml:"features"`
 	LogFormat     string              `toml:"log-format" default:"text"`
+	LogLevel      string              `toml:"log-level" default:"info"`
 	Server        ServerConfig        `toml:"server"`
 	Wildcard      []WildcardConfig    `toml:"wildcard"`
 	Storage       StorageConfig       `toml:"storage"`
