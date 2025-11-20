@@ -339,8 +339,7 @@ func Main() {
 		// The backend is not recreated (this is intentional as it allows preserving the cache).
 		OnReload(func() {
 			if newConfig, err := Configure(*configTomlPath); err != nil {
-				log.Println("config:", err)
-				log.Println("config: reload error")
+				log.Println("config: reload err:", err)
 			} else {
 				// From https://go.dev/ref/mem:
 				// > A read r of a memory location x holding a value that is not larger than
@@ -356,9 +355,9 @@ func Main() {
 				); err != nil {
 					// At this point the configuration is in an in-between, corrupted state, so
 					// the only reasonable choice is to crash.
-					log.Fatalln("config: reload failure:", err)
+					log.Fatalln("config: reload fail:", err)
 				} else {
-					log.Println("config: reloaded")
+					log.Println("config: reload ok")
 				}
 			}
 		})
