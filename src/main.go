@@ -303,6 +303,26 @@ func Main() {
 		}
 
 	default:
+		// Hook a signal (SIGHUP on *nix, nothing on Windows) for reloading the configuration
+		// at runtime. This is useful because it preserves S3 backend cache contents. Failed
+		// configuration reloads will not crash the process; you may want to check the syntax
+		// first with `git-pages -config ... -print-config` since there is no other feedback.
+		OnReload(func() {
+			if newConfig, err := Configure(*configTomlPath); err != nil {
+				log.Println("config:", err)
+				log.Println("config: reload failed")
+			} else {
+				log.Println("config: reloaded")
+				// From https://go.dev/ref/mem:
+				// > A read r of a memory location x holding a value that is not larger than
+				// > a machine word must observe some write w such that r does not happen before
+				// > w and there is no write w' such that w happens before w' and w' happens
+				// > before r. That is, each read must observe a value written by a preceding or
+				// > concurrent write.
+				config = newConfig
+			}
+		})
+
 		// Start listening on all ports before initializing the backend, otherwise if the backend
 		// spends some time initializing (which the S3 backend does) a proxy like Caddy can race
 		// with git-pages on startup and return errors for requests that would have been served
