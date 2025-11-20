@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	codeberg.org/git-pages/go-headers v1.1.0
+	codeberg.org/git-pages/go-slog-syslog v0.0.0-20251122140925-40467958039d
 	github.com/KimMachineGun/automemlimit v0.7.5
 	github.com/c2h5oh/datasize v0.0.0-20231215233829-aa82cc1e6500
 	github.com/creasty/defaults v1.8.0
@@ -39,6 +40,7 @@ require (
 	github.com/kevinburke/ssh_config v1.4.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
+	github.com/leodido/go-syslog/v4 v4.3.0 // indirect
 	github.com/minio/crc64nvme v1.1.0 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect

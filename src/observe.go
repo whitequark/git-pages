@@ -13,9 +13,12 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	slogmulti "github.com/samber/slog-multi"
+
+	syslog "codeberg.org/git-pages/go-slog-syslog"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -41,6 +44,8 @@ var (
 		NativeHistogramMinResetDuration: 10 * time.Minute,
 	}, []string{"method"})
 )
+
+var syslogHandler syslog.Handler
 
 func hasSentry() bool {
 	return os.Getenv("SENTRY_DSN") != ""
@@ -81,6 +86,19 @@ func InitObservability() {
 			slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel}))
 	default:
 		log.Println("unknown log format", config.LogFormat)
+	}
+
+	if syslogAddr := os.Getenv("SYSLOG_ADDR"); syslogAddr != "" {
+		var err error
+		syslogHandler, err = syslog.NewHandler(&syslog.HandlerOptions{
+			Address:          syslogAddr,
+			AppName:          "git-pages",
+			StructuredDataID: "git-pages",
+		})
+		if err != nil {
+			log.Fatalf("syslog: %v", err)
+		}
+		logHandlers = append(logHandlers, syslogHandler)
 	}
 
 	if hasSentry() {
@@ -154,9 +172,15 @@ func levelsFromMinimum(minLevel slog.Level) []slog.Level {
 }
 
 func FiniObservability() {
-	if hasSentry() {
-		sentry.Flush(2 * time.Second)
+	var wg sync.WaitGroup
+	timeout := 2 * time.Second
+	if syslogHandler != nil {
+		wg.Go(func() { syslogHandler.Flush(timeout) })
 	}
+	if hasSentry() {
+		wg.Go(func() { sentry.Flush(timeout) })
+	}
+	wg.Wait()
 }
 
 func ObserveError(err error) {
