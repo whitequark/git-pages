@@ -78,20 +78,16 @@ type Backend interface {
 	CreateDomain(ctx context.Context, domain string) error
 }
 
-var backend Backend
-
-func ConfigureBackend(config *StorageConfig) (err error) {
+func CreateBackend(config *StorageConfig) (backend Backend, err error) {
 	switch config.Type {
 	case "fs":
 		if backend, err = NewFSBackend(&config.FS); err != nil {
 			err = fmt.Errorf("fs backend: %w", err)
 		}
-
 	case "s3":
 		if backend, err = NewS3Backend(context.Background(), &config.S3); err != nil {
 			err = fmt.Errorf("s3 backend: %w", err)
 		}
-
 	default:
 		err = fmt.Errorf("unknown backend: %s", config.Type)
 	}

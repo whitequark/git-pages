@@ -329,7 +329,7 @@ func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
 		return auth, nil
 	}
 
-	for _, pattern := range wildcardPatterns {
+	for _, pattern := range wildcards {
 		auth, err = authorizeWildcardMatchHost(r, pattern)
 		if err != nil && IsUnauthorized(err) {
 			causes = append(causes, err)
@@ -397,7 +397,7 @@ func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 
 	// Wildcard match is only available for webhooks, not the REST API.
 	if r.Method == http.MethodPost {
-		for _, pattern := range wildcardPatterns {
+		for _, pattern := range wildcards {
 			auth, err = authorizeWildcardMatchSite(r, pattern)
 			if err != nil && IsUnauthorized(err) {
 				causes = append(causes, err)
@@ -592,7 +592,7 @@ func authorizeForgeWithToken(r *http.Request) (*Authorization, error) {
 	}
 
 	var errs []error
-	for _, pattern := range wildcardPatterns {
+	for _, pattern := range wildcards {
 		if !pattern.Authorization {
 			continue
 		}

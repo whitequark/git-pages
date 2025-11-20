@@ -23,8 +23,6 @@ type WildcardPattern struct {
 	Fallback      http.Handler
 }
 
-var wildcardPatterns []*WildcardPattern
-
 func (pattern *WildcardPattern) GetHost() string {
 	parts := []string{"*"}
 	parts = append(parts, pattern.Domain...)
@@ -95,7 +93,7 @@ func HandleWildcardFallback(w http.ResponseWriter, r *http.Request) (bool, error
 		return false, err
 	}
 
-	for _, pattern := range wildcardPatterns {
+	for _, pattern := range wildcards {
 		if pattern.IsFallbackFor(host) {
 			log.Printf("proxy: %s via %s", pattern.GetHost(), pattern.FallbackURL)
 			pattern.Fallback.ServeHTTP(w, r)
@@ -105,11 +103,12 @@ func HandleWildcardFallback(w http.ResponseWriter, r *http.Request) (bool, error
 	return false, nil
 }
 
-func ConfigureWildcards(configs []WildcardConfig) error {
+func TranslateWildcards(configs []WildcardConfig) ([]*WildcardPattern, error) {
+	var wildcardPatterns []*WildcardPattern
 	for _, config := range configs {
 		cloneURLTemplate, err := fasttemplate.NewTemplate(config.CloneURL, "<", ">")
 		if err != nil {
-			return fmt.Errorf("wildcard pattern: clone URL: %w", err)
+			return nil, fmt.Errorf("wildcard pattern: clone URL: %w", err)
 		}
 
 		var indexRepoTemplates []*fasttemplate.Template
@@ -117,7 +116,7 @@ func ConfigureWildcards(configs []WildcardConfig) error {
 		for _, indexRepo := range config.IndexRepos {
 			indexRepoTemplate, err := fasttemplate.NewTemplate(indexRepo, "<", ">")
 			if err != nil {
-				return fmt.Errorf("wildcard pattern: index repo: %w", err)
+				return nil, fmt.Errorf("wildcard pattern: index repo: %w", err)
 			}
 			indexRepoTemplates = append(indexRepoTemplates, indexRepoTemplate)
 		}
@@ -129,7 +128,7 @@ func ConfigureWildcards(configs []WildcardConfig) error {
 				// is the same for all of them.
 				authorization = true
 			} else {
-				return fmt.Errorf(
+				return nil, fmt.Errorf(
 					"wildcard pattern: unknown authorization mechanism: %s",
 					config.Authorization,
 				)
@@ -141,7 +140,7 @@ func ConfigureWildcards(configs []WildcardConfig) error {
 		if config.FallbackProxyTo != "" {
 			fallbackURL, err = url.Parse(config.FallbackProxyTo)
 			if err != nil {
-				return fmt.Errorf("wildcard pattern: fallback URL: %w", err)
+				return nil, fmt.Errorf("wildcard pattern: fallback URL: %w", err)
 			}
 
 			fallback = &httputil.ReverseProxy{
@@ -168,5 +167,5 @@ func ConfigureWildcards(configs []WildcardConfig) error {
 			Fallback:      fallback,
 		})
 	}
-	return nil
+	return wildcardPatterns, nil
 }

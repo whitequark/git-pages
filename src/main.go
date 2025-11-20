@@ -2,6 +2,7 @@ package git_pages
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -20,6 +21,47 @@ import (
 )
 
 var config *Config
+var wildcards []*WildcardPattern
+var backend Backend
+
+func configureFeatures() (err error) {
+	if len(config.Features) > 0 {
+		log.Println("features:", strings.Join(config.Features, ", "))
+	}
+	return
+}
+
+func configureMemLimit() (err error) {
+	// Avoid being OOM killed by not garbage collecting early enough.
+	memlimitBefore := datasize.ByteSize(debug.SetMemoryLimit(-1))
+	automemlimit.SetGoMemLimitWithOpts(
+		automemlimit.WithLogger(slog.New(slog.DiscardHandler)),
+		automemlimit.WithProvider(
+			automemlimit.ApplyFallback(
+				automemlimit.FromCgroup,
+				automemlimit.FromSystem,
+			),
+		),
+		automemlimit.WithRatio(float64(config.Limits.MaxHeapSizeRatio)),
+	)
+	memlimitAfter := datasize.ByteSize(debug.SetMemoryLimit(-1))
+	if memlimitBefore == memlimitAfter {
+		log.Println("memlimit: now", memlimitBefore.HR())
+	} else {
+		log.Println("memlimit: was", memlimitBefore.HR(), "now", memlimitAfter.HR())
+	}
+	return
+}
+
+func configureWildcards() (err error) {
+	newWildcards, err := TranslateWildcards(config.Wildcard)
+	if err != nil {
+		return err
+	} else {
+		wildcards = newWildcards
+		return nil
+	}
+}
 
 func listen(name string, listen string) net.Listener {
 	if listen == "-" {
@@ -168,32 +210,17 @@ func Main() {
 	InitObservability()
 	defer FiniObservability()
 
-	if len(config.Features) > 0 {
-		log.Println("features:", strings.Join(config.Features, ", "))
-	}
-
-	// Avoid being OOM killed by not garbage collecting early enough.
-	memlimitBefore := datasize.ByteSize(debug.SetMemoryLimit(-1))
-	automemlimit.SetGoMemLimitWithOpts(
-		automemlimit.WithLogger(slog.New(slog.DiscardHandler)),
-		automemlimit.WithProvider(
-			automemlimit.ApplyFallback(
-				automemlimit.FromCgroup,
-				automemlimit.FromSystem,
-			),
-		),
-		automemlimit.WithRatio(float64(config.Limits.MaxHeapSizeRatio)),
-	)
-	memlimitAfter := datasize.ByteSize(debug.SetMemoryLimit(-1))
-	if memlimitBefore == memlimitAfter {
-		log.Println("memlimit: now", memlimitBefore.HR())
-	} else {
-		log.Println("memlimit: was", memlimitBefore.HR(), "now", memlimitAfter.HR())
+	if err = errors.Join(
+		configureFeatures(),
+		configureMemLimit(),
+		configureWildcards(),
+	); err != nil {
+		log.Fatalln(err)
 	}
 
 	switch {
 	case *runMigration != "":
-		if err := ConfigureBackend(&config.Storage); err != nil {
+		if backend, err = CreateBackend(&config.Storage); err != nil {
 			log.Fatalln(err)
 		}
 
@@ -202,7 +229,7 @@ func Main() {
 		}
 
 	case *getBlob != "":
-		if err := ConfigureBackend(&config.Storage); err != nil {
+		if backend, err = CreateBackend(&config.Storage); err != nil {
 			log.Fatalln(err)
 		}
 
@@ -213,7 +240,7 @@ func Main() {
 		io.Copy(fileOutputArg(), reader)
 
 	case *getManifest != "":
-		if err := ConfigureBackend(&config.Storage); err != nil {
+		if backend, err = CreateBackend(&config.Storage); err != nil {
 			log.Fatalln(err)
 		}
 
@@ -225,7 +252,7 @@ func Main() {
 		fmt.Fprintln(fileOutputArg(), ManifestDebugJSON(manifest))
 
 	case *getArchive != "":
-		if err := ConfigureBackend(&config.Storage); err != nil {
+		if backend, err = CreateBackend(&config.Storage); err != nil {
 			log.Fatalln(err)
 		}
 
@@ -238,7 +265,7 @@ func Main() {
 		CollectTar(context.Background(), fileOutputArg(), manifest, manifestMtime)
 
 	case *updateSite != "":
-		if err := ConfigureBackend(&config.Storage); err != nil {
+		if backend, err = CreateBackend(&config.Storage); err != nil {
 			log.Fatalln(err)
 		}
 
@@ -307,12 +334,14 @@ func Main() {
 		// at runtime. This is useful because it preserves S3 backend cache contents. Failed
 		// configuration reloads will not crash the process; you may want to check the syntax
 		// first with `git-pages -config ... -print-config` since there is no other feedback.
+		//
+		// Note that not all of the configuration is updated on reload. Listeners are kept as-is.
+		// The backend is not recreated (this is intentional as it allows preserving the cache).
 		OnReload(func() {
 			if newConfig, err := Configure(*configTomlPath); err != nil {
 				log.Println("config:", err)
-				log.Println("config: reload failed")
+				log.Println("config: reload error")
 			} else {
-				log.Println("config: reloaded")
 				// From https://go.dev/ref/mem:
 				// > A read r of a memory location x holding a value that is not larger than
 				// > a machine word must observe some write w such that r does not happen before
@@ -320,6 +349,17 @@ func Main() {
 				// > before r. That is, each read must observe a value written by a preceding or
 				// > concurrent write.
 				config = newConfig
+				if err = errors.Join(
+					configureFeatures(),
+					configureMemLimit(),
+					configureWildcards(),
+				); err != nil {
+					// At this point the configuration is in an in-between, corrupted state, so
+					// the only reasonable choice is to crash.
+					log.Fatalln("config: reload failure:", err)
+				} else {
+					log.Println("config: reloaded")
+				}
 			}
 		})
 
@@ -331,15 +371,10 @@ func Main() {
 		caddyListener := listen("caddy", config.Server.Caddy)
 		metricsListener := listen("metrics", config.Server.Metrics)
 
-		if err := ConfigureBackend(&config.Storage); err != nil {
+		if backend, err = CreateBackend(&config.Storage); err != nil {
 			log.Fatalln(err)
 		}
-
 		backend = NewObservedBackend(backend)
-
-		if err := ConfigureWildcards(config.Wildcard); err != nil {
-			log.Fatalln(err)
-		}
 
 		go serve(pagesListener, ObserveHTTPHandler(http.HandlerFunc(ServePages)))
 		go serve(caddyListener, ObserveHTTPHandler(http.HandlerFunc(ServeCaddy)))
