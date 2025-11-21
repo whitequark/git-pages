@@ -384,6 +384,11 @@ func Main() {
 		} else {
 			log.Println("serve: ready")
 		}
-		select {}
+
+		interrupt := make(chan struct{})
+		OnInterrupt(func() { interrupt <- struct{}{} })
+		<-interrupt
+
+		log.Println("exiting gracefully")
 	}
 }

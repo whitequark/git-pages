@@ -18,3 +18,13 @@ func OnReload(handler func()) {
 		}
 	}()
 }
+
+func OnInterrupt(handler func()) {
+	sigint := make(chan os.Signal, 1)
+	signal.Notify(sigint, syscall.SIGINT)
+	go func() {
+		<-sigint
+		signal.Stop(sigint)
+		handler()
+	}()
+}
