@@ -3,7 +3,7 @@ FROM docker.io/library/alpine:latest@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be5
 RUN apk --no-cache add ca-certificates
 
 # Build supervisor.
-FROM docker.io/library/golang:1.25-alpine@sha256:aee43c3ccbf24fdffb7295693b6e33b21e01baec1b2a55acc351fde345e9ec34 AS supervisor-builder
+FROM docker.io/library/golang:1.25-alpine@sha256:d3f0cf7723f3429e3f9ed846243970b20a2de7bae6a5b66fc5914e228d831bbb AS supervisor-builder
 RUN apk --no-cache add git
 WORKDIR /build
 RUN git clone https://github.com/ochinchina/supervisord . && \
@@ -12,13 +12,13 @@ RUN GOBIN=/usr/bin go install -ldflags "-s -w" && \
     go clean -cache -modcache
 
 # Build Caddy with S3 storage backend.
-FROM docker.io/library/caddy:2.10.2-builder@sha256:53f91ad7c5f1ab9a607953199b7c1e10920c570ae002aef913d68ed7464fb19f AS caddy-builder
+FROM docker.io/library/caddy:2.10.2-builder@sha256:6e3ed727ce8695fc58e0a8de8e5d11888f6463c430ea5b40e0b5f679ab734868 AS caddy-builder
 RUN xcaddy build ${CADDY_VERSION} \
     --with=github.com/ss098/certmagic-s3@v0.0.0-20250922022452-8af482af5f39 && \
     go clean -cache -modcache
 
 # Build git-pages.
-FROM docker.io/library/golang:1.25-alpine@sha256:aee43c3ccbf24fdffb7295693b6e33b21e01baec1b2a55acc351fde345e9ec34 AS git-pages-builder
+FROM docker.io/library/golang:1.25-alpine@sha256:d3f0cf7723f3429e3f9ed846243970b20a2de7bae6a5b66fc5914e228d831bbb AS git-pages-builder
 RUN apk --no-cache add git
 WORKDIR /build
 COPY go.mod go.sum ./

@@ -9,12 +9,12 @@ jobs:
   check:
     runs-on: codeberg-small-lazy
     container:
-      image: docker.io/library/node:24-trixie-slim@sha256:45babd1b4ce0349fb12c4e24bf017b90b96d52806db32e001e3013f341bef0fe
+      image: docker.io/library/node:24-trixie-slim@sha256:fcdfd7bcd8f641c8c76a8950343c73912d68ba341e8dd1074e663b784d3e76f4
     steps:
       - name: Check out source code
-        uses: https://code.forgejo.org/actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: https://code.forgejo.org/actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - name: Set up toolchain
-        uses: https://code.forgejo.org/actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
+        uses: https://code.forgejo.org/actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
           go-version: '>=1.25.0'
       - name: Install dependencies
@@ -36,12 +36,12 @@ jobs:
     needs: [check]
     runs-on: codeberg-medium-lazy
     container:
-      image: docker.io/library/node:24-trixie-slim@sha256:ef4ca6d078dd18322059a1f051225f7bbfc2bb60c16cbb5d8a1ba2cc8964fe8a
+      image: docker.io/library/node:24-trixie-slim@sha256:fcdfd7bcd8f641c8c76a8950343c73912d68ba341e8dd1074e663b784d3e76f4
     steps:
       - name: Check out source code
-        uses: https://code.forgejo.org/actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: https://code.forgejo.org/actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - name: Set up toolchain
-        uses: https://code.forgejo.org/actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
+        uses: https://code.forgejo.org/actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
           go-version: '>=1.25.0'
       - name: Install dependencies
@@ -58,7 +58,7 @@ jobs:
           build linux   arm64
           build darwin  arm64
       - name: Create release
-        uses: https://code.forgejo.org/actions/forgejo-release@v2.7.3
+        uses: https://code.forgejo.org/actions/forgejo-release@fc0488c944626f9265d87fbc4dd6c08f78014c63 # v2.7.3
         with:
           tag: ${{ startsWith(forge.event.ref, 'refs/tags/v') && forge.ref_name || 'latest' }}
           release-dir: assets
@@ -71,14 +71,14 @@ jobs:
     needs: [check]
     runs-on: codeberg-medium-lazy
     container:
-      image: docker.io/library/node:24-trixie-slim@sha256:ef4ca6d078dd18322059a1f051225f7bbfc2bb60c16cbb5d8a1ba2cc8964fe8a
+      image: docker.io/library/node:24-trixie-slim@sha256:fcdfd7bcd8f641c8c76a8950343c73912d68ba341e8dd1074e663b784d3e76f4
     steps:
       - name: Install dependencies
         run: |
           apt-get -y update
           apt-get -y install buildah ca-certificates
       - name: Check out source code
-        uses: https://code.forgejo.org/actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: https://code.forgejo.org/actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - name: Build container
         run: |
           printf '[storage]\ndriver="vfs"\nrunroot="/run/containers/storage"\ngraphroot="/var/lib/containers/storage"\n' | tee /etc/containers/storage.conf

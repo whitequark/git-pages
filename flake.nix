@@ -43,7 +43,7 @@
             "-s -w"
           ];
 
-          vendorHash = "sha256-oVXELOXbRTzzU8pUGNE4K552thlZXGAX7qpv6ETwz6o=";
+          vendorHash = "sha256-o6qrKYZHPqhiSr8NcQHtJd7cMgo12FaMAcf2LymIpo8=";
         };
       in
       {
