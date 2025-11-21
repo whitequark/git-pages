@@ -159,11 +159,21 @@ func authorizeDNSAllowlist(r *http.Request) (*Authorization, error) {
 		return nil, err
 	}
 
+	projectName, err := GetProjectName(r)
+	if err != nil {
+		return nil, err
+	}
+
 	allowlistHostname := fmt.Sprintf("_git-pages-repository.%s", host)
 	records, err := net.LookupTXT(allowlistHostname)
 	if err != nil {
 		return nil, AuthError{http.StatusUnauthorized,
 			fmt.Sprintf("failed to look up DNS repository allowlist: %s TXT", allowlistHostname)}
+	}
+
+	if projectName != ".index" {
+		return nil, AuthError{http.StatusUnauthorized,
+			"DNS repository allowlist only authorizes index site"}
 	}
 
 	var (
