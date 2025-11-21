@@ -148,7 +148,7 @@ func DetectContentType(manifest *Manifest) {
 		} else if entry.GetType() == Type_InlineFile && entry.GetTransform() == Transform_None {
 			contentType := mime.TypeByExtension(filepath.Ext(path))
 			if contentType == "" {
-				contentType = http.DetectContentType(entry.Data[:512])
+				contentType = http.DetectContentType(entry.Data[:min(512, len(entry.Data))])
 			}
 			entry.ContentType = proto.String(contentType)
 		} else {
