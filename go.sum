@@ -1,9 +1,7 @@
 codeberg.org/git-pages/go-headers v1.1.0 h1:rk7/SOSsn+XuL7PUQZFYUaWKHEaj6K8mXmUV9rF2VxE=
 codeberg.org/git-pages/go-headers v1.1.0/go.mod h1:N4gwH0U3YPwmuyxqH7xBA8j44fTPX+vOEP7ejJVBPts=
-codeberg.org/git-pages/go-slog-syslog v0.0.0-20251122140501-cef0168bba20 h1:gwBA9NToHbaExklHIdOvjc4gzVJkDeffHxlsPY64NrM=
-codeberg.org/git-pages/go-slog-syslog v0.0.0-20251122140501-cef0168bba20/go.mod h1:8NPSXbYcVb71qqNM5cIgn1/uQgMisLbu2dVD1BNxsUw=
-codeberg.org/git-pages/go-slog-syslog v0.0.0-20251122140925-40467958039d h1:+U2YyXy2QX8oe1e5+UFR1PXfgIK79QWgAgM9l9FQG5o=
-codeberg.org/git-pages/go-slog-syslog v0.0.0-20251122140925-40467958039d/go.mod h1:8NPSXbYcVb71qqNM5cIgn1/uQgMisLbu2dVD1BNxsUw=
+codeberg.org/git-pages/go-slog-syslog v0.0.0-20251122144254-06c45d430fb9 h1:xfPDg8ThBt3+t+C+pvM3bEH4ePUzP5t5kY2v19TqgKc=
+codeberg.org/git-pages/go-slog-syslog v0.0.0-20251122144254-06c45d430fb9/go.mod h1:8NPSXbYcVb71qqNM5cIgn1/uQgMisLbu2dVD1BNxsUw=
 github.com/KimMachineGun/automemlimit v0.7.5 h1:RkbaC0MwhjL1ZuBKunGDjE/ggwAX43DwZrJqVwyveTk=
 github.com/KimMachineGun/automemlimit v0.7.5/go.mod h1:QZxpHaGOQoYvFhv/r4u3U0JTC2ZcOwbSr11UZF46UBM=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
