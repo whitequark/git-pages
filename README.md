@@ -164,4 +164,4 @@ The specific arrangement used is clearly not optimal; at a minimum it is likely 
 License
 -------
 
-[0-clause BSD](LICENSE-0BSD.txt)
+[0-clause BSD](LICENSE.txt)
