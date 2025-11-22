@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -32,9 +31,9 @@ func IsUnauthorized(err error) bool {
 	return false
 }
 
-func authorizeInsecure() *Authorization {
+func authorizeInsecure(r *http.Request) *Authorization {
 	if config.Insecure { // for testing only
-		log.Println("auth: INSECURE mode")
+		logc.Println(r.Context(), "auth: INSECURE mode")
 		return &Authorization{
 			repoURLs: nil,
 			branch:   "pages",
@@ -276,7 +275,7 @@ func authorizeCodebergPagesV2(r *http.Request) (*Authorization, error) {
 	}
 
 	if len(dnsRecords) > 0 {
-		log.Printf("auth: %s TXT/CNAME: %q\n", host, dnsRecords)
+		logc.Printf(r.Context(), "auth: %s TXT/CNAME: %q\n", host, dnsRecords)
 	}
 
 	for _, dnsRecord := range dnsRecords {
@@ -324,7 +323,7 @@ func authorizeCodebergPagesV2(r *http.Request) (*Authorization, error) {
 func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
-	auth := authorizeInsecure()
+	auth := authorizeInsecure(r)
 	if auth != nil {
 		return auth, nil
 	}
@@ -335,7 +334,7 @@ func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
 	} else if err != nil { // bad request
 		return nil, err
 	} else {
-		log.Println("auth: DNS challenge")
+		logc.Println(r.Context(), "auth: DNS challenge")
 		return auth, nil
 	}
 
@@ -346,7 +345,7 @@ func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
 		} else if err != nil { // bad request
 			return nil, err
 		} else {
-			log.Printf("auth: wildcard %s\n", pattern.GetHost())
+			logc.Printf(r.Context(), "auth: wildcard %s\n", pattern.GetHost())
 			return auth, nil
 		}
 	}
@@ -358,7 +357,7 @@ func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
 		} else if err != nil { // bad request
 			return nil, err
 		} else {
-			log.Printf("auth: codeberg %s\n", r.Host)
+			logc.Printf(r.Context(), "auth: codeberg %s\n", r.Host)
 			return auth, nil
 		}
 	}
@@ -376,7 +375,7 @@ func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 		return nil, err
 	}
 
-	auth := authorizeInsecure()
+	auth := authorizeInsecure(r)
 	if auth != nil {
 		return auth, nil
 	}
@@ -388,7 +387,7 @@ func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 	} else if err != nil { // bad request
 		return nil, err
 	} else {
-		log.Println("auth: DNS challenge: allow *")
+		logc.Println(r.Context(), "auth: DNS challenge: allow *")
 		return auth, nil
 	}
 
@@ -400,7 +399,7 @@ func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 		} else if err != nil { // bad request
 			return nil, err
 		} else {
-			log.Printf("auth: DNS allowlist: allow %v\n", auth.repoURLs)
+			logc.Printf(r.Context(), "auth: DNS allowlist: allow %v\n", auth.repoURLs)
 			return auth, nil
 		}
 	}
@@ -414,7 +413,7 @@ func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 			} else if err != nil { // bad request
 				return nil, err
 			} else {
-				log.Printf("auth: wildcard %s: allow %v\n", pattern.GetHost(), auth.repoURLs)
+				logc.Printf(r.Context(), "auth: wildcard %s: allow %v\n", pattern.GetHost(), auth.repoURLs)
 				return auth, nil
 			}
 		}
@@ -426,7 +425,7 @@ func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 			} else if err != nil { // bad request
 				return nil, err
 			} else {
-				log.Printf("auth: codeberg %s: allow %v branch %s\n",
+				logc.Printf(r.Context(), "auth: codeberg %s: allow %v branch %s\n",
 					r.Host, auth.repoURLs, auth.branch)
 				return auth, nil
 			}
@@ -643,7 +642,7 @@ func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
 		return nil, err
 	}
 
-	auth := authorizeInsecure()
+	auth := authorizeInsecure(r)
 	if auth != nil {
 		return auth, nil
 	}
@@ -655,7 +654,7 @@ func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
 	} else if err != nil { // bad request
 		return nil, err
 	} else {
-		log.Printf("auth: forge token: allow\n")
+		logc.Printf(r.Context(), "auth: forge token: allow\n")
 		return auth, nil
 	}
 
@@ -669,7 +668,7 @@ func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
 		} else if err != nil { // bad request
 			return nil, err
 		} else {
-			log.Println("auth: DNS challenge")
+			logc.Println(r.Context(), "auth: DNS challenge")
 			return auth, nil
 		}
 	}

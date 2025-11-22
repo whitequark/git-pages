@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"maps"
 	"net/http"
 	"net/url"
@@ -652,7 +651,7 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 	// any intentional deviation is an opportunity to miss an issue that will affect our
 	// visitors but not our health checks.
 	if r.Header.Get("Health-Check") == "" {
-		log.Println("pages:", r.Method, r.Host, r.URL, r.Header.Get("Content-Type"))
+		logc.Println(r.Context(), "pages:", r.Method, r.Host, r.URL, r.Header.Get("Content-Type"))
 		if region := os.Getenv("FLY_REGION"); region != "" {
 			machine_id := os.Getenv("FLY_MACHINE_ID")
 			w.Header().Add("Server", fmt.Sprintf("git-pages (fly.io; %s; %s)", region, machine_id))
@@ -695,6 +694,6 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, message, http.StatusRequestEntityTooLarge)
 			err = errors.New(message)
 		}
-		log.Println("pages err:", err)
+		logc.Println(r.Context(), "pages err:", err)
 	}
 }

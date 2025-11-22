@@ -3,7 +3,6 @@ package git_pages
 import (
 	"context"
 	"fmt"
-	"log"
 	"slices"
 	"strings"
 )
@@ -19,7 +18,7 @@ func RunMigration(ctx context.Context, name string) error {
 
 func createDomainMarkers(ctx context.Context) error {
 	if backend.HasFeature(ctx, FeatureCheckDomainMarker) {
-		log.Print("store already has domain markers")
+		logc.Print(ctx, "store already has domain markers")
 		return nil
 	}
 
@@ -36,7 +35,7 @@ func createDomainMarkers(ctx context.Context) error {
 		}
 	}
 	for idx, domain := range domains {
-		log.Printf("(%d / %d) creating domain %s", idx+1, len(domains), domain)
+		logc.Printf(ctx, "(%d / %d) creating domain %s", idx+1, len(domains), domain)
 		if err := backend.CreateDomain(ctx, domain); err != nil {
 			return fmt.Errorf("creating domain %s: %w", domain, err)
 		}
@@ -44,6 +43,6 @@ func createDomainMarkers(ctx context.Context) error {
 	if err := backend.EnableFeature(ctx, FeatureCheckDomainMarker); err != nil {
 		return err
 	}
-	log.Printf("created markers for %d domains", len(domains))
+	logc.Printf(ctx, "created markers for %d domains", len(domains))
 	return nil
 }

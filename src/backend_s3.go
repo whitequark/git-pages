@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"path"
 	"strings"
@@ -170,7 +169,7 @@ func NewS3Backend(ctx context.Context, config *S3Config) (*S3Backend, error) {
 	if err != nil {
 		return nil, err
 	} else if !exists {
-		log.Printf("s3: create bucket %s\n", bucket)
+		logc.Printf(ctx, "s3: create bucket %s\n", bucket)
 
 		err = client.MakeBucket(ctx, bucket,
 			minio.MakeBucketOptions{Region: config.Region})
@@ -236,13 +235,13 @@ func (s3 *S3Backend) HasFeature(ctx context.Context, feature BackendFeature) boo
 			minio.StatObjectOptions{})
 		if err != nil {
 			if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
-				log.Printf("s3 feature %q: disabled", feature)
+				logc.Printf(ctx, "s3 feature %q: disabled", feature)
 				return false, nil
 			} else {
 				return false, err
 			}
 		}
-		log.Printf("s3 feature %q: enabled", feature)
+		logc.Printf(ctx, "s3 feature %q: enabled", feature)
 		return true, nil
 	}
 
@@ -250,7 +249,7 @@ func (s3 *S3Backend) HasFeature(ctx context.Context, feature BackendFeature) boo
 	if err != nil {
 		err = fmt.Errorf("getting s3 backend feature %q: %w", feature, err)
 		ObserveError(err)
-		log.Print(err)
+		logc.Println(ctx, err)
 		return false
 	}
 	return isOn
@@ -268,7 +267,7 @@ func (s3 *S3Backend) GetBlob(
 	reader io.ReadSeeker, size uint64, mtime time.Time, err error,
 ) {
 	loader := func(ctx context.Context, name string) (*CachedBlob, error) {
-		log.Printf("s3: get blob %s\n", name)
+		logc.Printf(ctx, "s3: get blob %s\n", name)
 
 		startTime := time.Now()
 
@@ -313,7 +312,7 @@ func (s3 *S3Backend) GetBlob(
 }
 
 func (s3 *S3Backend) PutBlob(ctx context.Context, name string, data []byte) error {
-	log.Printf("s3: put blob %s (%s)\n", name, datasize.ByteSize(len(data)).HumanReadable())
+	logc.Printf(ctx, "s3: put blob %s (%s)\n", name, datasize.ByteSize(len(data)).HumanReadable())
 
 	_, err := s3.client.StatObject(ctx, s3.bucket, blobObjectName(name),
 		minio.GetObjectOptions{})
@@ -325,7 +324,7 @@ func (s3 *S3Backend) PutBlob(ctx context.Context, name string, data []byte) erro
 				return err
 			} else {
 				ObserveData(ctx, "blob.status", "created")
-				log.Printf("s3: put blob %s (created)\n", name)
+				logc.Printf(ctx, "s3: put blob %s (created)\n", name)
 				return nil
 			}
 		} else {
@@ -333,7 +332,7 @@ func (s3 *S3Backend) PutBlob(ctx context.Context, name string, data []byte) erro
 		}
 	} else {
 		ObserveData(ctx, "blob.status", "exists")
-		log.Printf("s3: put blob %s (exists)\n", name)
+		logc.Printf(ctx, "s3: put blob %s (exists)\n", name)
 		blobsDedupedCount.Inc()
 		blobsDedupedBytes.Add(float64(len(data)))
 		return nil
@@ -341,7 +340,7 @@ func (s3 *S3Backend) PutBlob(ctx context.Context, name string, data []byte) erro
 }
 
 func (s3 *S3Backend) DeleteBlob(ctx context.Context, name string) error {
-	log.Printf("s3: delete blob %s\n", name)
+	logc.Printf(ctx, "s3: delete blob %s\n", name)
 
 	return s3.client.RemoveObject(ctx, s3.bucket, blobObjectName(name),
 		minio.RemoveObjectOptions{})
@@ -356,7 +355,7 @@ func stagedManifestObjectName(manifestData []byte) string {
 }
 
 func (s3 *S3Backend) ListManifests(ctx context.Context) (manifests []string, err error) {
-	log.Print("s3: list manifests")
+	logc.Print(ctx, "s3: list manifests")
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -396,7 +395,7 @@ func (l s3ManifestLoader) Reload(ctx context.Context, key string, oldValue *Cach
 }
 
 func (l s3ManifestLoader) load(ctx context.Context, name string, oldManifest *CachedManifest) (*CachedManifest, error) {
-	log.Printf("s3: get manifest %s\n", name)
+	logc.Printf(ctx, "s3: get manifest %s\n", name)
 
 	loader := func() (*CachedManifest, error) {
 		opts := minio.GetObjectOptions{}
@@ -475,7 +474,7 @@ func (s3 *S3Backend) GetManifest(
 
 func (s3 *S3Backend) StageManifest(ctx context.Context, manifest *Manifest) error {
 	data := EncodeManifest(manifest)
-	log.Printf("s3: stage manifest %x\n", sha256.Sum256(data))
+	logc.Printf(ctx, "s3: stage manifest %x\n", sha256.Sum256(data))
 
 	_, err := s3.client.PutObject(ctx, s3.bucket, stagedManifestObjectName(data),
 		bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{})
@@ -484,7 +483,7 @@ func (s3 *S3Backend) StageManifest(ctx context.Context, manifest *Manifest) erro
 
 func (s3 *S3Backend) CommitManifest(ctx context.Context, name string, manifest *Manifest) error {
 	data := EncodeManifest(manifest)
-	log.Printf("s3: commit manifest %x -> %s", sha256.Sum256(data), name)
+	logc.Printf(ctx, "s3: commit manifest %x -> %s", sha256.Sum256(data), name)
 
 	// Remove staged object unconditionally (whether commit succeeded or failed), since
 	// the upper layer has to retry the complete operation anyway.
@@ -503,7 +502,7 @@ func (s3 *S3Backend) CommitManifest(ctx context.Context, name string, manifest *
 }
 
 func (s3 *S3Backend) DeleteManifest(ctx context.Context, name string) error {
-	log.Printf("s3: delete manifest %s\n", name)
+	logc.Printf(ctx, "s3: delete manifest %s\n", name)
 
 	err := s3.client.RemoveObject(ctx, s3.bucket, manifestObjectName(name),
 		minio.RemoveObjectOptions{})
@@ -516,7 +515,7 @@ func domainCheckObjectName(domain string) string {
 }
 
 func (s3 *S3Backend) CheckDomain(ctx context.Context, domain string) (exists bool, err error) {
-	log.Printf("s3: check domain %s\n", domain)
+	logc.Printf(ctx, "s3: check domain %s\n", domain)
 
 	_, err = s3.client.StatObject(ctx, s3.bucket, domainCheckObjectName(domain),
 		minio.StatObjectOptions{})
@@ -547,7 +546,7 @@ func (s3 *S3Backend) CheckDomain(ctx context.Context, domain string) (exists boo
 }
 
 func (s3 *S3Backend) CreateDomain(ctx context.Context, domain string) error {
-	log.Printf("s3: create domain %s\n", domain)
+	logc.Printf(ctx, "s3: create domain %s\n", domain)
 
 	_, err := s3.client.PutObject(ctx, s3.bucket, domainCheckObjectName(domain),
 		&bytes.Reader{}, 0, minio.PutObjectOptions{})

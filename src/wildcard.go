@@ -3,7 +3,6 @@ package git_pages
 import (
 	"crypto/tls"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -95,7 +94,7 @@ func HandleWildcardFallback(w http.ResponseWriter, r *http.Request) (bool, error
 
 	for _, pattern := range wildcards {
 		if pattern.IsFallbackFor(host) {
-			log.Printf("proxy: %s via %s", pattern.GetHost(), pattern.FallbackURL)
+			logc.Printf(r.Context(), "proxy: %s via %s", pattern.GetHost(), pattern.FallbackURL)
 			pattern.Fallback.ServeHTTP(w, r)
 			return true, nil
 		}

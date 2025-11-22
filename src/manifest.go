@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"log"
 	"mime"
 	"net/http"
 	"path"
@@ -189,7 +188,7 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 
 	if originalSize != 0 {
 		spaceSaving := (float64(originalSize) - float64(compressedSize)) / float64(originalSize)
-		log.Printf("compress: saved %.2f percent (%s to %s)",
+		logc.Printf(ctx, "compress: saved %.2f percent (%s to %s)",
 			spaceSaving*100.0,
 			datasize.ByteSize(originalSize).HR(),
 			datasize.ByteSize(compressedSize).HR(),
@@ -205,16 +204,16 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 func PrepareManifest(ctx context.Context, manifest *Manifest) error {
 	// Parse Netlify-style `_redirects`
 	if err := ProcessRedirectsFile(manifest); err != nil {
-		log.Printf("redirects err: %s\n", err)
+		logc.Printf(ctx, "redirects err: %s\n", err)
 	} else if len(manifest.Redirects) > 0 {
-		log.Printf("redirects ok: %d rules\n", len(manifest.Redirects))
+		logc.Printf(ctx, "redirects ok: %d rules\n", len(manifest.Redirects))
 	}
 
 	// Parse Netlify-style `_headers`
 	if err := ProcessHeadersFile(manifest); err != nil {
-		log.Printf("headers err: %s\n", err)
+		logc.Printf(ctx, "headers err: %s\n", err)
 	} else if len(manifest.Headers) > 0 {
-		log.Printf("headers ok: %d rules\n", len(manifest.Headers))
+		logc.Printf(ctx, "headers ok: %d rules\n", len(manifest.Headers))
 	}
 
 	// Sniff content type like `http.ServeContent`

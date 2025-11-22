@@ -3,7 +3,6 @@ package git_pages
 import (
 	"crypto/tls"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -22,7 +21,7 @@ func ServeCaddy(w http.ResponseWriter, r *http.Request) {
 	// this isn't really what git-pages is designed for, and object store accesses can cost money.
 	// [^1]: https://letsencrypt.org/2025/07/01/issuing-our-first-ip-address-certificate
 	if ip := net.ParseIP(domain); ip != nil {
-		log.Println("caddy:", domain, 404, "(bare IP)")
+		logc.Println(r.Context(), "caddy:", domain, 404, "(bare IP)")
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -52,7 +51,7 @@ func ServeCaddy(w http.ResponseWriter, r *http.Request) {
 			} else {
 				connectHost += ":443"
 			}
-			log.Printf("caddy: check TLS %s", fallbackURL)
+			logc.Printf(r.Context(), "caddy: check TLS %s", fallbackURL)
 			connection, err := tls.Dial("tcp", connectHost, &tls.Config{ServerName: domain})
 			if err != nil {
 				continue
@@ -64,13 +63,13 @@ func ServeCaddy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if found {
-		log.Println("caddy:", domain, 200)
+		logc.Println(r.Context(), "caddy:", domain, 200)
 		w.WriteHeader(http.StatusOK)
 	} else if err == nil {
-		log.Println("caddy:", domain, 404)
+		logc.Println(r.Context(), "caddy:", domain, 404)
 		w.WriteHeader(http.StatusNotFound)
 	} else {
-		log.Println("caddy:", domain, 500)
+		logc.Println(r.Context(), "caddy:", domain, 500)
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintln(w, err)
 	}

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 )
 
@@ -71,12 +70,12 @@ func Update(ctx context.Context, webRoot string, manifest *Manifest) UpdateResul
 			status = "unchanged"
 		}
 		if newManifest.Commit != nil {
-			log.Printf("update %s ok: %s %s", webRoot, status, *newManifest.Commit)
+			logc.Printf(ctx, "update %s ok: %s %s", webRoot, status, *newManifest.Commit)
 		} else {
-			log.Printf("update %s ok: %s", webRoot, status)
+			logc.Printf(ctx, "update %s ok: %s", webRoot, status)
 		}
 	} else {
-		log.Printf("update %s err: %s", webRoot, err)
+		logc.Printf(ctx, "update %s err: %s", webRoot, err)
 	}
 
 	return UpdateResult{outcome, newManifest, err}
@@ -91,7 +90,7 @@ func UpdateFromRepository(
 	span, ctx := ObserveFunction(ctx, "UpdateFromRepository", "repo.url", repoURL)
 	defer span.Finish()
 
-	log.Printf("update %s: %s %s\n", webRoot, repoURL, branch)
+	logc.Printf(ctx, "update %s: %s %s\n", webRoot, repoURL, branch)
 
 	manifest, err := FetchRepository(ctx, repoURL, branch)
 	if errors.Is(err, context.DeadlineExceeded) {
@@ -119,23 +118,23 @@ func UpdateFromArchive(
 
 	switch contentType {
 	case "application/x-tar":
-		log.Printf("update %s: (tar)", webRoot)
+		logc.Printf(ctx, "update %s: (tar)", webRoot)
 		manifest, err = ExtractTar(reader) // yellow?
 	case "application/x-tar+gzip":
-		log.Printf("update %s: (tar.gz)", webRoot)
+		logc.Printf(ctx, "update %s: (tar.gz)", webRoot)
 		manifest, err = ExtractTarGzip(reader) // definitely yellow.
 	case "application/x-tar+zstd":
-		log.Printf("update %s: (tar.zst)", webRoot)
+		logc.Printf(ctx, "update %s: (tar.zst)", webRoot)
 		manifest, err = ExtractTarZstd(reader)
 	case "application/zip":
-		log.Printf("update %s: (zip)", webRoot)
+		logc.Printf(ctx, "update %s: (zip)", webRoot)
 		manifest, err = ExtractZip(reader)
 	default:
 		err = errArchiveFormat
 	}
 
 	if err != nil {
-		log.Printf("update %s err: %s", webRoot, err)
+		logc.Printf(ctx, "update %s err: %s", webRoot, err)
 		result = UpdateResult{UpdateError, nil, err}
 	} else {
 		result = Update(ctx, webRoot, manifest)
