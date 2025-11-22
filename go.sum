@@ -45,8 +45,8 @@ github.com/go-git/go-billy/v6 v6.0.0-20251120215217-80673c4ccbfb h1:DMxvYQ9F7gtl
 github.com/go-git/go-billy/v6 v6.0.0-20251120215217-80673c4ccbfb/go.mod h1:0NjwVNrwtVFZBReAp5OoGklGJIgJFEbVyHneAr4lc8k=
 github.com/go-git/go-git-fixtures/v5 v5.1.1 h1:OH8i1ojV9bWfr0ZfasfpgtUXQHQyVS8HXik/V1C099w=
 github.com/go-git/go-git-fixtures/v5 v5.1.1/go.mod h1:Altk43lx3b1ks+dVoAG2300o5WWUnktvfY3VI6bcaXU=
-github.com/go-git/go-git/v6 v6.0.0-20251120100153-0fd785bbcd95 h1:S/fNP0u4ZTjXjdgfZahfItc24pVtM3g/g0n+ZgMtAVc=
-github.com/go-git/go-git/v6 v6.0.0-20251120100153-0fd785bbcd95/go.mod h1:82JGB4xCU6W8toVHjEcv4KH4GSiB+MhjFTCGQxPOLdM=
+github.com/go-git/go-git/v6 v6.0.0-20251121083746-39fcec474970 h1:fTBItLbjioU31giAolw2Kfg91P/LmLcXH7stoJSQXLc=
+github.com/go-git/go-git/v6 v6.0.0-20251121083746-39fcec474970/go.mod h1:82JGB4xCU6W8toVHjEcv4KH4GSiB+MhjFTCGQxPOLdM=
 github.com/go-ini/ini v1.67.0 h1:z6ZrTEZqSWOTyH2FlglNbNgARyHG8oLW9gMELqKr06A=
 github.com/go-ini/ini v1.67.0/go.mod h1:ByCAeIL28uOIIG0E3PJtZPDL8WnHpFKFOtgjp+3Ies8=
 github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 h1:f+oWsMOmNPc8JmEHVZIycC7hBoQxHH9pNKQORJNozsQ=

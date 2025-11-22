@@ -10,7 +10,7 @@ require (
 	github.com/getsentry/sentry-go v0.38.0
 	github.com/getsentry/sentry-go/slog v0.38.0
 	github.com/go-git/go-billy/v6 v6.0.0-20251120215217-80673c4ccbfb
-	github.com/go-git/go-git/v6 v6.0.0-20251120100153-0fd785bbcd95
+	github.com/go-git/go-git/v6 v6.0.0-20251121083746-39fcec474970
 	github.com/klauspost/compress v1.18.1
 	github.com/maypok86/otter/v2 v2.2.1
 	github.com/minio/minio-go/v7 v7.0.97
