@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -666,9 +667,15 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	allowedMethods := []string{"OPTIONS", "HEAD", "GET", "PUT", "DELETE", "POST"}
+	if r.Method == "OPTIONS" || !slices.Contains(allowedMethods, r.Method) {
+		w.Header().Add("Allow", strings.Join(allowedMethods, ", "))
+	}
 	err := error(nil)
 	switch r.Method {
 	// REST API
+	case http.MethodOptions:
+		// no preflight options
 	case http.MethodHead, http.MethodGet:
 		err = getPage(w, r)
 	case http.MethodPut:
@@ -679,7 +686,6 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		err = postPage(w, r)
 	default:
-		w.Header().Add("Allow", "HEAD, GET, PUT, DELETE, POST")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		err = fmt.Errorf("method %s not allowed", r.Method)
 	}
