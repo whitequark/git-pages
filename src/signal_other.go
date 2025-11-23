@@ -6,6 +6,8 @@ func OnReload(handler func()) {
 	// not implemented
 }
 
-func OnInterrupt(handler func()) {
-	// not implemented
+func WaitForInterrupt() {
+	for {
+		// Ctrl+C not supported
+	}
 }

@@ -385,10 +385,7 @@ func Main() {
 			log.Println("serve: ready")
 		}
 
-		interrupt := make(chan struct{})
-		OnInterrupt(func() { interrupt <- struct{}{} })
-		<-interrupt
-
-		log.Println("exiting gracefully")
+		WaitForInterrupt()
+		log.Println("serve: exiting")
 	}
 }
