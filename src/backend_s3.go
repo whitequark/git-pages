@@ -35,7 +35,7 @@ var (
 	manifestCacheEvictionsCount prometheus.Counter
 
 	s3GetObjectDurationSeconds *prometheus.HistogramVec
-	s3GetObjectErrorsCount     *prometheus.CounterVec
+	s3GetObjectResponseCount   *prometheus.CounterVec
 )
 
 func initS3BackendMetrics() {
@@ -95,10 +95,10 @@ func initS3BackendMetrics() {
 		NativeHistogramMaxBucketNumber:  100,
 		NativeHistogramMinResetDuration: 10 * time.Minute,
 	}, []string{"kind"})
-	s3GetObjectErrorsCount = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "git_pages_s3_get_object_errors_count",
-		Help: "Count of s3:GetObject errors",
-	}, []string{"object_kind"})
+	s3GetObjectResponseCount = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "git_pages_s3_get_object_responses_count",
+		Help: "Count of s3:GetObject responses",
+	}, []string{"kind", "code"})
 }
 
 // Blobs can be safely cached indefinitely. They only need to be evicted to preserve memory.
@@ -296,11 +296,20 @@ func (s3 *S3Backend) GetBlob(
 		return &CachedBlob{data, stat.LastModified}, nil
 	}
 
+	observer := func(ctx context.Context, name string) (*CachedBlob, error) {
+		cached, err := loader(ctx, name)
+		var code = "OK"
+		if resp, ok := err.(minio.ErrorResponse); ok {
+			code = resp.Code
+		}
+		s3GetObjectResponseCount.With(prometheus.Labels{"kind": "blob", "code": code}).Inc()
+		return cached, err
+	}
+
 	var cached *CachedBlob
-	cached, err = s3.blobCache.Get(ctx, name, otter.LoaderFunc[string, *CachedBlob](loader))
+	cached, err = s3.blobCache.Get(ctx, name, otter.LoaderFunc[string, *CachedBlob](observer))
 	if err != nil {
 		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
-			s3GetObjectErrorsCount.With(prometheus.Labels{"object_kind": "blob"}).Inc()
 			err = fmt.Errorf("%w: %s", ErrObjectNotFound, errResp.Key)
 		}
 	} else {
@@ -427,8 +436,18 @@ func (l s3ManifestLoader) load(ctx context.Context, name string, oldManifest *Ca
 		return &CachedManifest{manifest, uint32(len(data)), stat.LastModified, stat.ETag, nil}, nil
 	}
 
+	observer := func() (*CachedManifest, error) {
+		cached, err := loader()
+		var code = "OK"
+		if resp, ok := err.(minio.ErrorResponse); ok {
+			code = resp.Code
+		}
+		s3GetObjectResponseCount.With(prometheus.Labels{"kind": "manifest", "code": code}).Inc()
+		return cached, err
+	}
+
 	startTime := time.Now()
-	cached, err := loader()
+	cached, err := observer()
 	s3GetObjectDurationSeconds.
 		With(prometheus.Labels{"kind": "manifest"}).
 		Observe(time.Since(startTime).Seconds())
@@ -436,7 +455,6 @@ func (l s3ManifestLoader) load(ctx context.Context, name string, oldManifest *Ca
 	if err != nil {
 		errResp := minio.ToErrorResponse(err)
 		if errResp.Code == "NoSuchKey" {
-			s3GetObjectErrorsCount.With(prometheus.Labels{"object_kind": "manifest"}).Inc()
 			err = fmt.Errorf("%w: %s", ErrObjectNotFound, errResp.Key)
 			return &CachedManifest{nil, 1, time.Time{}, "", err}, nil
 		} else if errResp.StatusCode == http.StatusNotModified && oldManifest != nil {
