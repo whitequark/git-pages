@@ -27,6 +27,11 @@ import (
 const notFoundPage = "404.html"
 
 var (
+	serveEncodingCount = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "git_pages_serve_encoding_count",
+		Help: "Count of blob transform vs negotiated encoding",
+	}, []string{"transform", "negotiated"})
+
 	siteUpdatesCount = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "git_pages_site_updates",
 		Help: "Count of site updates in total",
@@ -303,8 +308,14 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	case Transform_Identity:
 		switch acceptedEncodings.Negotiate("identity") {
 		case "identity":
+			serveEncodingCount.
+				With(prometheus.Labels{"transform": "identity", "negotiated": "identity"}).
+				Inc()
 		default:
 			negotiatedEncoding = false
+			serveEncodingCount.
+				With(prometheus.Labels{"transform": "identity", "negotiated": "failure"}).
+				Inc()
 		}
 	case Transform_Zstd:
 		supported := []string{"zstd", "identity"}
@@ -319,6 +330,9 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			// it if Content-Encoding is unset or if it's a range request.
 			w.Header().Set("Content-Length", strconv.FormatInt(*entry.Size, 10))
 			w.Header().Set("Content-Encoding", "zstd")
+			serveEncodingCount.
+				With(prometheus.Labels{"transform": "zstd", "negotiated": "zstd"}).
+				Inc()
 		case "identity":
 			compressedData, _ := io.ReadAll(reader)
 			decompressedData, err := zstdDecoder.DecodeAll(compressedData, []byte{})
@@ -328,8 +342,14 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				return err
 			}
 			reader = bytes.NewReader(decompressedData)
+			serveEncodingCount.
+				With(prometheus.Labels{"transform": "zstd", "negotiated": "identity"}).
+				Inc()
 		default:
 			negotiatedEncoding = false
+			serveEncodingCount.
+				With(prometheus.Labels{"transform": "zstd", "negotiated": "failure"}).
+				Inc()
 		}
 	default:
 		return fmt.Errorf("unexpected transform")
