@@ -144,7 +144,7 @@ func DetectContentType(manifest *Manifest) {
 	for path, entry := range manifest.Contents {
 		if entry.GetType() == Type_Directory || entry.GetType() == Type_Symlink {
 			// no Content-Type
-		} else if entry.GetType() == Type_InlineFile && entry.GetTransform() == Transform_None {
+		} else if entry.GetType() == Type_InlineFile && entry.GetTransform() == Transform_Identity {
 			contentType := mime.TypeByExtension(filepath.Ext(path))
 			if contentType == "" {
 				contentType = http.DetectContentType(entry.Data[:min(512, len(entry.Data))])
@@ -168,7 +168,7 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 
 	var originalSize, compressedSize int64
 	for _, entry := range manifest.Contents {
-		if entry.GetType() == Type_InlineFile && entry.GetTransform() == Transform_None {
+		if entry.GetType() == Type_InlineFile && entry.GetTransform() == Transform_Identity {
 			mtype := getMediaType(entry.GetContentType())
 			if strings.HasPrefix(mtype, "video/") || strings.HasPrefix(mtype, "audio/") {
 				continue
@@ -178,7 +178,7 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 			if len(compressedData) < int(*entry.Size) {
 				entry.Data = compressedData
 				entry.Size = proto.Int64(int64(len(entry.Data)))
-				entry.Transform = Transform_Zstandard.Enum()
+				entry.Transform = Transform_Zstd.Enum()
 			}
 			compressedSize += entry.GetSize()
 		}

@@ -22,8 +22,8 @@ func CollectTar(
 
 	appendFile := func(header *tar.Header, data []byte, transform Transform) (err error) {
 		switch transform {
-		case Transform_None:
-		case Transform_Zstandard:
+		case Transform_Identity:
+		case Transform_Zstd:
 			data, err = zstdDecoder.DecodeAll(data, []byte{})
 			if err != nil {
 				return err
@@ -53,7 +53,7 @@ func CollectTar(
 			header.Typeflag = tar.TypeDir
 			header.Mode = 0755
 			header.ModTime = manifestMtime
-			err = appendFile(&header, nil, Transform_None)
+			err = appendFile(&header, nil, Transform_Identity)
 
 		case Type_InlineFile:
 			header.Typeflag = tar.TypeReg
@@ -79,7 +79,7 @@ func CollectTar(
 			header.Typeflag = tar.TypeSymlink
 			header.Mode = 0644
 			header.ModTime = manifestMtime
-			err = appendFile(&header, entry.GetData(), Transform_None)
+			err = appendFile(&header, entry.GetData(), Transform_Identity)
 
 		default:
 			return fmt.Errorf("unexpected entry type")
@@ -95,7 +95,7 @@ func CollectTar(
 			Typeflag: tar.TypeReg,
 			Mode:     0644,
 			ModTime:  manifestMtime,
-		}, []byte(redirects), Transform_None)
+		}, []byte(redirects), Transform_Identity)
 		if err != nil {
 			return err
 		}
@@ -107,7 +107,7 @@ func CollectTar(
 			Typeflag: tar.TypeReg,
 			Mode:     0644,
 			ModTime:  manifestMtime,
-		}, []byte(headers), Transform_None)
+		}, []byte(headers), Transform_Identity)
 		if err != nil {
 			return err
 		}

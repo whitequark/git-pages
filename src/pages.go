@@ -300,11 +300,13 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	acceptedEncodings := parseHTTPEncodings(r.Header.Get("Accept-Encoding"))
 	negotiatedEncoding := true
 	switch entry.GetTransform() {
-	case Transform_None:
-		if acceptedEncodings.Negotiate("identity") != "identity" {
+	case Transform_Identity:
+		switch acceptedEncodings.Negotiate("identity") {
+		case "identity":
+		default:
 			negotiatedEncoding = false
 		}
-	case Transform_Zstandard:
+	case Transform_Zstd:
 		supported := []string{"zstd", "identity"}
 		if entry.ContentType == nil {
 			// If Content-Type is unset, `http.ServeContent` will try to sniff

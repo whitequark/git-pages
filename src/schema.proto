@@ -15,11 +15,12 @@ enum Type {
 	Symlink = 4;
 }
 
+// Transformation names should match HTTP `Accept-Encoding:` header.
 enum Transform {
 	// No transformation.
-	None = 0;
+	Identity = 0;
 	// Zstandard compression.
-	Zstandard = 1;
+	Zstd = 1;
 }
 
 message Entry {

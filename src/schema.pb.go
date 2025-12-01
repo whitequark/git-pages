@@ -81,24 +81,25 @@ func (Type) EnumDescriptor() ([]byte, []int) {
 	return file_schema_proto_rawDescGZIP(), []int{0}
 }
 
+// Transformation names should match HTTP `Accept-Encoding:` header.
 type Transform int32
 
 const (
 	// No transformation.
-	Transform_None Transform = 0
+	Transform_Identity Transform = 0
 	// Zstandard compression.
-	Transform_Zstandard Transform = 1
+	Transform_Zstd Transform = 1
 )
 
 // Enum value maps for Transform.
 var (
 	Transform_name = map[int32]string{
-		0: "None",
-		1: "Zstandard",
+		0: "Identity",
+		1: "Zstd",
 	}
 	Transform_value = map[string]int32{
-		"None":      0,
-		"Zstandard": 1,
+		"Identity": 0,
+		"Zstd":     1,
 	}
 )
 
@@ -207,7 +208,7 @@ func (x *Entry) GetTransform() Transform {
 	if x != nil && x.Transform != nil {
 		return *x.Transform
 	}
-	return Transform_None
+	return Transform_Identity
 }
 
 func (x *Entry) GetContentType() string {
@@ -614,10 +615,10 @@ const file_schema_proto_rawDesc = "" +
 	"\n" +
 	"InlineFile\x10\x02\x12\x10\n" +
 	"\fExternalFile\x10\x03\x12\v\n" +
-	"\aSymlink\x10\x04*$\n" +
-	"\tTransform\x12\b\n" +
-	"\x04None\x10\x00\x12\r\n" +
-	"\tZstandard\x10\x01B,Z*codeberg.org/git-pages/git-pages/git_pagesb\beditionsp\xe8\a"
+	"\aSymlink\x10\x04*#\n" +
+	"\tTransform\x12\f\n" +
+	"\bIdentity\x10\x00\x12\b\n" +
+	"\x04Zstd\x10\x01B,Z*codeberg.org/git-pages/git-pages/git_pagesb\beditionsp\xe8\a"
 
 var (
 	file_schema_proto_rawDescOnce sync.Once
