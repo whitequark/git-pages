@@ -405,6 +405,16 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+func checkDryRun(w http.ResponseWriter, r *http.Request) bool {
+	// "Dry run" requests are used to non-destructively check if the request would have
+	// successfully been authorized.
+	if r.Header.Get("Dry-Run") != "" {
+		fmt.Fprintln(w, "dry-run ok")
+		return true
+	}
+	return false
+}
+
 func putPage(w http.ResponseWriter, r *http.Request) error {
 	var result UpdateResult
 
@@ -424,8 +434,8 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 	defer cancel()
 
 	contentType := getMediaType(r.Header.Get("Content-Type"))
-
-	if contentType == "application/x-www-form-urlencoded" {
+	switch contentType {
+	case "application/x-www-form-urlencoded":
 		auth, err := AuthorizeUpdateFromRepository(r)
 		if err != nil {
 			return err
@@ -450,11 +460,20 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 
+		if checkDryRun(w, r) {
+			return nil
+		}
+
 		result = UpdateFromRepository(updateCtx, webRoot, repoURL, branch)
-	} else {
+
+	default:
 		_, err := AuthorizeUpdateFromArchive(r)
 		if err != nil {
 			return err
+		}
+
+		if checkDryRun(w, r) {
+			return nil
 		}
 
 		// request body contains archive
@@ -516,6 +535,10 @@ func deletePage(w http.ResponseWriter, r *http.Request) error {
 	projectName, err := GetProjectName(r)
 	if err != nil {
 		return err
+	}
+
+	if checkDryRun(w, r) {
+		return nil
 	}
 
 	err = backend.DeleteManifest(r.Context(), makeWebRoot(host, projectName))
@@ -618,6 +641,10 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	if checkDryRun(w, r) {
+		return nil
+	}
+
 	resultChan := make(chan UpdateResult)
 	go func(ctx context.Context) {
 		ctx, cancel := context.WithTimeout(ctx, time.Duration(config.Limits.UpdateTimeout))
@@ -645,16 +672,12 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		w.WriteHeader(http.StatusGatewayTimeout)
 		fmt.Fprintln(w, "update timeout")
 	case UpdateNoChange:
-		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "unchanged")
 	case UpdateCreated:
-		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "created")
 	case UpdateReplaced:
-		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "replaced")
 	case UpdateDeleted:
-		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "deleted")
 	}
 	if result.manifest != nil {
