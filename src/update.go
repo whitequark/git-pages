@@ -92,7 +92,10 @@ func UpdateFromRepository(
 
 	logc.Printf(ctx, "update %s: %s %s\n", webRoot, repoURL, branch)
 
-	manifest, err := FetchRepository(ctx, repoURL, branch)
+	oldManifest, _, _ := backend.GetManifest(ctx, webRoot, GetManifestOptions{})
+	// Ignore errors; worst case we have to re-fetch all of the blobs.
+
+	manifest, err := FetchRepository(ctx, repoURL, branch, oldManifest)
 	if errors.Is(err, context.DeadlineExceeded) {
 		result = UpdateResult{UpdateTimeout, nil, fmt.Errorf("update timeout")}
 	} else if err != nil {

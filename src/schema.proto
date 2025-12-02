@@ -26,8 +26,13 @@ enum Transform {
 message Entry {
 	Type type = 1;
 	// Only present for `type == InlineFile` and `type == ExternalFile`.
-	// For transformed entries, refers to the post-transformation (compressed) size.
-	int64 size = 2;
+	// For transformed entries, refers to the pre-transformation (decompressed) size; otherwise
+	// equal to `compressed_size`.
+	int64 original_size = 7;
+	// Only present for `type == InlineFile` and `type == ExternalFile`.
+	// For transformed entries, refers to the post-transformation (compressed) size; otherwise
+	// equal to `original_size`.
+	int64 compressed_size = 2;
 	// Meaning depends on `type`:
 	//  * If `type == InlineFile`, contains file data.
 	//  * If `type == ExternalFile`, contains blob name (an otherwise unspecified
@@ -41,6 +46,12 @@ message Entry {
 	// Only present for `type == InlineFile` and `type == ExternalFile`.
 	// Currently, optional (not present on certain legacy manifests).
 	string content_type = 5;
+	// May be present for `type == InlineFile` and `type == ExternalFile`.
+	// Used to reduce the amount of work being done during git checkouts.
+	// The type of hash used is determined by the length:
+	//   * 40 bytes: SHA1DC (as hex)
+	//   * 64 bytes: SHA256 (as hex)
+	string git_hash = 6;
 }
 
 // See https://docs.netlify.com/manage/routing/redirects/overview/ for details.
@@ -76,9 +87,9 @@ message Manifest {
 
 	// Contents
 	map<string, Entry> contents = 4;
-	int64 original_size = 10; // total size of entries before compression
-	int64 compressed_size = 5; // simple sum of each `entry.size`
-	int64 stored_size = 8; // total size of (deduplicated) external objects
+	int64 original_size = 10; // sum of each `entry.original_size`
+	int64 compressed_size = 5; // sum of each `entry.compressed_size`
+	int64 stored_size = 8; // sum of deduplicated `entry.compressed_size` for external files only
 
 	// Netlify-style `_redirects` and `_headers`
 	repeated RedirectRule redirects = 6;

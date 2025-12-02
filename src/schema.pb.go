@@ -134,8 +134,13 @@ type Entry struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Type  *Type                  `protobuf:"varint,1,opt,name=type,enum=Type" json:"type,omitempty"`
 	// Only present for `type == InlineFile` and `type == ExternalFile`.
-	// For transformed entries, refers to the post-transformation (compressed) size.
-	Size *int64 `protobuf:"varint,2,opt,name=size" json:"size,omitempty"`
+	// For transformed entries, refers to the pre-transformation (decompressed) size; otherwise
+	// equal to `compressed_size`.
+	OriginalSize *int64 `protobuf:"varint,7,opt,name=original_size,json=originalSize" json:"original_size,omitempty"`
+	// Only present for `type == InlineFile` and `type == ExternalFile`.
+	// For transformed entries, refers to the post-transformation (compressed) size; otherwise
+	// equal to `original_size`.
+	CompressedSize *int64 `protobuf:"varint,2,opt,name=compressed_size,json=compressedSize" json:"compressed_size,omitempty"`
 	// Meaning depends on `type`:
 	//   - If `type == InlineFile`, contains file data.
 	//   - If `type == ExternalFile`, contains blob name (an otherwise unspecified
@@ -148,7 +153,13 @@ type Entry struct {
 	Transform *Transform `protobuf:"varint,4,opt,name=transform,enum=Transform" json:"transform,omitempty"`
 	// Only present for `type == InlineFile` and `type == ExternalFile`.
 	// Currently, optional (not present on certain legacy manifests).
-	ContentType   *string `protobuf:"bytes,5,opt,name=content_type,json=contentType" json:"content_type,omitempty"`
+	ContentType *string `protobuf:"bytes,5,opt,name=content_type,json=contentType" json:"content_type,omitempty"`
+	// May be present for `type == InlineFile` and `type == ExternalFile`.
+	// Used to reduce the amount of work being done during git checkouts.
+	// The type of hash used is determined by the length:
+	//   - 40 bytes: SHA1DC (as hex)
+	//   - 64 bytes: SHA256 (as hex)
+	GitHash       *string `protobuf:"bytes,6,opt,name=git_hash,json=gitHash" json:"git_hash,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -190,9 +201,16 @@ func (x *Entry) GetType() Type {
 	return Type_Invalid
 }
 
-func (x *Entry) GetSize() int64 {
-	if x != nil && x.Size != nil {
-		return *x.Size
+func (x *Entry) GetOriginalSize() int64 {
+	if x != nil && x.OriginalSize != nil {
+		return *x.OriginalSize
+	}
+	return 0
+}
+
+func (x *Entry) GetCompressedSize() int64 {
+	if x != nil && x.CompressedSize != nil {
+		return *x.CompressedSize
 	}
 	return 0
 }
@@ -214,6 +232,13 @@ func (x *Entry) GetTransform() Transform {
 func (x *Entry) GetContentType() string {
 	if x != nil && x.ContentType != nil {
 		return *x.ContentType
+	}
+	return ""
+}
+
+func (x *Entry) GetGitHash() string {
+	if x != nil && x.GitHash != nil {
+		return *x.GitHash
 	}
 	return ""
 }
@@ -569,14 +594,16 @@ var File_schema_proto protoreflect.FileDescriptor
 
 const file_schema_proto_rawDesc = "" +
 	"\n" +
-	"\fschema.proto\"\x97\x01\n" +
+	"\fschema.proto\"\xec\x01\n" +
 	"\x05Entry\x12\x19\n" +
-	"\x04type\x18\x01 \x01(\x0e2\x05.TypeR\x04type\x12\x12\n" +
-	"\x04size\x18\x02 \x01(\x03R\x04size\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\x0e2\x05.TypeR\x04type\x12#\n" +
+	"\roriginal_size\x18\a \x01(\x03R\foriginalSize\x12'\n" +
+	"\x0fcompressed_size\x18\x02 \x01(\x03R\x0ecompressedSize\x12\x12\n" +
 	"\x04data\x18\x03 \x01(\fR\x04data\x12(\n" +
 	"\ttransform\x18\x04 \x01(\x0e2\n" +
 	".TransformR\ttransform\x12!\n" +
-	"\fcontent_type\x18\x05 \x01(\tR\vcontentType\"`\n" +
+	"\fcontent_type\x18\x05 \x01(\tR\vcontentType\x12\x19\n" +
+	"\bgit_hash\x18\x06 \x01(\tR\agitHash\"`\n" +
 	"\fRedirectRule\x12\x12\n" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\tR\x02to\x12\x16\n" +

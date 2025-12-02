@@ -59,13 +59,17 @@ func ExtractTar(reader io.Reader) (*Manifest, error) {
 			}
 
 			manifestEntry.Type = Type_InlineFile.Enum()
-			manifestEntry.Size = proto.Int64(header.Size)
 			manifestEntry.Data = fileData
+			manifestEntry.Transform = Transform_Identity.Enum()
+			manifestEntry.OriginalSize = proto.Int64(header.Size)
+			manifestEntry.CompressedSize = proto.Int64(header.Size)
 
 		case tar.TypeSymlink:
 			manifestEntry.Type = Type_Symlink.Enum()
-			manifestEntry.Size = proto.Int64(header.Size)
 			manifestEntry.Data = []byte(header.Linkname)
+			manifestEntry.Transform = Transform_Identity.Enum()
+			manifestEntry.OriginalSize = proto.Int64(header.Size)
+			manifestEntry.CompressedSize = proto.Int64(header.Size)
 
 		case tar.TypeDir:
 			manifestEntry.Type = Type_Directory.Enum()
@@ -150,8 +154,10 @@ func ExtractZip(reader io.Reader) (*Manifest, error) {
 			} else {
 				manifestEntry.Type = Type_InlineFile.Enum()
 			}
-			manifestEntry.Size = proto.Int64(int64(file.UncompressedSize64))
 			manifestEntry.Data = fileData
+			manifestEntry.Transform = Transform_Identity.Enum()
+			manifestEntry.OriginalSize = proto.Int64(int64(file.UncompressedSize64))
+			manifestEntry.CompressedSize = proto.Int64(int64(file.UncompressedSize64))
 		} else {
 			manifestEntry.Type = Type_Directory.Enum()
 		}

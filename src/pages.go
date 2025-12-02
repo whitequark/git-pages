@@ -328,7 +328,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		case "zstd":
 			// Set Content-Length ourselves since `http.ServeContent` only sets
 			// it if Content-Encoding is unset or if it's a range request.
-			w.Header().Set("Content-Length", strconv.FormatInt(*entry.Size, 10))
+			w.Header().Set("Content-Length", strconv.FormatInt(entry.GetCompressedSize(), 10))
 			w.Header().Set("Content-Encoding", "zstd")
 			serveEncodingCount.
 				With(prometheus.Labels{"transform": "zstd", "negotiated": "zstd"}).

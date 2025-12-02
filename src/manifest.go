@@ -150,14 +150,14 @@ func DetectContentType(manifest *Manifest) {
 				contentType = http.DetectContentType(entry.Data[:min(512, len(entry.Data))])
 			}
 			entry.ContentType = proto.String(contentType)
-		} else {
+		} else if entry.GetContentType() == "" {
 			panic(fmt.Errorf("DetectContentType encountered invalid entry: %v, %v",
 				entry.GetType(), entry.GetTransform()))
 		}
 	}
 }
 
-// The `clauspost/compress/zstd` package recommends reusing a compressor to avoid repeated
+// The `klauspost/compress/zstd` package recommends reusing a compressor to avoid repeated
 // allocations of internal buffers.
 var zstdEncoder, _ = zstd.NewWriter(nil, zstd.WithEncoderLevel(zstd.SpeedBetterCompression))
 
@@ -166,22 +166,24 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 	span, _ := ObserveFunction(ctx, "CompressFiles")
 	defer span.Finish()
 
-	var originalSize, compressedSize int64
+	var originalSize int64
+	var compressedSize int64
 	for _, entry := range manifest.Contents {
 		if entry.GetType() == Type_InlineFile && entry.GetTransform() == Transform_Identity {
-			mtype := getMediaType(entry.GetContentType())
-			if strings.HasPrefix(mtype, "video/") || strings.HasPrefix(mtype, "audio/") {
+			mediaType := getMediaType(entry.GetContentType())
+			if strings.HasPrefix(mediaType, "video/") || strings.HasPrefix(mediaType, "audio/") {
 				continue
 			}
-			originalSize += entry.GetSize()
-			compressedData := zstdEncoder.EncodeAll(entry.GetData(), make([]byte, 0, entry.GetSize()))
-			if len(compressedData) < int(*entry.Size) {
+			compressedData := zstdEncoder.EncodeAll(entry.GetData(),
+				make([]byte, 0, entry.GetOriginalSize()))
+			if int64(len(compressedData)) < entry.GetOriginalSize() {
 				entry.Data = compressedData
-				entry.Size = proto.Int64(int64(len(entry.Data)))
 				entry.Transform = Transform_Zstd.Enum()
+				entry.CompressedSize = proto.Int64(int64(len(entry.Data)))
 			}
-			compressedSize += entry.GetSize()
 		}
+		originalSize += entry.GetOriginalSize()
+		compressedSize += entry.GetCompressedSize()
 	}
 	manifest.OriginalSize = proto.Int64(originalSize)
 	manifest.CompressedSize = proto.Int64(compressedSize)
@@ -246,27 +248,34 @@ func StoreManifest(ctx context.Context, name string, manifest *Manifest) (*Manif
 		CompressedSize: manifest.CompressedSize,
 		StoredSize:     proto.Int64(0),
 	}
-	extObjectSizes := make(map[string]int64)
 	for name, entry := range manifest.Contents {
 		cannotBeInlined := entry.GetType() == Type_InlineFile &&
-			entry.GetSize() > int64(config.Limits.MaxInlineFileSize.Bytes())
+			entry.GetCompressedSize() > int64(config.Limits.MaxInlineFileSize.Bytes())
 		if cannotBeInlined {
 			dataHash := sha256.Sum256(entry.Data)
 			extManifest.Contents[name] = &Entry{
-				Type:        Type_ExternalFile.Enum(),
-				Size:        entry.Size,
-				Data:        fmt.Appendf(nil, "sha256-%x", dataHash),
-				Transform:   entry.Transform,
-				ContentType: entry.ContentType,
+				Type:           Type_ExternalFile.Enum(),
+				OriginalSize:   entry.OriginalSize,
+				CompressedSize: entry.CompressedSize,
+				Data:           fmt.Appendf(nil, "sha256-%x", dataHash),
+				Transform:      entry.Transform,
+				ContentType:    entry.ContentType,
+				GitHash:        entry.GitHash,
 			}
-			extObjectSizes[string(dataHash[:])] = entry.GetSize()
 		} else {
 			extManifest.Contents[name] = entry
 		}
 	}
-	// `extObjectMap` stores size once per object, deduplicating it
-	for _, storedSize := range extObjectSizes {
-		*extManifest.StoredSize += storedSize
+
+	// Compute the deduplicated storage size.
+	var blobSizes = make(map[string]int64)
+	for _, entry := range manifest.Contents {
+		if entry.GetType() == Type_ExternalFile {
+			blobSizes[string(entry.Data)] = entry.GetCompressedSize()
+		}
+	}
+	for _, blobSize := range blobSizes {
+		*extManifest.StoredSize += blobSize
 	}
 
 	// Upload the resulting manifest and the blob it references.
