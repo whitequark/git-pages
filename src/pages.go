@@ -489,6 +489,8 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 			w.WriteHeader(http.StatusUnsupportedMediaType)
 		} else if errors.Is(result.err, ErrArchiveTooLarge) {
 			w.WriteHeader(http.StatusRequestEntityTooLarge)
+		} else if errors.Is(result.err, ErrDomainFrozen) {
+			w.WriteHeader(http.StatusForbidden)
 		} else {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}

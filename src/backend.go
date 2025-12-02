@@ -11,6 +11,7 @@ import (
 )
 
 var ErrObjectNotFound = errors.New("not found")
+var ErrDomainFrozen = errors.New("domain administratively frozen")
 
 func splitBlobName(name string) []string {
 	algo, hash, found := strings.Cut(name, "-")
@@ -76,6 +77,10 @@ type Backend interface {
 
 	// Creates a domain. This allows us to start serving content for the domain.
 	CreateDomain(ctx context.Context, domain string) error
+
+	// Freeze or thaw a domain. This allows a site to be administratively locked, e.g. if it
+	// is discovered serving abusive content.
+	FreezeDomain(ctx context.Context, domain string, freeze bool) error
 }
 
 func CreateBackend(config *StorageConfig) (backend Backend, err error) {

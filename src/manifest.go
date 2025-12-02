@@ -311,7 +311,11 @@ func StoreManifest(ctx context.Context, name string, manifest *Manifest) (*Manif
 	}
 
 	if err := backend.CommitManifest(ctx, name, &extManifest); err != nil {
-		return nil, fmt.Errorf("commit manifest: %w", err)
+		if errors.Is(err, ErrDomainFrozen) {
+			return nil, err
+		} else {
+			return nil, fmt.Errorf("commit manifest: %w", err)
+		}
 	}
 
 	return &extManifest, nil

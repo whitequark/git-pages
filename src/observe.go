@@ -417,15 +417,22 @@ func (backend *observedBackend) DeleteManifest(ctx context.Context, name string)
 }
 
 func (backend *observedBackend) CheckDomain(ctx context.Context, domain string) (found bool, err error) {
-	span, ctx := ObserveFunction(ctx, "CheckDomain", "manifest.domain", domain)
+	span, ctx := ObserveFunction(ctx, "CheckDomain", "domain.name", domain)
 	found, err = backend.inner.CheckDomain(ctx, domain)
 	span.Finish()
 	return
 }
 
 func (backend *observedBackend) CreateDomain(ctx context.Context, domain string) (err error) {
-	span, ctx := ObserveFunction(ctx, "CreateDomain", "manifest.domain", domain)
+	span, ctx := ObserveFunction(ctx, "CreateDomain", "domain.name", domain)
 	err = backend.inner.CreateDomain(ctx, domain)
+	span.Finish()
+	return
+}
+
+func (backend *observedBackend) FreezeDomain(ctx context.Context, domain string, freeze bool) (err error) {
+	span, ctx := ObserveFunction(ctx, "FreezeDomain", "domain.name", domain, "domain.frozen", freeze)
+	err = backend.inner.FreezeDomain(ctx, domain, freeze)
 	span.Finish()
 	return
 }

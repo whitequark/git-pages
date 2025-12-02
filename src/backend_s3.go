@@ -499,9 +499,30 @@ func (s3 *S3Backend) StageManifest(ctx context.Context, manifest *Manifest) erro
 	return err
 }
 
+func domainFrozenObjectName(domain string) string {
+	return manifestObjectName(fmt.Sprintf("%s/.frozen", domain))
+}
+
+func (s3 *S3Backend) checkDomainFrozen(ctx context.Context, domain string) error {
+	_, err := s3.client.GetObject(ctx, s3.bucket, domainFrozenObjectName(domain),
+		minio.GetObjectOptions{})
+	if err == nil {
+		return ErrDomainFrozen
+	} else if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
+		return nil
+	} else {
+		return err
+	}
+}
+
 func (s3 *S3Backend) CommitManifest(ctx context.Context, name string, manifest *Manifest) error {
 	data := EncodeManifest(manifest)
 	logc.Printf(ctx, "s3: commit manifest %x -> %s", sha256.Sum256(data), name)
+
+	_, domain, _ := strings.Cut(name, "/")
+	if err := s3.checkDomainFrozen(ctx, domain); err != nil {
+		return err
+	}
 
 	// Remove staged object unconditionally (whether commit succeeded or failed), since
 	// the upper layer has to retry the complete operation anyway.
@@ -521,6 +542,11 @@ func (s3 *S3Backend) CommitManifest(ctx context.Context, name string, manifest *
 
 func (s3 *S3Backend) DeleteManifest(ctx context.Context, name string) error {
 	logc.Printf(ctx, "s3: delete manifest %s\n", name)
+
+	_, domain, _ := strings.Cut(name, "/")
+	if err := s3.checkDomainFrozen(ctx, domain); err != nil {
+		return err
+	}
 
 	err := s3.client.RemoveObject(ctx, s3.bucket, manifestObjectName(name),
 		minio.RemoveObjectOptions{})
@@ -569,4 +595,24 @@ func (s3 *S3Backend) CreateDomain(ctx context.Context, domain string) error {
 	_, err := s3.client.PutObject(ctx, s3.bucket, domainCheckObjectName(domain),
 		&bytes.Reader{}, 0, minio.PutObjectOptions{})
 	return err
+}
+
+func (s3 *S3Backend) FreezeDomain(ctx context.Context, domain string, freeze bool) error {
+	if freeze {
+		logc.Printf(ctx, "s3: freeze domain %s\n", domain)
+
+		_, err := s3.client.PutObject(ctx, s3.bucket, domainFrozenObjectName(domain),
+			&bytes.Reader{}, 0, minio.PutObjectOptions{})
+		return err
+	} else {
+		logc.Printf(ctx, "s3: thaw domain %s\n", domain)
+
+		err := s3.client.RemoveObject(ctx, s3.bucket, domainFrozenObjectName(domain),
+			minio.RemoveObjectOptions{})
+		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
+			return nil
+		} else {
+			return err
+		}
+	}
 }

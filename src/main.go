@@ -141,7 +141,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "(server) "+
 		"git-pages [-config <file>|-no-config]\n")
 	fmt.Fprintf(os.Stderr, "(admin)  "+
-		"git-pages {-run-migration <name>}\n")
+		"git-pages {-run-migration <name>|-freeze-domain <domain>|-unfreeze-domain <domain>}\n")
 	fmt.Fprintf(os.Stderr, "(info)   "+
 		"git-pages {-print-config-env-vars|-print-config}\n")
 	fmt.Fprintf(os.Stderr, "(cli)    "+
@@ -169,9 +169,16 @@ func Main() {
 		"write archive for `site` (either 'domain.tld' or 'domain.tld/dir') in tar format")
 	updateSite := flag.String("update-site", "",
 		"update `site` (either 'domain.tld' or 'domain.tld/dir') from archive or repository URL")
+	freezeDomain := flag.String("freeze-domain", "",
+		"prevent any site uploads to a given `domain`")
+	unfreezeDomain := flag.String("unfreeze-domain", "",
+		"allow site uploads to a `domain` again after it has been frozen")
 	flag.Parse()
 
 	var cliOperations int
+	if *runMigration != "" {
+		cliOperations += 1
+	}
 	if *getBlob != "" {
 		cliOperations += 1
 	}
@@ -181,8 +188,17 @@ func Main() {
 	if *getArchive != "" {
 		cliOperations += 1
 	}
+	if *updateSite != "" {
+		cliOperations += 1
+	}
+	if *freezeDomain != "" {
+		cliOperations += 1
+	}
+	if *unfreezeDomain != "" {
+		cliOperations += 1
+	}
 	if cliOperations > 1 {
-		log.Fatalln("-get-blob, -get-manifest, and -get-archive are mutually exclusive")
+		log.Fatalln("-get-blob, -get-manifest, -get-archive, -update-site, -freeze, and -unfreeze are mutually exclusive")
 	}
 
 	if *configTomlPath != "" && *noConfig {
@@ -327,6 +343,30 @@ func Main() {
 			log.Println("deleted")
 		case UpdateNoChange:
 			log.Println("no-change")
+		}
+
+	case *freezeDomain != "" || *unfreezeDomain != "":
+		var domain string
+		var freeze bool
+		if *freezeDomain != "" {
+			domain = *freezeDomain
+			freeze = true
+		} else {
+			domain = *unfreezeDomain
+			freeze = false
+		}
+
+		if backend, err = CreateBackend(&config.Storage); err != nil {
+			log.Fatalln(err)
+		}
+
+		if err = backend.FreezeDomain(context.Background(), domain, freeze); err != nil {
+			log.Fatalln(err)
+		}
+		if freeze {
+			log.Println("frozen")
+		} else {
+			log.Println("thawed")
 		}
 
 	default:

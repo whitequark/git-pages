@@ -208,7 +208,26 @@ func (fs *FSBackend) StageManifest(ctx context.Context, manifest *Manifest) erro
 	return nil
 }
 
+func domainFrozenMarkerName(domain string) string {
+	return filepath.Join(domain, ".frozen")
+}
+
+func (fs *FSBackend) checkDomainFrozen(_ctx context.Context, domain string) error {
+	if _, err := fs.siteRoot.Stat(domainFrozenMarkerName(domain)); err == nil {
+		return ErrDomainFrozen
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("stat: %w", err)
+	} else {
+		return nil
+	}
+}
+
 func (fs *FSBackend) CommitManifest(ctx context.Context, name string, manifest *Manifest) error {
+	domain := filepath.Dir(name)
+	if err := fs.checkDomainFrozen(ctx, domain); err != nil {
+		return err
+	}
+
 	manifestData := EncodeManifest(manifest)
 	manifestHashName := stagedManifestName(manifestData)
 
@@ -216,7 +235,7 @@ func (fs *FSBackend) CommitManifest(ctx context.Context, name string, manifest *
 		return fmt.Errorf("manifest not staged")
 	}
 
-	if err := fs.siteRoot.MkdirAll(filepath.Dir(name), 0o755); err != nil {
+	if err := fs.siteRoot.MkdirAll(domain, 0o755); err != nil {
 		return fmt.Errorf("mkdir: %w", err)
 	}
 
@@ -228,6 +247,11 @@ func (fs *FSBackend) CommitManifest(ctx context.Context, name string, manifest *
 }
 
 func (fs *FSBackend) DeleteManifest(ctx context.Context, name string) error {
+	domain := filepath.Dir(name)
+	if err := fs.checkDomainFrozen(ctx, domain); err != nil {
+		return err
+	}
+
 	err := fs.siteRoot.Remove(name)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -249,4 +273,17 @@ func (fs *FSBackend) CheckDomain(ctx context.Context, domain string) (bool, erro
 
 func (fs *FSBackend) CreateDomain(ctx context.Context, domain string) error {
 	return nil // no-op
+}
+
+func (fs *FSBackend) FreezeDomain(ctx context.Context, domain string, freeze bool) error {
+	if freeze {
+		return fs.siteRoot.WriteFile(domainFrozenMarkerName(domain), []byte{}, 0o644)
+	} else {
+		err := fs.siteRoot.Remove(domainFrozenMarkerName(domain))
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		} else {
+			return err
+		}
+	}
 }
