@@ -74,10 +74,12 @@ Features
 * Files with a certain name, when placed in the root of a site, have special functions:
     - [Netlify `_redirects`][_redirects] file can be used to specify HTTP redirect and rewrite rules. The _git-pages_ implementation currently does not support placeholders, query parameters, or conditions, and may differ from Netlify in other minor ways. If you find that a supported `_redirects` file feature does not work the same as on Netlify, please file an issue. (Note that _git-pages_ does not perform URL normalization; `/foo` and `/foo/` are *not* the same, unlike with Netlify.)
     - [Netlify `_headers`][_headers] file can be used to specify custom HTTP response headers (if allowlisted by configuration). In particular, this is useful to enable [CORS requests][cors]. The _git-pages_ implementation may differ from Netlify in minor ways; if you find that a `_headers` file feature does not work the same as on Netlify, please file an issue.
+* Support for SHA-256 Git hashes is [limited by go-git][go-git-sha256]; once go-git implements the required features, _git-pages_ will automatically gain support for SHA-256 Git hashes. Note that shallow clones (used by _git-pages_ to conserve bandwidth if available) aren't supported yet in the Git protocol as of 2025.
 
 [_redirects]: https://docs.netlify.com/manage/routing/redirects/overview/
 [_headers]: https://docs.netlify.com/manage/routing/headers/
 [cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS
+[go-git-sha256]: https://github.com/go-git/go-git/issues/706
 
 
 Authorization
