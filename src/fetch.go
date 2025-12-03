@@ -146,7 +146,8 @@ func FetchRepository(
 	for _, oldManifestEntry := range oldManifest.GetContents() {
 		if hash, ok := plumbing.FromHex(oldManifestEntry.GetGitHash()); ok {
 			if manifestEntry, found := blobsNeeded[hash]; found {
-				CopyProtoMessage(manifestEntry, oldManifestEntry)
+				manifestEntry.Reset()
+				proto.Merge(manifestEntry, oldManifestEntry)
 				dataBytesFromOldManifest += oldManifestEntry.GetOriginalSize()
 				delete(blobsNeeded, hash)
 			}

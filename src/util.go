@@ -4,8 +4,6 @@ import (
 	"errors"
 	"io"
 	"strings"
-
-	"google.golang.org/protobuf/proto"
 )
 
 type BoundedReader struct {
@@ -86,20 +84,4 @@ func getMediaType(mimeType string) (mediaType string) {
 	mediaType, _, _ = strings.Cut(mimeType, ";")
 	mediaType = strings.TrimSpace(strings.ToLower(mediaType))
 	return
-}
-
-// Copying Protobuf messages like `*dest = *src` causes a lock to be copied, which is unsound.
-// Copying Protobuf messages field-wise is fragile: adding a new field to the schema does not
-// cause a diagnostic to be emitted pointing to the copy site, making it easy to miss updates.
-// Serializing and deserializing is reliable and breaks referential links.
-func CopyProtoMessage(dest, src proto.Message) {
-	data, err := proto.Marshal(src)
-	if err != nil {
-		panic(err)
-	}
-
-	err = proto.Unmarshal(data, dest)
-	if err != nil {
-		panic(err)
-	}
 }
