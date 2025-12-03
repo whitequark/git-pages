@@ -67,14 +67,8 @@ func configureWildcards(_ context.Context) (err error) {
 }
 
 func configureFallback(_ context.Context) (err error) {
-	if config.Fallback.ProxyTo != "" {
-		var fallbackURL *url.URL
-		fallbackURL, err = url.Parse(config.Fallback.ProxyTo)
-		if err != nil {
-			err = fmt.Errorf("fallback: %w", err)
-			return
-		}
-
+	if config.Fallback.ProxyTo != nil {
+		fallbackURL := &config.Fallback.ProxyTo.URL
 		fallback = &httputil.ReverseProxy{
 			Rewrite: func(r *httputil.ProxyRequest) {
 				r.SetURL(fallbackURL)

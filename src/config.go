@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"reflect"
 	"slices"
@@ -16,7 +17,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-// For some reason, the standard `time.Duration` type doesn't implement the standard
+// For an unknown reason, the standard `time.Duration` type doesn't implement the standard
 // `encoding.{TextMarshaler,TextUnmarshaler}` interfaces.
 type Duration time.Duration
 
@@ -26,11 +27,35 @@ func (t Duration) String() string {
 
 func (t *Duration) UnmarshalText(data []byte) (err error) {
 	u, err := time.ParseDuration(string(data))
-	*t = Duration(u)
+	if err == nil {
+		*t = Duration(u)
+	}
 	return
 }
 
 func (t *Duration) MarshalText() ([]byte, error) {
+	return []byte(t.String()), nil
+}
+
+// For a known but upsetting reason, the standard `url.URL` type doesn't implement the standard
+// `encoding.{TextMarshaler,TextUnmarshaler}` interfaces.
+type URL struct {
+	url.URL
+}
+
+func (t *URL) String() string {
+	return fmt.Sprint(&t.URL)
+}
+
+func (t *URL) UnmarshalText(data []byte) (err error) {
+	u, err := url.Parse(string(data))
+	if err == nil {
+		*t = URL{*u}
+	}
+	return
+}
+
+func (t *URL) MarshalText() ([]byte, error) {
 	return []byte(t.String()), nil
 }
 
@@ -56,15 +81,15 @@ type ServerConfig struct {
 
 type WildcardConfig struct {
 	Domain          string   `toml:"domain"`
-	CloneURL        string   `toml:"clone-url"`
+	CloneURL        string   `toml:"clone-url"` // URL template, not an exact URL
 	IndexRepos      []string `toml:"index-repos" default:"[]"`
 	IndexRepoBranch string   `toml:"index-repo-branch" default:"pages"`
 	Authorization   string   `toml:"authorization"`
 }
 
 type FallbackConfig struct {
-	ProxyTo  string `toml:"proxy-to"`
-	Insecure bool   `toml:"insecure"`
+	ProxyTo  *URL `toml:"proxy-to"`
+	Insecure bool `toml:"insecure"`
 }
 
 type CacheConfig struct {
@@ -223,14 +248,19 @@ func setConfigValue(reflValue reflect.Value, repr string) (err error) {
 		if valueCast, err = datasize.ParseString(repr); err == nil {
 			reflValue.Set(reflect.ValueOf(valueCast))
 		}
-	case time.Duration:
-		if valueCast, err = time.ParseDuration(repr); err == nil {
-			reflValue.Set(reflect.ValueOf(valueCast))
-		}
 	case Duration:
 		var parsed time.Duration
 		if parsed, err = time.ParseDuration(repr); err == nil {
 			reflValue.Set(reflect.ValueOf(Duration(parsed)))
+		}
+	case *URL:
+		if repr == "" {
+			reflValue.Set(reflect.ValueOf(nil))
+		} else {
+			var parsed *url.URL
+			if parsed, err = url.Parse(repr); err == nil {
+				reflValue.Set(reflect.ValueOf(&URL{*parsed}))
+			}
 		}
 	case []WildcardConfig:
 		var parsed []*WildcardConfig

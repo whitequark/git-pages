@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"strings"
 )
 
@@ -55,14 +54,11 @@ func ServeCaddy(w http.ResponseWriter, r *http.Request) {
 }
 
 func tryDialWithSNI(ctx context.Context, domain string) (bool, error) {
-	if config.Fallback.ProxyTo == "" {
+	if config.Fallback.ProxyTo == nil {
 		return false, nil
 	}
 
-	fallbackURL, err := url.Parse(config.Fallback.ProxyTo)
-	if err != nil {
-		return false, err
-	}
+	fallbackURL := config.Fallback.ProxyTo
 	if fallbackURL.Scheme != "https" {
 		return false, nil
 	}
