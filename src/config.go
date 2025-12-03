@@ -152,6 +152,8 @@ type AuditConfig struct {
 	NodeID int `toml:"node-id"`
 	// Whether audit reports should be stored whenever an audit event occurs.
 	Collect bool `toml:"collect"`
+	// Endpoint to notify with a `GET /<notify-url>?<id>` whenever an audit event occurs.
+	NotifyURL *URL `toml:"notify-url"`
 }
 
 type ObservabilityConfig struct {

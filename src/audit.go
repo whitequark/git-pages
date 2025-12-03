@@ -3,9 +3,12 @@ package git_pages
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/influxdata/influxdb/pkg/snowflake"
+	exponential "github.com/jpillora/backoff"
 	"google.golang.org/protobuf/proto"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -62,9 +65,38 @@ func (audited *auditedBackend) appendNewAuditRecord(ctx context.Context, record 
 				subject = fmt.Sprintf("%s/%s", *record.Domain, *record.Project)
 			}
 			logc.Printf(ctx, "audit %s ok: %s %s\n", subject, record.Event.String(), id)
+
+			// Send a notification to the audit server, if configured, and try to make sure
+			// it is delivered by retrying with exponential backoff on errors.
+			notifyAudit(context.WithoutCancel(ctx), id)
 		}
 	}
 	return
+}
+
+func notifyAudit(ctx context.Context, id string) {
+	if config.Audit.NotifyURL != nil {
+		notifyURL := config.Audit.NotifyURL.URL
+		notifyURL.RawQuery = id
+		go func() {
+			backoff := exponential.Backoff{
+				Jitter: true,
+				Min:    time.Second * 1,
+				Max:    time.Second * 60,
+			}
+			for {
+				_, err := http.Get(notifyURL.String())
+				if err != nil {
+					sleepFor := backoff.Duration()
+					logc.Printf(ctx, "audit notify %s err: %s (retry in %s)", id, err, sleepFor)
+					time.Sleep(sleepFor)
+				} else {
+					logc.Printf(ctx, "audit notify %s ok", id)
+					break
+				}
+			}
+		}()
+	}
 }
 
 func (audited *auditedBackend) CommitManifest(ctx context.Context, name string, manifest *Manifest) (err error) {
