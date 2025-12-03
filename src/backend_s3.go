@@ -143,10 +143,12 @@ func makeCacheOptions[K comparable, V any](
 		options.Weigher = weigher
 	}
 	if config.MaxStale != 0 {
-		options.RefreshCalculator = otter.RefreshWriting[K, V](time.Duration(config.MaxAge))
+		options.RefreshCalculator = otter.RefreshWriting[K, V](
+			time.Duration(config.MaxAge))
 	}
 	if config.MaxAge != 0 || config.MaxStale != 0 {
-		options.ExpiryCalculator = otter.ExpiryWriting[K, V](time.Duration(config.MaxAge + config.MaxStale))
+		options.ExpiryCalculator = otter.ExpiryWriting[K, V](
+			time.Duration(config.MaxAge + config.MaxStale))
 	}
 	return options
 }
@@ -395,15 +397,27 @@ type s3ManifestLoader struct {
 	s3 *S3Backend
 }
 
-func (l s3ManifestLoader) Load(ctx context.Context, key string) (*CachedManifest, error) {
+func (l s3ManifestLoader) Load(
+	ctx context.Context, key string,
+) (
+	*CachedManifest, error,
+) {
 	return l.load(ctx, key, nil)
 }
 
-func (l s3ManifestLoader) Reload(ctx context.Context, key string, oldValue *CachedManifest) (*CachedManifest, error) {
+func (l s3ManifestLoader) Reload(
+	ctx context.Context, key string, oldValue *CachedManifest,
+) (
+	*CachedManifest, error,
+) {
 	return l.load(ctx, key, oldValue)
 }
 
-func (l s3ManifestLoader) load(ctx context.Context, name string, oldManifest *CachedManifest) (*CachedManifest, error) {
+func (l s3ManifestLoader) load(
+	ctx context.Context, name string, oldManifest *CachedManifest,
+) (
+	*CachedManifest, error,
+) {
 	logc.Printf(ctx, "s3: get manifest %s\n", name)
 
 	loader := func() (*CachedManifest, error) {
