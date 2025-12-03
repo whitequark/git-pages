@@ -518,7 +518,7 @@ func domainFrozenObjectName(domain string) string {
 }
 
 func (s3 *S3Backend) checkDomainFrozen(ctx context.Context, domain string) error {
-	_, err := s3.client.GetObject(ctx, s3.bucket, domainFrozenObjectName(domain),
+	_, err := s3.client.StatObject(ctx, s3.bucket, domainFrozenObjectName(domain),
 		minio.GetObjectOptions{})
 	if err == nil {
 		return ErrDomainFrozen
