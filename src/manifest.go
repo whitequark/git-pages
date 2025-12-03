@@ -36,6 +36,14 @@ var (
 	})
 )
 
+func NewManifest() *Manifest {
+	return &Manifest{
+		Contents: map[string]*Entry{
+			"": {Type: Type_Directory.Enum()},
+		},
+	}
+}
+
 func IsManifestEmpty(manifest *Manifest) bool {
 	if len(manifest.Contents) > 1 {
 		return false
@@ -80,6 +88,37 @@ func DecodeManifest(data []byte) (manifest *Manifest, err error) {
 	manifest = &Manifest{}
 	err = proto.Unmarshal(data, manifest)
 	return
+}
+
+func NewManifestEntry(type_ Type, data []byte) *Entry {
+	entry := &Entry{}
+	entry.Type = type_.Enum()
+	if data != nil {
+		entry.Data = data
+		entry.Transform = Transform_Identity.Enum()
+		entry.OriginalSize = proto.Int64(int64(len(data)))
+		entry.CompressedSize = proto.Int64(int64(len(data)))
+	}
+	return entry
+}
+
+func AddFile(manifest *Manifest, path string, data []byte) *Entry {
+	entry := NewManifestEntry(Type_InlineFile, data)
+	manifest.Contents[path] = entry
+	return entry
+}
+
+func AddSymlink(manifest *Manifest, path string, target string) *Entry {
+	entry := NewManifestEntry(Type_Symlink, []byte(target))
+	manifest.Contents[path] = entry
+	return entry
+}
+
+func AddDirectory(manifest *Manifest, path string) *Entry {
+	path = strings.TrimSuffix(path, "/")
+	entry := NewManifestEntry(Type_Directory, nil)
+	manifest.Contents[path] = entry
+	return entry
 }
 
 func AddProblem(manifest *Manifest, path, format string, args ...any) error {

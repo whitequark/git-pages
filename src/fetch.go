@@ -96,14 +96,10 @@ func FetchRepository(
 
 	// Create a manifest for the tree object corresponding to `branch`, but do not populate it
 	// with data yet; instead, record all the blobs we'll need.
-	manifest := &Manifest{
-		RepoUrl: proto.String(repoURL),
-		Branch:  proto.String(branch),
-		Commit:  proto.String(ref.Hash().String()),
-		Contents: map[string]*Entry{
-			"": {Type: Type_Directory.Enum()},
-		},
-	}
+	manifest := NewManifest()
+	manifest.RepoUrl = proto.String(repoURL)
+	manifest.Branch = proto.String(branch)
+	manifest.Commit = proto.String(ref.Hash().String())
 	blobsNeeded := map[plumbing.Hash]*Entry{}
 	for {
 		name, entry, err := walker.Next()

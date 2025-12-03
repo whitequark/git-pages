@@ -13,7 +13,6 @@ import (
 
 	"github.com/c2h5oh/datasize"
 	"github.com/klauspost/compress/zstd"
-	"google.golang.org/protobuf/proto"
 )
 
 var ErrArchiveTooLarge = errors.New("archive too large")
@@ -46,11 +45,7 @@ func ExtractZstd(reader io.Reader, next func(io.Reader) (*Manifest, error)) (*Ma
 func ExtractTar(reader io.Reader) (*Manifest, error) {
 	archive := tar.NewReader(reader)
 
-	manifest := Manifest{
-		Contents: map[string]*Entry{
-			"": {Type: Type_Directory.Enum()},
-		},
-	}
+	manifest := NewManifest()
 	for {
 		header, err := archive.Next()
 		if err == io.EOF {
@@ -70,38 +65,23 @@ func ExtractTar(reader io.Reader) (*Manifest, error) {
 			}
 		}
 
-		manifestEntry := Entry{}
 		switch header.Typeflag {
 		case tar.TypeReg:
 			fileData, err := io.ReadAll(archive)
 			if err != nil {
 				return nil, fmt.Errorf("tar: %s: %w", fileName, err)
 			}
-
-			manifestEntry.Type = Type_InlineFile.Enum()
-			manifestEntry.Data = fileData
-			manifestEntry.Transform = Transform_Identity.Enum()
-			manifestEntry.OriginalSize = proto.Int64(header.Size)
-			manifestEntry.CompressedSize = proto.Int64(header.Size)
-
+			AddFile(manifest, fileName, fileData)
 		case tar.TypeSymlink:
-			manifestEntry.Type = Type_Symlink.Enum()
-			manifestEntry.Data = []byte(header.Linkname)
-			manifestEntry.Transform = Transform_Identity.Enum()
-			manifestEntry.OriginalSize = proto.Int64(header.Size)
-			manifestEntry.CompressedSize = proto.Int64(header.Size)
-
+			AddSymlink(manifest, fileName, header.Linkname)
 		case tar.TypeDir:
-			manifestEntry.Type = Type_Directory.Enum()
-			fileName = strings.TrimSuffix(fileName, "/")
-
+			AddDirectory(manifest, fileName)
 		default:
-			AddProblem(&manifest, fileName, "unsupported type '%c'", header.Typeflag)
+			AddProblem(manifest, fileName, "unsupported type '%c'", header.Typeflag)
 			continue
 		}
-		manifest.Contents[fileName] = &manifestEntry
 	}
-	return &manifest, nil
+	return manifest, nil
 }
 
 func ExtractZip(reader io.Reader) (*Manifest, error) {
@@ -128,14 +108,11 @@ func ExtractZip(reader io.Reader) (*Manifest, error) {
 		)
 	}
 
-	manifest := Manifest{
-		Contents: map[string]*Entry{
-			"": {Type: Type_Directory.Enum()},
-		},
-	}
+	manifest := NewManifest()
 	for _, file := range archive.File {
-		manifestEntry := Entry{}
-		if !strings.HasSuffix(file.Name, "/") {
+		if strings.HasSuffix(file.Name, "/") {
+			AddDirectory(manifest, file.Name)
+		} else {
 			fileReader, err := file.Open()
 			if err != nil {
 				return nil, err
@@ -148,18 +125,11 @@ func ExtractZip(reader io.Reader) (*Manifest, error) {
 			}
 
 			if file.Mode()&os.ModeSymlink != 0 {
-				manifestEntry.Type = Type_Symlink.Enum()
+				AddSymlink(manifest, file.Name, string(fileData))
 			} else {
-				manifestEntry.Type = Type_InlineFile.Enum()
+				AddFile(manifest, file.Name, fileData)
 			}
-			manifestEntry.Data = fileData
-			manifestEntry.Transform = Transform_Identity.Enum()
-			manifestEntry.OriginalSize = proto.Int64(int64(file.UncompressedSize64))
-			manifestEntry.CompressedSize = proto.Int64(int64(file.UncompressedSize64))
-		} else {
-			manifestEntry.Type = Type_Directory.Enum()
 		}
-		manifest.Contents[strings.TrimSuffix(file.Name, "/")] = &manifestEntry
 	}
-	return &manifest, nil
+	return manifest, nil
 }
