@@ -1,17 +1,60 @@
 package git_pages
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/influxdata/influxdb/pkg/snowflake"
 	exponential "github.com/jpillora/backoff"
+	"github.com/kankanreno/go-snowflake"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"google.golang.org/protobuf/proto"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 )
+
+var (
+	auditNotifyOkCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "git_pages_audit_notify_ok",
+		Help: "Count of successful audit notifications",
+	})
+	auditNotifyErrorCount = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "git_pages_audit_notify_error",
+		Help: "Count of failed audit notifications",
+	})
+)
+
+type AuditID int64
+
+func GenerateAuditID() AuditID {
+	inner, err := snowflake.NextID()
+	if err != nil {
+		panic(err)
+	}
+	return AuditID(inner)
+}
+
+func ParseAuditID(repr string) (AuditID, error) {
+	inner, err := strconv.ParseInt(repr, 16, 64)
+	if err != nil {
+		return AuditID(0), err
+	}
+	return AuditID(inner), nil
+}
+
+func (id AuditID) String() string {
+	return fmt.Sprintf("%016x", int64(id))
+}
+
+func (id AuditID) CompareTime(when time.Time) int {
+	idMillis := int64(id) >> (snowflake.MachineIDLength + snowflake.SequenceLength)
+	whenMillis := when.UTC().UnixNano() / 1e6
+	return cmp.Compare(idMillis, whenMillis)
+}
 
 func EncodeAuditRecord(auditRecord *AuditRecord) (data []byte) {
 	data, err := proto.MarshalOptions{Deterministic: true}.Marshal(auditRecord)
@@ -29,15 +72,13 @@ func DecodeAuditRecord(data []byte) (auditRecord *AuditRecord, err error) {
 
 type auditedBackend struct {
 	Backend
-	ids *snowflake.Generator
 }
 
 var _ Backend = (*auditedBackend)(nil)
 
 func NewAuditedBackend(backend Backend) Backend {
 	if config.Feature("audit") {
-		ids := snowflake.New(config.Audit.NodeID)
-		return &auditedBackend{backend, ids}
+		return &auditedBackend{backend}
 	} else {
 		return backend
 	}
@@ -50,11 +91,12 @@ func NewAuditedBackend(backend Backend) Backend {
 // to be a 100% accurate reflection of performed actions. When in doubt, the audit records
 // should be examined together with the application logs.
 func (audited *auditedBackend) appendNewAuditRecord(ctx context.Context, record *AuditRecord) (err error) {
-	record.Timestamp = timestamppb.Now()
-
 	if config.Audit.Collect {
-		id := fmt.Sprintf("%016x", audited.ids.Next())
-		err = audited.Backend.AppendAuditRecord(ctx, id, record)
+		id := GenerateAuditID()
+		record.Id = proto.Int64(int64(id))
+		record.Timestamp = timestamppb.Now()
+
+		err = audited.Backend.AppendAuditLog(ctx, id, record)
 		if err != nil {
 			err = fmt.Errorf("audit: %w", err)
 		} else {
@@ -64,7 +106,7 @@ func (audited *auditedBackend) appendNewAuditRecord(ctx context.Context, record 
 			} else {
 				subject = fmt.Sprintf("%s/%s", *record.Domain, *record.Project)
 			}
-			logc.Printf(ctx, "audit %s ok: %s %s\n", subject, record.Event.String(), id)
+			logc.Printf(ctx, "audit %s ok: %s %s\n", subject, id, record.Event.String())
 
 			// Send a notification to the audit server, if configured, and try to make sure
 			// it is delivered by retrying with exponential backoff on errors.
@@ -74,10 +116,11 @@ func (audited *auditedBackend) appendNewAuditRecord(ctx context.Context, record 
 	return
 }
 
-func notifyAudit(ctx context.Context, id string) {
+func notifyAudit(ctx context.Context, id AuditID) {
 	if config.Audit.NotifyURL != nil {
 		notifyURL := config.Audit.NotifyURL.URL
-		notifyURL.RawQuery = id
+		notifyURL.RawQuery = id.String()
+
 		go func() {
 			backoff := exponential.Backoff{
 				Jitter: true,
@@ -89,9 +132,11 @@ func notifyAudit(ctx context.Context, id string) {
 				if err != nil {
 					sleepFor := backoff.Duration()
 					logc.Printf(ctx, "audit notify %s err: %s (retry in %s)", id, err, sleepFor)
+					auditNotifyErrorCount.Inc()
 					time.Sleep(sleepFor)
 				} else {
 					logc.Printf(ctx, "audit notify %s ok", id)
+					auditNotifyOkCount.Inc()
 					break
 				}
 			}

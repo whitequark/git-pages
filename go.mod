@@ -12,8 +12,8 @@ require (
 	github.com/getsentry/sentry-go/slog v0.40.0
 	github.com/go-git/go-billy/v6 v6.0.0-20251126203821-7f9c95185ee0
 	github.com/go-git/go-git/v6 v6.0.0-20251128074608-48f817f57805
-	github.com/influxdata/influxdb v1.12.2
 	github.com/jpillora/backoff v1.0.0
+	github.com/kankanreno/go-snowflake v1.2.0
 	github.com/klauspost/compress v1.18.1
 	github.com/maypok86/otter/v2 v2.2.1
 	github.com/minio/minio-go/v7 v7.0.97

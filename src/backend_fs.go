@@ -6,7 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
+	iofs "io/fs"
+	"iter"
 	"os"
 	"path/filepath"
 	"strings"
@@ -154,18 +155,19 @@ func (fs *FSBackend) DeleteBlob(ctx context.Context, name string) error {
 	return fs.blobRoot.Remove(blobPath)
 }
 
-func (b *FSBackend) ListManifests(ctx context.Context) (manifests []string, err error) {
-	err = fs.WalkDir(b.siteRoot.FS(), ".", func(path string, d fs.DirEntry, err error) error {
-		if strings.Count(path, "/") > 1 {
-			return fs.SkipDir
-		}
-		_, project, _ := strings.Cut(path, "/")
-		if project == "" || strings.HasPrefix(project, ".") && project != ".index" {
+func (fs *FSBackend) ListManifests(ctx context.Context) (manifests []string, err error) {
+	err = iofs.WalkDir(fs.siteRoot.FS(), ".",
+		func(path string, entry iofs.DirEntry, err error) error {
+			if strings.Count(path, "/") > 1 {
+				return iofs.SkipDir
+			}
+			_, project, _ := strings.Cut(path, "/")
+			if project == "" || strings.HasPrefix(project, ".") && project != ".index" {
+				return nil
+			}
+			manifests = append(manifests, path)
 			return nil
-		}
-		manifests = append(manifests, path)
-		return nil
-	})
+		})
 	return
 }
 
@@ -293,10 +295,50 @@ func (fs *FSBackend) FreezeDomain(ctx context.Context, domain string, freeze boo
 	}
 }
 
-func (fs *FSBackend) AppendAuditRecord(ctx context.Context, id string, record *AuditRecord) error {
-	if _, err := fs.auditRoot.Stat(id); err == nil {
+func (fs *FSBackend) AppendAuditLog(ctx context.Context, id AuditID, record *AuditRecord) error {
+	if _, err := fs.auditRoot.Stat(id.String()); err == nil {
 		panic(fmt.Errorf("audit ID collision: %s", id))
 	}
 
-	return fs.auditRoot.WriteFile(id, EncodeAuditRecord(record), 0o644)
+	return fs.auditRoot.WriteFile(id.String(), EncodeAuditRecord(record), 0o644)
+}
+
+func (fs *FSBackend) QueryAuditLog(ctx context.Context, id AuditID) (*AuditRecord, error) {
+	if data, err := fs.auditRoot.ReadFile(id.String()); err != nil {
+		return nil, fmt.Errorf("read: %w", err)
+	} else if record, err := DecodeAuditRecord(data); err != nil {
+		return nil, fmt.Errorf("decode: %w", err)
+	} else {
+		return record, nil
+	}
+}
+
+func (fs *FSBackend) SearchAuditLog(
+	ctx context.Context, opts QueryAuditLogOptions,
+) iter.Seq[QueryAuditLogResult] {
+	return func(yield func(QueryAuditLogResult) bool) {
+		iofs.WalkDir(fs.auditRoot.FS(), ".",
+			func(path string, entry iofs.DirEntry, err error) error {
+				if path == "." {
+					return nil
+				}
+				var result QueryAuditLogResult
+				if err != nil {
+					result.Err = err
+				} else if id, err := ParseAuditID(path); err != nil {
+					result.Err = err
+				} else if !opts.Since.IsZero() && id.CompareTime(opts.Since) < 0 {
+					return nil
+				} else if !opts.Until.IsZero() && id.CompareTime(opts.Until) > 0 {
+					return nil
+				} else {
+					result.ID = id
+				}
+				if !yield(result) {
+					return iofs.SkipAll
+				} else {
+					return nil
+				}
+			})
+	}
 }

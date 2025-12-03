@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"slices"
 	"strings"
 	"time"
@@ -29,7 +30,25 @@ const (
 )
 
 type GetManifestOptions struct {
+	// If true and the manifest is past the cache `MaxAge`, `GetManifest` blocks and returns
+	// a fresh object instead of revalidating in background and returning a stale object.
 	BypassCache bool
+}
+
+type QueryAuditLogOptions struct {
+	// Inclusive lower bound on returned audit records, per their Snowflake ID (which may differ
+	// slightly from the embedded timestamp). If zero, audit records are returned since beginning
+	// of time.
+	Since time.Time
+	// Inclusive upper bound on returned audit records, per their Snowflake ID (which may differ
+	// slightly from the embedded timestamp). If zero, audit records are returned until the end
+	// of time.
+	Until time.Time
+}
+
+type QueryAuditLogResult struct {
+	ID  AuditID
+	Err error
 }
 
 type Backend interface {
@@ -82,8 +101,14 @@ type Backend interface {
 	// is discovered serving abusive content.
 	FreezeDomain(ctx context.Context, domain string, freeze bool) error
 
-	// Append an audit record to the log.
-	AppendAuditRecord(ctx context.Context, id string, record *AuditRecord) error
+	// Append a record to the audit log.
+	AppendAuditLog(ctx context.Context, id AuditID, record *AuditRecord) error
+
+	// Retrieve a single record from the audit log.
+	QueryAuditLog(ctx context.Context, id AuditID) (record *AuditRecord, err error)
+
+	// Retrieve records from the audit log by time range.
+	SearchAuditLog(ctx context.Context, opts QueryAuditLogOptions) iter.Seq[QueryAuditLogResult]
 }
 
 func CreateBackend(config *StorageConfig) (backend Backend, err error) {

@@ -654,8 +654,9 @@ func (x *Manifest) GetProblems() []*Problem {
 type AuditRecord struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Audit event metadata.
-	Event     *AuditEvent            `protobuf:"varint,1,opt,name=event,enum=AuditEvent" json:"event,omitempty"`
+	Id        *int64                 `protobuf:"varint,1,opt,name=id" json:"id,omitempty"`
 	Timestamp *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=timestamp" json:"timestamp,omitempty"`
+	Event     *AuditEvent            `protobuf:"varint,3,opt,name=event,enum=AuditEvent" json:"event,omitempty"`
 	// Affected resource.
 	Domain  *string `protobuf:"bytes,10,opt,name=domain" json:"domain,omitempty"`
 	Project *string `protobuf:"bytes,11,opt,name=project" json:"project,omitempty"` // only for `*Manifest` events
@@ -695,11 +696,11 @@ func (*AuditRecord) Descriptor() ([]byte, []int) {
 	return file_schema_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *AuditRecord) GetEvent() AuditEvent {
-	if x != nil && x.Event != nil {
-		return *x.Event
+func (x *AuditRecord) GetId() int64 {
+	if x != nil && x.Id != nil {
+		return *x.Id
 	}
-	return AuditEvent_InvalidEvent
+	return 0
 }
 
 func (x *AuditRecord) GetTimestamp() *timestamppb.Timestamp {
@@ -707,6 +708,13 @@ func (x *AuditRecord) GetTimestamp() *timestamppb.Timestamp {
 		return x.Timestamp
 	}
 	return nil
+}
+
+func (x *AuditRecord) GetEvent() AuditEvent {
+	if x != nil && x.Event != nil {
+		return *x.Event
+	}
+	return AuditEvent_InvalidEvent
 }
 
 func (x *AuditRecord) GetDomain() string {
@@ -775,10 +783,11 @@ const file_schema_proto_rawDesc = "" +
 	"\bproblems\x18\a \x03(\v2\b.ProblemR\bproblems\x1aC\n" +
 	"\rContentsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x1c\n" +
-	"\x05value\x18\x02 \x01(\v2\x06.EntryR\x05value:\x028\x01\"\xc3\x01\n" +
-	"\vAuditRecord\x12!\n" +
-	"\x05event\x18\x01 \x01(\x0e2\v.AuditEventR\x05event\x128\n" +
-	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x16\n" +
+	"\x05value\x18\x02 \x01(\v2\x06.EntryR\x05value:\x028\x01\"\xd3\x01\n" +
+	"\vAuditRecord\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x128\n" +
+	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12!\n" +
+	"\x05event\x18\x03 \x01(\x0e2\v.AuditEventR\x05event\x12\x16\n" +
 	"\x06domain\x18\n" +
 	" \x01(\tR\x06domain\x12\x18\n" +
 	"\aproject\x18\v \x01(\tR\aproject\x12%\n" +
@@ -837,8 +846,8 @@ var file_schema_proto_depIdxs = []int32{
 	4,  // 4: Manifest.redirects:type_name -> RedirectRule
 	6,  // 5: Manifest.headers:type_name -> HeaderRule
 	7,  // 6: Manifest.problems:type_name -> Problem
-	2,  // 7: AuditRecord.event:type_name -> AuditEvent
-	11, // 8: AuditRecord.timestamp:type_name -> google.protobuf.Timestamp
+	11, // 7: AuditRecord.timestamp:type_name -> google.protobuf.Timestamp
+	2,  // 8: AuditRecord.event:type_name -> AuditEvent
 	8,  // 9: AuditRecord.manifest:type_name -> Manifest
 	3,  // 10: Manifest.ContentsEntry.value:type_name -> Entry
 	11, // [11:11] is the sub-list for method output_type

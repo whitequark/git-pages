@@ -148,7 +148,7 @@ type LimitsConfig struct {
 }
 
 type AuditConfig struct {
-	// Globally unique node identifier (0 to 1023 inclusive).
+	// Globally unique machine identifier (0 to 63 inclusive).
 	NodeID int `toml:"node-id"`
 	// Whether audit reports should be stored whenever an audit event occurs.
 	Collect bool `toml:"collect"`

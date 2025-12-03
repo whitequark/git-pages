@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"iter"
 	"net/http"
 	"path"
 	"strings"
@@ -631,11 +632,13 @@ func (s3 *S3Backend) FreezeDomain(ctx context.Context, domain string, freeze boo
 	}
 }
 
-func auditObjectName(id string) string {
+func auditObjectName(id AuditID) string {
 	return fmt.Sprintf("audit/%s", id)
 }
 
-func (s3 *S3Backend) AppendAuditRecord(ctx context.Context, id string, record *AuditRecord) error {
+func (s3 *S3Backend) AppendAuditLog(ctx context.Context, id AuditID, record *AuditRecord) error {
+	logc.Printf(ctx, "s3: append audit %s\n", id)
+
 	name := auditObjectName(id)
 	data := EncodeAuditRecord(record)
 
@@ -647,4 +650,50 @@ func (s3 *S3Backend) AppendAuditRecord(ctx context.Context, id string, record *A
 		panic(fmt.Errorf("audit ID collision: %s", name))
 	}
 	return err
+}
+
+func (s3 *S3Backend) QueryAuditLog(ctx context.Context, id AuditID) (*AuditRecord, error) {
+	logc.Printf(ctx, "s3: read audit %s\n", id)
+
+	object, err := s3.client.GetObject(ctx, s3.bucket, auditObjectName(id),
+		minio.GetObjectOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer object.Close()
+
+	data, err := io.ReadAll(object)
+	if err != nil {
+		return nil, err
+	}
+
+	return DecodeAuditRecord(data)
+}
+
+func (s3 *S3Backend) SearchAuditLog(
+	ctx context.Context, opts QueryAuditLogOptions,
+) iter.Seq[QueryAuditLogResult] {
+	return func(yield func(QueryAuditLogResult) bool) {
+		logc.Printf(ctx, "s3: query audit\n")
+
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		prefix := "audit/"
+		for object := range s3.client.ListObjectsIter(ctx, s3.bucket, minio.ListObjectsOptions{
+			Prefix: prefix,
+		}) {
+			var result QueryAuditLogResult
+			if object.Err != nil {
+				result.Err = object.Err
+			} else if id, err := ParseAuditID(strings.TrimPrefix(object.Key, prefix)); err != nil {
+				result.Err = err
+			} else {
+				result.ID = id
+			}
+			if !yield(result) {
+				break
+			}
+		}
+	}
 }

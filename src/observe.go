@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"log"
 	"log/slog"
 	"math/rand/v2"
@@ -437,9 +438,33 @@ func (backend *observedBackend) FreezeDomain(ctx context.Context, domain string,
 	return
 }
 
-func (backend *observedBackend) AppendAuditRecord(ctx context.Context, id string, record *AuditRecord) (err error) {
-	span, ctx := ObserveFunction(ctx, "AppendAudit", "audit.id", id)
-	err = backend.inner.AppendAuditRecord(ctx, id, record)
+func (backend *observedBackend) AppendAuditLog(ctx context.Context, id AuditID, record *AuditRecord) (err error) {
+	span, ctx := ObserveFunction(ctx, "AppendAuditLog", "audit.id", id)
+	err = backend.inner.AppendAuditLog(ctx, id, record)
 	span.Finish()
 	return
+}
+
+func (backend *observedBackend) QueryAuditLog(ctx context.Context, id AuditID) (record *AuditRecord, err error) {
+	span, ctx := ObserveFunction(ctx, "QueryAuditLog", "audit.id", id)
+	record, err = backend.inner.QueryAuditLog(ctx, id)
+	span.Finish()
+	return
+}
+
+func (backend *observedBackend) SearchAuditLog(
+	ctx context.Context, opts QueryAuditLogOptions,
+) iter.Seq[QueryAuditLogResult] {
+	return func(yield func(QueryAuditLogResult) bool) {
+		span, ctx := ObserveFunction(ctx, "SearchAuditLog",
+			"audit.search.since", opts.Since,
+			"audit.search.until", opts.Until,
+		)
+		for result := range backend.inner.SearchAuditLog(ctx, opts) {
+			if !yield(result) {
+				break
+			}
+		}
+		span.Finish()
+	}
 }

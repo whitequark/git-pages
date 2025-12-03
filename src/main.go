@@ -16,9 +16,11 @@ import (
 	"os"
 	"runtime/debug"
 	"strings"
+	"time"
 
 	automemlimit "github.com/KimMachineGun/automemlimit/memlimit"
 	"github.com/c2h5oh/datasize"
+	"github.com/kankanreno/go-snowflake"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -82,6 +84,13 @@ func configureFallback(_ context.Context) (err error) {
 			},
 		}
 	}
+	return
+}
+
+// Thread-unsafe, must be called only during initial configuration.
+func configureAudit(_ context.Context) (err error) {
+	snowflake.SetStartTime(time.Date(2025, 12, 1, 0, 0, 0, 0, time.UTC))
+	snowflake.SetMachineID(config.Audit.NodeID)
 	return
 }
 
@@ -256,6 +265,7 @@ func Main() {
 		configureMemLimit(ctx),
 		configureWildcards(ctx),
 		configureFallback(ctx),
+		configureAudit(ctx),
 	); err != nil {
 		logc.Fatalln(ctx, err)
 	}

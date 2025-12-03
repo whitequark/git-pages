@@ -116,8 +116,9 @@ enum AuditEvent {
 
 message AuditRecord {
 	// Audit event metadata.
-	AuditEvent event = 1;
+	int64 id = 1;
 	google.protobuf.Timestamp timestamp = 2;
+	AuditEvent event = 3;
 
 	// Affected resource.
 	string domain = 10;
