@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -26,7 +27,7 @@ func (l slogWithCtx) log(ctx context.Context, level slog.Level, msg string) {
 	// skip [runtime.Callers, this method, method calling this method]
 	runtime.Callers(3, pcs[:])
 
-	record := slog.NewRecord(time.Now(), level, msg, pcs[0])
+	record := slog.NewRecord(time.Now(), level, strings.TrimRight(msg, "\n"), pcs[0])
 	logger.Handler().Handle(ctx, record)
 }
 
