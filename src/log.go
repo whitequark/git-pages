@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"runtime"
 	"time"
 )
@@ -25,8 +26,8 @@ func (l slogWithCtx) log(ctx context.Context, level slog.Level, msg string) {
 	// skip [runtime.Callers, this method, method calling this method]
 	runtime.Callers(3, pcs[:])
 
-	r := slog.NewRecord(time.Now(), level, msg, pcs[0])
-	logger.Handler().Handle(ctx, r)
+	record := slog.NewRecord(time.Now(), level, msg, pcs[0])
+	logger.Handler().Handle(ctx, record)
 }
 
 func (l slogWithCtx) Print(ctx context.Context, v ...any) {
@@ -39,4 +40,14 @@ func (l slogWithCtx) Printf(ctx context.Context, format string, v ...any) {
 
 func (l slogWithCtx) Println(ctx context.Context, v ...any) {
 	l.log(ctx, slog.LevelInfo, fmt.Sprintln(v...))
+}
+
+func (l slogWithCtx) Fatalf(ctx context.Context, format string, v ...any) {
+	l.log(ctx, slog.LevelError, fmt.Sprintf(format, v...))
+	os.Exit(1)
+}
+
+func (l slogWithCtx) Fatalln(ctx context.Context, v ...any) {
+	l.log(ctx, slog.LevelError, fmt.Sprintln(v...))
+	os.Exit(1)
 }

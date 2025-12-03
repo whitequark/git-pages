@@ -27,14 +27,14 @@ var wildcards []*WildcardPattern
 var fallback http.Handler
 var backend Backend
 
-func configureFeatures() (err error) {
+func configureFeatures(ctx context.Context) (err error) {
 	if len(config.Features) > 0 {
-		log.Println("features:", strings.Join(config.Features, ", "))
+		logc.Println(ctx, "features:", strings.Join(config.Features, ", "))
 	}
 	return
 }
 
-func configureMemLimit() (err error) {
+func configureMemLimit(ctx context.Context) (err error) {
 	// Avoid being OOM killed by not garbage collecting early enough.
 	memlimitBefore := datasize.ByteSize(debug.SetMemoryLimit(-1))
 	automemlimit.SetGoMemLimitWithOpts(
@@ -49,14 +49,14 @@ func configureMemLimit() (err error) {
 	)
 	memlimitAfter := datasize.ByteSize(debug.SetMemoryLimit(-1))
 	if memlimitBefore == memlimitAfter {
-		log.Println("memlimit: now", memlimitBefore.HR())
+		logc.Println(ctx, "memlimit: now", memlimitBefore.HR())
 	} else {
-		log.Println("memlimit: was", memlimitBefore.HR(), "now", memlimitAfter.HR())
+		logc.Println(ctx, "memlimit: was", memlimitBefore.HR(), "now", memlimitAfter.HR())
 	}
 	return
 }
 
-func configureWildcards() (err error) {
+func configureWildcards(_ context.Context) (err error) {
 	newWildcards, err := TranslateWildcards(config.Wildcard)
 	if err != nil {
 		return err
@@ -66,7 +66,7 @@ func configureWildcards() (err error) {
 	}
 }
 
-func configureFallback() (err error) {
+func configureFallback(_ context.Context) (err error) {
 	if config.Fallback.ProxyTo != "" {
 		var fallbackURL *url.URL
 		fallbackURL, err = url.Parse(config.Fallback.ProxyTo)
@@ -91,19 +91,19 @@ func configureFallback() (err error) {
 	return
 }
 
-func listen(name string, listen string) net.Listener {
+func listen(ctx context.Context, name string, listen string) net.Listener {
 	if listen == "-" {
 		return nil
 	}
 
 	protocol, address, ok := strings.Cut(listen, "/")
 	if !ok {
-		log.Fatalf("%s: %s: malformed endpoint", name, listen)
+		logc.Fatalf(ctx, "%s: %s: malformed endpoint", name, listen)
 	}
 
 	listener, err := net.Listen(protocol, address)
 	if err != nil {
-		log.Fatalf("%s: %s\n", name, err)
+		logc.Fatalf(ctx, "%s: %s\n", name, err)
 	}
 
 	return listener
@@ -125,7 +125,7 @@ func panicHandler(handler http.Handler) http.Handler {
 	})
 }
 
-func serve(listener net.Listener, handler http.Handler) {
+func serve(ctx context.Context, listener net.Listener, handler http.Handler) {
 	if listener != nil {
 		handler = panicHandler(handler)
 
@@ -135,7 +135,7 @@ func serve(listener net.Listener, handler http.Handler) {
 		if config.Feature("serve-h2c") {
 			server.Protocols.SetUnencryptedHTTP2(true)
 		}
-		log.Fatalln(server.Serve(listener))
+		logc.Fatalln(ctx, server.Serve(listener))
 	}
 }
 
@@ -146,7 +146,8 @@ func webRootArg(arg string) string {
 	case 1:
 		return arg
 	default:
-		log.Fatalf("webroot argument must be either 'domain.tld' or 'domain.tld/dir")
+		logc.Fatalln(context.Background(),
+			"webroot argument must be either 'domain.tld' or 'domain.tld/dir")
 		return ""
 	}
 }
@@ -158,7 +159,7 @@ func fileOutputArg() (writer io.WriteCloser) {
 	} else {
 		writer, err = os.Create(flag.Arg(0))
 		if err != nil {
-			log.Fatalln(err)
+			logc.Fatalln(context.Background(), err)
 		}
 	}
 	return
@@ -178,6 +179,8 @@ func usage() {
 }
 
 func Main() {
+	ctx := context.Background()
+
 	flag.Usage = usage
 	printConfigEnvVars := flag.Bool("print-config-env-vars", false,
 		"print every recognized configuration environment variable and exit")
@@ -226,11 +229,11 @@ func Main() {
 		cliOperations += 1
 	}
 	if cliOperations > 1 {
-		log.Fatalln("-get-blob, -get-manifest, -get-archive, -update-site, -freeze, and -unfreeze are mutually exclusive")
+		logc.Fatalln(ctx, "-get-blob, -get-manifest, -get-archive, -update-site, -freeze, and -unfreeze are mutually exclusive")
 	}
 
 	if *configTomlPath != "" && *noConfig {
-		log.Fatalln("-no-config and -config are mutually exclusive")
+		logc.Fatalln(ctx, "-no-config and -config are mutually exclusive")
 	}
 
 	if *printConfigEnvVars {
@@ -243,7 +246,7 @@ func Main() {
 		*configTomlPath = "config.toml"
 	}
 	if config, err = Configure(*configTomlPath); err != nil {
-		log.Fatalln("config:", err)
+		logc.Fatalln(ctx, "config:", err)
 	}
 
 	if *printConfig {
@@ -255,79 +258,79 @@ func Main() {
 	defer FiniObservability()
 
 	if err = errors.Join(
-		configureFeatures(),
-		configureMemLimit(),
-		configureWildcards(),
-		configureFallback(),
+		configureFeatures(ctx),
+		configureMemLimit(ctx),
+		configureWildcards(ctx),
+		configureFallback(ctx),
 	); err != nil {
-		log.Fatalln(err)
+		logc.Fatalln(ctx, err)
 	}
 
 	switch {
 	case *runMigration != "":
 		if backend, err = CreateBackend(&config.Storage); err != nil {
-			log.Fatalln(err)
+			logc.Fatalln(ctx, err)
 		}
 
-		if err := RunMigration(context.Background(), *runMigration); err != nil {
-			log.Fatalln(err)
+		if err := RunMigration(ctx, *runMigration); err != nil {
+			logc.Fatalln(ctx, err)
 		}
 
 	case *getBlob != "":
 		if backend, err = CreateBackend(&config.Storage); err != nil {
-			log.Fatalln(err)
+			logc.Fatalln(ctx, err)
 		}
 
-		reader, _, _, err := backend.GetBlob(context.Background(), *getBlob)
+		reader, _, _, err := backend.GetBlob(ctx, *getBlob)
 		if err != nil {
-			log.Fatalln(err)
+			logc.Fatalln(ctx, err)
 		}
 		io.Copy(fileOutputArg(), reader)
 
 	case *getManifest != "":
 		if backend, err = CreateBackend(&config.Storage); err != nil {
-			log.Fatalln(err)
+			logc.Fatalln(ctx, err)
 		}
 
 		webRoot := webRootArg(*getManifest)
-		manifest, _, err := backend.GetManifest(context.Background(), webRoot, GetManifestOptions{})
+		manifest, _, err := backend.GetManifest(ctx, webRoot, GetManifestOptions{})
 		if err != nil {
-			log.Fatalln(err)
+			logc.Fatalln(ctx, err)
 		}
 		fmt.Fprintln(fileOutputArg(), ManifestDebugJSON(manifest))
 
 	case *getArchive != "":
 		if backend, err = CreateBackend(&config.Storage); err != nil {
-			log.Fatalln(err)
+			logc.Fatalln(ctx, err)
 		}
 
 		webRoot := webRootArg(*getArchive)
 		manifest, manifestMtime, err :=
-			backend.GetManifest(context.Background(), webRoot, GetManifestOptions{})
+			backend.GetManifest(ctx, webRoot, GetManifestOptions{})
 		if err != nil {
-			log.Fatalln(err)
+			logc.Fatalln(ctx, err)
 		}
-		CollectTar(context.Background(), fileOutputArg(), manifest, manifestMtime)
+		CollectTar(ctx, fileOutputArg(), manifest, manifestMtime)
 
 	case *updateSite != "":
 		if backend, err = CreateBackend(&config.Storage); err != nil {
-			log.Fatalln(err)
+			logc.Fatalln(ctx, err)
 		}
 
 		if flag.NArg() != 1 {
-			log.Fatalln("update source must be provided as the argument")
+			logc.Fatalln(ctx, "update source must be provided as the argument")
 		}
 
 		sourceURL, err := url.Parse(flag.Arg(0))
 		if err != nil {
-			log.Fatalln(err)
+			logc.Fatalln(ctx, err)
 		}
 
 		var result UpdateResult
 		if sourceURL.Scheme == "" {
 			file, err := os.Open(sourceURL.Path)
 			if err != nil {
-				log.Fatalln(err)
+				logc.Fatalln(ctx, err)
 			}
 			defer file.Close()
 
@@ -346,7 +349,7 @@ func Main() {
 			}
 
 			webRoot := webRootArg(*updateSite)
-			result = UpdateFromArchive(context.Background(), webRoot, contentType, file)
+			result = UpdateFromArchive(ctx, webRoot, contentType, file)
 		} else {
 			branch := "pages"
 			if sourceURL.Fragment != "" {
@@ -354,24 +357,24 @@ func Main() {
 			}
 
 			webRoot := webRootArg(*updateSite)
-			result = UpdateFromRepository(context.Background(), webRoot, sourceURL.String(), branch)
+			result = UpdateFromRepository(ctx, webRoot, sourceURL.String(), branch)
 		}
 
 		switch result.outcome {
 		case UpdateError:
-			log.Printf("error: %s\n", result.err)
+			logc.Printf(ctx, "error: %s\n", result.err)
 			os.Exit(2)
 		case UpdateTimeout:
-			log.Println("timeout")
+			logc.Println(ctx, "timeout")
 			os.Exit(1)
 		case UpdateCreated:
-			log.Println("created")
+			logc.Println(ctx, "created")
 		case UpdateReplaced:
-			log.Println("replaced")
+			logc.Println(ctx, "replaced")
 		case UpdateDeleted:
-			log.Println("deleted")
+			logc.Println(ctx, "deleted")
 		case UpdateNoChange:
-			log.Println("no-change")
+			logc.Println(ctx, "no-change")
 		}
 
 	case *freezeDomain != "" || *unfreezeDomain != "":
@@ -386,11 +389,11 @@ func Main() {
 		}
 
 		if backend, err = CreateBackend(&config.Storage); err != nil {
-			log.Fatalln(err)
+			logc.Fatalln(ctx, err)
 		}
 
-		if err = backend.FreezeDomain(context.Background(), domain, freeze); err != nil {
-			log.Fatalln(err)
+		if err = backend.FreezeDomain(ctx, domain, freeze); err != nil {
+			logc.Fatalln(ctx, err)
 		}
 		if freeze {
 			log.Println("frozen")
@@ -408,7 +411,7 @@ func Main() {
 		// The backend is not recreated (this is intentional as it allows preserving the cache).
 		OnReload(func() {
 			if newConfig, err := Configure(*configTomlPath); err != nil {
-				log.Println("config: reload err:", err)
+				logc.Println(ctx, "config: reload err:", err)
 			} else {
 				// From https://go.dev/ref/mem:
 				// > A read r of a memory location x holding a value that is not larger than
@@ -418,16 +421,16 @@ func Main() {
 				// > concurrent write.
 				config = newConfig
 				if err = errors.Join(
-					configureFeatures(),
-					configureMemLimit(),
-					configureWildcards(),
-					configureFallback(),
+					configureFeatures(ctx),
+					configureMemLimit(ctx),
+					configureWildcards(ctx),
+					configureFallback(ctx),
 				); err != nil {
 					// At this point the configuration is in an in-between, corrupted state, so
 					// the only reasonable choice is to crash.
-					log.Fatalln("config: reload fail:", err)
+					logc.Fatalln(ctx, "config: reload fail:", err)
 				} else {
-					log.Println("config: reload ok")
+					logc.Println(ctx, "config: reload ok")
 				}
 			}
 		})
@@ -436,26 +439,26 @@ func Main() {
 		// spends some time initializing (which the S3 backend does) a proxy like Caddy can race
 		// with git-pages on startup and return errors for requests that would have been served
 		// just 0.5s later.
-		pagesListener := listen("pages", config.Server.Pages)
-		caddyListener := listen("caddy", config.Server.Caddy)
-		metricsListener := listen("metrics", config.Server.Metrics)
+		pagesListener := listen(ctx, "pages", config.Server.Pages)
+		caddyListener := listen(ctx, "caddy", config.Server.Caddy)
+		metricsListener := listen(ctx, "metrics", config.Server.Metrics)
 
 		if backend, err = CreateBackend(&config.Storage); err != nil {
-			log.Fatalln(err)
+			logc.Fatalln(ctx, err)
 		}
 		backend = NewObservedBackend(backend)
 
-		go serve(pagesListener, ObserveHTTPHandler(http.HandlerFunc(ServePages)))
-		go serve(caddyListener, ObserveHTTPHandler(http.HandlerFunc(ServeCaddy)))
-		go serve(metricsListener, promhttp.Handler())
+		go serve(ctx, pagesListener, ObserveHTTPHandler(http.HandlerFunc(ServePages)))
+		go serve(ctx, caddyListener, ObserveHTTPHandler(http.HandlerFunc(ServeCaddy)))
+		go serve(ctx, metricsListener, promhttp.Handler())
 
 		if config.Insecure {
-			log.Println("serve: ready (INSECURE)")
+			logc.Println(ctx, "serve: ready (INSECURE)")
 		} else {
-			log.Println("serve: ready")
+			logc.Println(ctx, "serve: ready")
 		}
 
 		WaitForInterrupt()
-		log.Println("serve: exiting")
+		logc.Println(ctx, "serve: exiting")
 	}
 }

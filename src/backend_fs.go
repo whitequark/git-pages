@@ -212,7 +212,7 @@ func domainFrozenMarkerName(domain string) string {
 	return filepath.Join(domain, ".frozen")
 }
 
-func (fs *FSBackend) checkDomainFrozen(_ctx context.Context, domain string) error {
+func (fs *FSBackend) checkDomainFrozen(ctx context.Context, domain string) error {
 	if _, err := fs.siteRoot.Stat(domainFrozenMarkerName(domain)); err == nil {
 		return ErrDomainFrozen
 	} else if !errors.Is(err, os.ErrNotExist) {
