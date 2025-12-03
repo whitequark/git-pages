@@ -530,12 +530,53 @@ func (s3 *S3Backend) checkDomainFrozen(ctx context.Context, domain string) error
 	}
 }
 
-func (s3 *S3Backend) CommitManifest(ctx context.Context, name string, manifest *Manifest) error {
+func (s3 *S3Backend) HasAtomicCAS(ctx context.Context) bool {
+	// Support for `If-Unmodified-Since:` or `If-Match:` for PutObject requests is very spotty:
+	//   - AWS supports only `If-Match:`:
+	//     https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html
+	//   - Minio supports `If-Match:`:
+	//     https://blog.min.io/leading-the-way-minios-conditional-write-feature-for-modern-data-workloads/
+	//   - Tigris supports `If-Unmodified-Since:` and `If-Match:`, but only with `X-Tigris-Consistent: true`;
+	//     https://www.tigrisdata.com/docs/objects/conditionals/
+	//     Note that the `X-Tigris-Consistent: true` header must be present on *every* transaction
+	//     touching the object, not just on the CAS transactions.
+	//   - Wasabi does not support either one and docs seem to suggest that the headers are ignored;
+	//   - Garage does not support either one and source code suggests the headers are ignored.
+	// It seems that the only safe option is to not claim support for atomic CAS, and only do
+	// best-effort CAS implementation using HeadObject and PutObject/DeleteObject.
+	return false
+}
+
+func (s3 *S3Backend) checkManifestPrecondition(
+	ctx context.Context, name string, opts ModifyManifestOptions,
+) error {
+	if !opts.IfUnmodifiedSince.IsZero() {
+		stat, err := s3.client.StatObject(ctx, s3.bucket, manifestObjectName(name),
+			minio.GetObjectOptions{})
+		if err != nil {
+			return fmt.Errorf("stat: %w", err)
+		}
+
+		if stat.LastModified.Compare(opts.IfUnmodifiedSince) > 0 {
+			return fmt.Errorf("%w: If-Unmodified-Since", ErrPreconditionFailed)
+		}
+	}
+
+	return nil
+}
+
+func (s3 *S3Backend) CommitManifest(
+	ctx context.Context, name string, manifest *Manifest, opts ModifyManifestOptions,
+) error {
 	data := EncodeManifest(manifest)
 	logc.Printf(ctx, "s3: commit manifest %x -> %s", sha256.Sum256(data), name)
 
 	_, domain, _ := strings.Cut(name, "/")
 	if err := s3.checkDomainFrozen(ctx, domain); err != nil {
+		return err
+	}
+
+	if err := s3.checkManifestPrecondition(ctx, name, opts); err != nil {
 		return err
 	}
 
@@ -547,7 +588,11 @@ func (s3 *S3Backend) CommitManifest(ctx context.Context, name string, manifest *
 		minio.RemoveObjectOptions{})
 	s3.siteCache.Cache.Invalidate(name)
 	if putErr != nil {
-		return putErr
+		if errResp := minio.ToErrorResponse(putErr); errResp.Code == "PreconditionFailed" {
+			return ErrPreconditionFailed
+		} else {
+			return putErr
+		}
 	} else if removeErr != nil {
 		return removeErr
 	} else {
@@ -555,11 +600,17 @@ func (s3 *S3Backend) CommitManifest(ctx context.Context, name string, manifest *
 	}
 }
 
-func (s3 *S3Backend) DeleteManifest(ctx context.Context, name string) error {
+func (s3 *S3Backend) DeleteManifest(
+	ctx context.Context, name string, opts ModifyManifestOptions,
+) error {
 	logc.Printf(ctx, "s3: delete manifest %s\n", name)
 
 	_, domain, _ := strings.Cut(name, "/")
 	if err := s3.checkDomainFrozen(ctx, domain); err != nil {
+		return err
+	}
+
+	if err := s3.checkManifestPrecondition(ctx, name, opts); err != nil {
 		return err
 	}
 

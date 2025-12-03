@@ -69,8 +69,17 @@ Features
     - If the `PUT` method receives an `application/x-tar`, `application/x-tar+gzip`, `application/x-tar+zstd`, or `application/zip` body, it contains an archive to be extracted.
     - The `POST` method requires an `application/json` body containing a Forgejo/Gitea/Gogs/GitHub webhook event payload. Requests where the `ref` key contains anything other than `refs/heads/pages` are ignored, and only the `pages` branch is used. The `repository.clone_url` key contains a repository URL to be shallowly cloned.
     - If the received contents is empty, performs the same action as `DELETE`.
+* **With feature `patch`:** In response to a `PATCH` request, the server partially updates a site with new content. The URL of the request must be the root URL of the site that is being published.
+    - The request must have a `application/x-tar`, `application/x-tar+gzip`, or `application/x-tar+zstd` body, whose contents is *merged* with the existing site contents as follows:
+        - A character device entry with major 0 and minor 0 is treated as a "whiteout marker" (following [unionfs][whiteout]): it causes any existing file or directory with the same name to be deleted.
+        - A directory entry replaces any existing file or directory with the same name (if any), recursively removing the old contents.
+        - A file or symlink entry replaces any existing file or directory with the same name (if any).
+        - In any case, the parent of an entry must exist and be a directory.
+    - The request must have a `Race-Free: yes` or `Race-Free: no` header. Not every backend configuration makes it possible to perform atomic compare-and-swap operations; on backends without atomic CAS support, `Race-Free: yes` requests will fail, while `Race-Free: no` requests will provide a best-effort approximation.
+    - If a `PATCH` request loses a race against another content update request, it may return `409 Conflict`. This is true regardless of the `Race-Free:` header value. Whenever this happens, resubmit the request as-is.
+    - If the site has no contents after the update is applied, performs the same action as `DELETE`.
 * In response to a `DELETE` request, the server unpublishes a site. The URL of the request must be the root URL of the site that is being unpublished. Site data remains stored for an indeterminate period of time, but becomes completely inaccessible.
-* If a `Dry-Run: yes` header is provided with a `PUT`, `DELETE`, or `POST` request, only the authorization checks are run; no destructive updates are made. Note that this functionality was added in _git-pages_ v0.2.0.
+* If a `Dry-Run: yes` header is provided with a `PUT`, `PATCH`, `DELETE`, or `POST` request, only the authorization checks are run; no destructive updates are made. Note that this functionality was added in _git-pages_ v0.2.0.
 * All updates to site content are atomic (subject to consistency guarantees of the storage backend). That is, there is an instantaneous moment during an update before which the server will return the old content and after which it will return the new content.
 * Files with a certain name, when placed in the root of a site, have special functions:
     - [Netlify `_redirects`][_redirects] file can be used to specify HTTP redirect and rewrite rules. The _git-pages_ implementation currently does not support placeholders, query parameters, or conditions, and may differ from Netlify in other minor ways. If you find that a supported `_redirects` file feature does not work the same as on Netlify, please file an issue. (Note that _git-pages_ does not perform URL normalization; `/foo` and `/foo/` are *not* the same, unlike with Netlify.)
@@ -81,6 +90,7 @@ Features
 [_headers]: https://docs.netlify.com/manage/routing/headers/
 [cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS
 [go-git-sha256]: https://github.com/go-git/go-git/issues/706
+[whiteout]: https://docs.kernel.org/filesystems/overlayfs.html#whiteouts-and-opaque-directories
 
 
 Authorization
@@ -88,17 +98,17 @@ Authorization
 
 DNS is the primary authorization method, using either TXT records or wildcard matching. In certain cases, git forge authorization is used in addition to DNS.
 
-The authorization flow for content updates (`PUT`, `DELETE`, `POST` requests) proceeds sequentially in the following order, with the first of multiple applicable rule taking precedence:
+The authorization flow for content updates (`PUT`, `PATCH`, `DELETE`, `POST` requests) proceeds sequentially in the following order, with the first of multiple applicable rule taking precedence:
 
 1. **Development Mode:** If the environment variable `PAGES_INSECURE` is set to a truthful value like `1`, the request is authorized.
-2. **DNS Challenge:** If the method is `PUT`, `DELETE`, `POST`, and a well-formed `Authorization:` header is provided containing a `<token>`, and a TXT record lookup at `_git-pages-challenge.<host>` returns a record whose concatenated value equals `SHA256("<host> <token>")`, the request is authorized.
+2. **DNS Challenge:** If the method is `PUT`, `PATCH`, `DELETE`, `POST`, and a well-formed `Authorization:` header is provided containing a `<token>`, and a TXT record lookup at `_git-pages-challenge.<host>` returns a record whose concatenated value equals `SHA256("<host> <token>")`, the request is authorized.
     - **`Pages` scheme:** Request includes an `Authorization: Pages <token>` header.
     - **`Basic` scheme:** Request includes an `Authorization: Basic <basic>` header, where `<basic>` is equal to `Base64("Pages:<token>")`. (Useful for non-Forgejo forges.)
 3. **DNS Allowlist:** If the method is `PUT` or `POST`, and the request URL is `scheme://<user>.<host>/`, and a TXT record lookup at `_git-pages-repository.<host>` returns a set of well-formed absolute URLs, and (for `PUT` requests) the body contains a repository URL, and the requested clone URLs is contained in this set of URLs, the request is authorized.
 4. **Wildcard Match (content):** If the method is `POST`, and a `[[wildcard]]` configuration section exists where the suffix of a hostname (compared label-wise) is equal to `[[wildcard]].domain`, and (for `PUT` requests) the body contains a repository URL, and the requested clone URL is a *matching* clone URL, the request is authorized.
     - **Index repository:** If the request URL is `scheme://<user>.<host>/`, a *matching* clone URL is computed by templating `[[wildcard]].clone-url` with `<user>` and `<project>`, where `<project>` is computed by templating each element of `[[wildcard]].index-repos` with `<user>`, and `[[wildcard]]` is the section where the match occurred.
     - **Project repository:** If the request URL is `scheme://<user>.<host>/<project>/`, a *matching* clone URL is computed by templating `[[wildcard]].clone-url` with `<user>` and `<project>`, and `[[wildcard]]` is the section where the match occurred.
-5. **Forge Authorization:** If the method is `PUT`, and the body contains an archive, and a `[[wildcard]]` configuration section exists where the suffix of a hostname (compared label-wise) is equal to `[[wildcard]].domain`, and `[[wildcard]].authorization` is non-empty, and the request includes a `Forge-Authorization:` header, and the header (when forwarded as `Authorization:`) grants push permissions to a repository at the *matching* clone URL (as defined above) as determined by an API call to the forge, the request is authorized. (This enables publishing a site for a private repository.)
+5. **Forge Authorization:** If the method is `PUT` or `PATCH`, and the body contains an archive, and a `[[wildcard]]` configuration section exists where the suffix of a hostname (compared label-wise) is equal to `[[wildcard]].domain`, and `[[wildcard]].authorization` is non-empty, and the request includes a `Forge-Authorization:` header, and the header (when forwarded as `Authorization:`) grants push permissions to a repository at the *matching* clone URL (as defined above) as determined by an API call to the forge, the request is authorized. (This enables publishing a site for a private repository.)
 5. **Default Deny:** Otherwise, the request is not authorized.
 
 The authorization flow for metadata retrieval (`GET` requests with site paths starting with `.git-pages/`) in the following order, with the first of multiple applicable rule taking precedence:

@@ -11,13 +11,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
 type FSBackend struct {
-	blobRoot  *os.Root
-	siteRoot  *os.Root
-	auditRoot *os.Root
+	blobRoot     *os.Root
+	siteRoot     *os.Root
+	auditRoot    *os.Root
+	hasAtomicCAS bool
 }
 
 var _ Backend = (*FSBackend)(nil)
@@ -56,7 +58,21 @@ func createTempInRoot(root *os.Root, name string, data []byte) (string, error) {
 	return tempPath, nil
 }
 
-func NewFSBackend(config *FSConfig) (*FSBackend, error) {
+func checkAtomicCAS(root *os.Root) bool {
+	fileName := ".hasAtomicCAS"
+	file, err := root.Create(fileName)
+	if err != nil {
+		panic(err)
+	}
+	root.Remove(fileName)
+	defer file.Close()
+
+	flockErr := FileLock(file)
+	funlockErr := FileUnlock(file)
+	return (flockErr == nil && funlockErr == nil)
+}
+
+func NewFSBackend(ctx context.Context, config *FSConfig) (*FSBackend, error) {
 	blobRoot, err := maybeCreateOpenRoot(config.Root, "blob")
 	if err != nil {
 		return nil, fmt.Errorf("blob: %w", err)
@@ -69,7 +85,13 @@ func NewFSBackend(config *FSConfig) (*FSBackend, error) {
 	if err != nil {
 		return nil, fmt.Errorf("audit: %w", err)
 	}
-	return &FSBackend{blobRoot, siteRoot, auditRoot}, nil
+	hasAtomicCAS := checkAtomicCAS(siteRoot)
+	if hasAtomicCAS {
+		logc.Println(ctx, "fs: has atomic CAS")
+	} else {
+		logc.Println(ctx, "fs: has best-effort CAS")
+	}
+	return &FSBackend{blobRoot, siteRoot, auditRoot, hasAtomicCAS}, nil
 }
 
 func (fs *FSBackend) Backend() Backend {
@@ -229,9 +251,78 @@ func (fs *FSBackend) checkDomainFrozen(ctx context.Context, domain string) error
 	}
 }
 
-func (fs *FSBackend) CommitManifest(ctx context.Context, name string, manifest *Manifest) error {
+func (fs *FSBackend) HasAtomicCAS(ctx context.Context) bool {
+	// On a suitable filesystem, POSIX advisory locks can be used to implement atomic CAS.
+	// An implementation consists of two parts:
+	//   - Intra-process mutex set (one per manifest), to prevent races between goroutines;
+	//   - Inter-process POSIX advisory locks (one per manifest), to prevent races between
+	//     different git-pages instances.
+	return fs.hasAtomicCAS
+}
+
+// Right now updates aren't very common, so this lock is essentially entirely uncontended.
+// If it ever becomes a bottleneck it should be replaced with a per-manifest lock.
+var sharedManifestLock = sync.Mutex{}
+
+type manifestLockGuard struct {
+	file *os.File
+}
+
+func lockManifest(fs *os.Root, name string) (*manifestLockGuard, error) {
+	file, err := fs.Open(name)
+	if errors.Is(err, os.ErrNotExist) {
+		return &manifestLockGuard{nil}, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("open: %w", err)
+	}
+	if err := FileLock(file); err != nil {
+		file.Close()
+		return nil, fmt.Errorf("flock(LOCK_EX): %w", err)
+	}
+	sharedManifestLock.Lock()
+	return &manifestLockGuard{file}, nil
+}
+
+func (guard *manifestLockGuard) Unlock() {
+	if guard.file != nil {
+		FileUnlock(guard.file)
+		guard.file.Close()
+		sharedManifestLock.Unlock()
+	}
+}
+
+func (fs *FSBackend) checkManifestPrecondition(
+	ctx context.Context, name string, opts ModifyManifestOptions,
+) error {
+	if !opts.IfUnmodifiedSince.IsZero() {
+		stat, err := fs.siteRoot.Stat(name)
+		if err != nil {
+			return fmt.Errorf("stat: %w", err)
+		}
+
+		if stat.ModTime().Compare(opts.IfUnmodifiedSince) > 0 {
+			return fmt.Errorf("%w: If-Unmodified-Since", ErrPreconditionFailed)
+		}
+	}
+
+	return nil
+}
+
+func (fs *FSBackend) CommitManifest(
+	ctx context.Context, name string, manifest *Manifest, opts ModifyManifestOptions,
+) error {
+	if guard, err := lockManifest(fs.siteRoot, name); err != nil {
+		return err
+	} else {
+		defer guard.Unlock()
+	}
+
 	domain := filepath.Dir(name)
 	if err := fs.checkDomainFrozen(ctx, domain); err != nil {
+		return err
+	}
+
+	if err := fs.checkManifestPrecondition(ctx, name, opts); err != nil {
 		return err
 	}
 
@@ -253,9 +344,21 @@ func (fs *FSBackend) CommitManifest(ctx context.Context, name string, manifest *
 	return nil
 }
 
-func (fs *FSBackend) DeleteManifest(ctx context.Context, name string) error {
+func (fs *FSBackend) DeleteManifest(
+	ctx context.Context, name string, opts ModifyManifestOptions,
+) error {
+	if guard, err := lockManifest(fs.siteRoot, name); err != nil {
+		return err
+	} else {
+		defer guard.Unlock()
+	}
+
 	domain := filepath.Dir(name)
 	if err := fs.checkDomainFrozen(ctx, domain); err != nil {
+		return err
+	}
+
+	if err := fs.checkManifestPrecondition(ctx, name, opts); err != nil {
 		return err
 	}
 

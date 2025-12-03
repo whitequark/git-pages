@@ -270,7 +270,9 @@ var ErrManifestTooLarge = errors.New("manifest too large")
 
 // Uploads inline file data over certain size to the storage backend. Returns a copy of
 // the manifest updated to refer to an external content-addressable store.
-func StoreManifest(ctx context.Context, name string, manifest *Manifest) (*Manifest, error) {
+func StoreManifest(
+	ctx context.Context, name string, manifest *Manifest, opts ModifyManifestOptions,
+) (*Manifest, error) {
 	span, ctx := ObserveFunction(ctx, "StoreManifest", "manifest.name", name)
 	defer span.Finish()
 
@@ -349,7 +351,7 @@ func StoreManifest(ctx context.Context, name string, manifest *Manifest) (*Manif
 		return nil, err // currently ignores all but 1st error
 	}
 
-	if err := backend.CommitManifest(ctx, name, &extManifest); err != nil {
+	if err := backend.CommitManifest(ctx, name, &extManifest, opts); err != nil {
 		if errors.Is(err, ErrDomainFrozen) {
 			return nil, err
 		} else {

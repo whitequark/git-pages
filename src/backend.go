@@ -12,6 +12,8 @@ import (
 )
 
 var ErrObjectNotFound = errors.New("not found")
+var ErrPreconditionFailed = errors.New("precondition failed")
+var ErrWriteConflict = errors.New("write conflict")
 var ErrDomainFrozen = errors.New("domain administratively frozen")
 
 func splitBlobName(name string) []string {
@@ -33,6 +35,12 @@ type GetManifestOptions struct {
 	// If true and the manifest is past the cache `MaxAge`, `GetManifest` blocks and returns
 	// a fresh object instead of revalidating in background and returning a stale object.
 	BypassCache bool
+}
+
+type ModifyManifestOptions struct {
+	// If non-zero, the request will only succeed if the manifest hasn't been changed since
+	// the given time. Whether this is racy or not is can be determined via `HasAtomicCAS()`.
+	IfUnmodifiedSince time.Time
 }
 
 type QueryAuditLogOptions struct {
@@ -81,12 +89,17 @@ type Backend interface {
 	// effects.
 	StageManifest(ctx context.Context, manifest *Manifest) error
 
+	// Whether a compare-and-swap operation on a manifest is truly race-free, or only best-effort
+	// atomic with a small but non-zero window where two requests may race where the one committing
+	// first will have its update lost. (Plain swap operations are always guaranteed to be atomic.)
+	HasAtomicCAS(ctx context.Context) bool
+
 	// Commit a manifest. This is an atomic operation; `GetManifest` calls will return either
 	// the old version or the new version of the manifest, never anything else.
-	CommitManifest(ctx context.Context, name string, manifest *Manifest) error
+	CommitManifest(ctx context.Context, name string, manifest *Manifest, opts ModifyManifestOptions) error
 
 	// Delete a manifest.
-	DeleteManifest(ctx context.Context, name string) error
+	DeleteManifest(ctx context.Context, name string, opts ModifyManifestOptions) error
 
 	// List all manifests.
 	ListManifests(ctx context.Context) (manifests []string, err error)
@@ -114,7 +127,7 @@ type Backend interface {
 func CreateBackend(config *StorageConfig) (backend Backend, err error) {
 	switch config.Type {
 	case "fs":
-		if backend, err = NewFSBackend(&config.FS); err != nil {
+		if backend, err = NewFSBackend(context.Background(), &config.FS); err != nil {
 			err = fmt.Errorf("fs backend: %w", err)
 		}
 	case "s3":

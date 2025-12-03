@@ -46,9 +46,8 @@ var (
 	}, []string{"cause"})
 )
 
-func reportSiteUpdate(via string, result *UpdateResult) {
+func observeSiteUpdate(via string, result *UpdateResult) {
 	siteUpdatesCount.With(prometheus.Labels{"via": via}).Inc()
-
 	switch result.outcome {
 	case UpdateError:
 		siteUpdateErrorCount.With(prometheus.Labels{"cause": "other"}).Inc()
@@ -358,7 +357,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	}
 	if !negotiatedEncoding {
 		w.WriteHeader(http.StatusNotAcceptable)
-		return fmt.Errorf("no supported content encodings (accept-encoding: %q)",
+		return fmt.Errorf("no supported content encodings (Accept-Encoding: %q)",
 			r.Header.Get("Accept-Encoding"))
 	}
 
@@ -419,6 +418,15 @@ func checkDryRun(w http.ResponseWriter, r *http.Request) bool {
 
 func putPage(w http.ResponseWriter, r *http.Request) error {
 	var result UpdateResult
+
+	for _, header := range []string{
+		"If-Modified-Since", "If-Unmodified-Since", "If-Match", "If-None-Match",
+	} {
+		if r.Header.Get(header) != "" {
+			http.Error(w, fmt.Sprintf("unsupported precondition %s", header), http.StatusBadRequest)
+			return nil
+		}
+	}
 
 	host, err := GetHost(r)
 	if err != nil {
@@ -483,6 +491,74 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		result = UpdateFromArchive(updateCtx, webRoot, contentType, reader)
 	}
 
+	return reportUpdateResult(w, result)
+}
+
+func patchPage(w http.ResponseWriter, r *http.Request) error {
+	if !config.Feature("patch") {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return nil
+	}
+
+	for _, header := range []string{
+		"If-Modified-Since", "If-Unmodified-Since", "If-Match", "If-None-Match",
+	} {
+		if r.Header.Get(header) != "" {
+			http.Error(w, fmt.Sprintf("unsupported precondition %s", header), http.StatusBadRequest)
+			return nil
+		}
+	}
+
+	host, err := GetHost(r)
+	if err != nil {
+		return err
+	}
+
+	projectName, err := GetProjectName(r)
+	if err != nil {
+		return err
+	}
+
+	webRoot := makeWebRoot(host, projectName)
+
+	updateCtx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
+	defer cancel()
+
+	if _, err = AuthorizeUpdateFromArchive(r); err != nil {
+		return err
+	}
+
+	// Providing atomic compare-and-swap operations might be difficult or impossible depending
+	// on the backend in use and its configuration, but for applications where a mostly-atomic
+	// compare-and-swap operation is good enough (e.g. generating page previews) we don't want
+	// to prevent the use of partial updates.
+	wantRaceFree := r.Header.Get("Race-Free")
+	hasAtomicCAS := backend.HasAtomicCAS(r.Context())
+	switch {
+	case wantRaceFree == "yes" && hasAtomicCAS || wantRaceFree == "no":
+		// all good
+	case wantRaceFree == "yes":
+		http.Error(w, "race free partial updates unsupported", http.StatusPreconditionFailed)
+		return nil
+	case wantRaceFree == "":
+		http.Error(w, "must provide \"Race-Free: yes|no\" header", http.StatusPreconditionRequired)
+		return nil
+	default:
+		http.Error(w, "malformed Race-Free: header", http.StatusBadRequest)
+		return nil
+	}
+
+	if checkDryRun(w, r) {
+		return nil
+	}
+
+	contentType := getMediaType(r.Header.Get("Content-Type"))
+	reader := http.MaxBytesReader(w, r.Body, int64(config.Limits.MaxSiteSize.Bytes()))
+	result := PartialUpdateFromArchive(updateCtx, webRoot, contentType, reader)
+	return reportUpdateResult(w, result)
+}
+
+func reportUpdateResult(w http.ResponseWriter, result UpdateResult) error {
 	switch result.outcome {
 	case UpdateError:
 		if errors.Is(result.err, ErrManifestTooLarge) {
@@ -491,6 +567,12 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 			w.WriteHeader(http.StatusUnsupportedMediaType)
 		} else if errors.Is(result.err, ErrArchiveTooLarge) {
 			w.WriteHeader(http.StatusRequestEntityTooLarge)
+		} else if errors.Is(result.err, ErrMalformedPatch) {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+		} else if errors.Is(result.err, ErrPreconditionFailed) {
+			w.WriteHeader(http.StatusPreconditionFailed)
+		} else if errors.Is(result.err, ErrWriteConflict) {
+			w.WriteHeader(http.StatusConflict)
 		} else if errors.Is(result.err, ErrDomainFrozen) {
 			w.WriteHeader(http.StatusForbidden)
 		} else {
@@ -521,7 +603,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 	} else {
 		fmt.Fprintln(w, "internal error")
 	}
-	reportSiteUpdate("rest", &result)
+	observeSiteUpdate("rest", &result)
 	return nil
 }
 
@@ -545,7 +627,8 @@ func deletePage(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 
-	err = backend.DeleteManifest(r.Context(), makeWebRoot(host, projectName))
+	err = backend.DeleteManifest(r.Context(), makeWebRoot(host, projectName),
+		ModifyManifestOptions{})
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
@@ -656,7 +739,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 
 		result := UpdateFromRepository(ctx, webRoot, repoURL, auth.branch)
 		resultChan <- result
-		reportSiteUpdate("webhook", &result)
+		observeSiteUpdate("webhook", &result)
 	}(context.Background())
 
 	var result UpdateResult
@@ -716,7 +799,7 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	allowedMethods := []string{"OPTIONS", "HEAD", "GET", "PUT", "DELETE", "POST"}
+	allowedMethods := []string{"OPTIONS", "HEAD", "GET", "PUT", "PATCH", "DELETE", "POST"}
 	if r.Method == "OPTIONS" || !slices.Contains(allowedMethods, r.Method) {
 		w.Header().Add("Allow", strings.Join(allowedMethods, ", "))
 	}
@@ -729,6 +812,8 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 		err = getPage(w, r)
 	case http.MethodPut:
 		err = putPage(w, r)
+	case http.MethodPatch:
+		err = patchPage(w, r)
 	case http.MethodDelete:
 		err = deletePage(w, r)
 	// webhook API

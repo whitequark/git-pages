@@ -144,7 +144,9 @@ func notifyAudit(ctx context.Context, id AuditID) {
 	}
 }
 
-func (audited *auditedBackend) CommitManifest(ctx context.Context, name string, manifest *Manifest) (err error) {
+func (audited *auditedBackend) CommitManifest(
+	ctx context.Context, name string, manifest *Manifest, opts ModifyManifestOptions,
+) (err error) {
 	domain, project, ok := strings.Cut(name, "/")
 	if !ok {
 		panic("malformed manifest name")
@@ -156,10 +158,12 @@ func (audited *auditedBackend) CommitManifest(ctx context.Context, name string, 
 		Manifest: manifest,
 	})
 
-	return audited.Backend.CommitManifest(ctx, name, manifest)
+	return audited.Backend.CommitManifest(ctx, name, manifest, opts)
 }
 
-func (audited *auditedBackend) DeleteManifest(ctx context.Context, name string) (err error) {
+func (audited *auditedBackend) DeleteManifest(
+	ctx context.Context, name string, opts ModifyManifestOptions,
+) (err error) {
 	domain, project, ok := strings.Cut(name, "/")
 	if !ok {
 		panic("malformed manifest name")
@@ -170,7 +174,7 @@ func (audited *auditedBackend) DeleteManifest(ctx context.Context, name string) 
 		Project: proto.String(project),
 	})
 
-	return audited.Backend.DeleteManifest(ctx, name)
+	return audited.Backend.DeleteManifest(ctx, name, opts)
 }
 
 func (audited *auditedBackend) FreezeDomain(ctx context.Context, domain string, freeze bool) (err error) {

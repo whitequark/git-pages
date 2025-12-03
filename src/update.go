@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"google.golang.org/protobuf/proto"
 )
 
 type UpdateOutcome int
@@ -25,14 +27,16 @@ type UpdateResult struct {
 	err      error
 }
 
-func Update(ctx context.Context, webRoot string, manifest *Manifest) UpdateResult {
-	var oldManifest, newManifest *Manifest
+func Update(
+	ctx context.Context, webRoot string, oldManifest, newManifest *Manifest,
+	opts ModifyManifestOptions,
+) UpdateResult {
 	var err error
+	var storedManifest *Manifest
 
 	outcome := UpdateError
-	oldManifest, _, _ = backend.GetManifest(ctx, webRoot, GetManifestOptions{})
-	if IsManifestEmpty(manifest) {
-		newManifest, err = manifest, backend.DeleteManifest(ctx, webRoot)
+	if IsManifestEmpty(newManifest) {
+		storedManifest, err = newManifest, backend.DeleteManifest(ctx, webRoot, opts)
 		if err == nil {
 			if oldManifest == nil {
 				outcome = UpdateNoChange
@@ -40,8 +44,8 @@ func Update(ctx context.Context, webRoot string, manifest *Manifest) UpdateResul
 				outcome = UpdateDeleted
 			}
 		}
-	} else if err = PrepareManifest(ctx, manifest); err == nil {
-		newManifest, err = StoreManifest(ctx, webRoot, manifest)
+	} else if err = PrepareManifest(ctx, newManifest); err == nil {
+		storedManifest, err = StoreManifest(ctx, webRoot, newManifest, opts)
 		if err == nil {
 			domain, _, _ := strings.Cut(webRoot, "/")
 			err = backend.CreateDomain(ctx, domain)
@@ -49,7 +53,7 @@ func Update(ctx context.Context, webRoot string, manifest *Manifest) UpdateResul
 		if err == nil {
 			if oldManifest == nil {
 				outcome = UpdateCreated
-			} else if CompareManifest(oldManifest, newManifest) {
+			} else if CompareManifest(oldManifest, storedManifest) {
 				outcome = UpdateNoChange
 			} else {
 				outcome = UpdateReplaced
@@ -69,8 +73,8 @@ func Update(ctx context.Context, webRoot string, manifest *Manifest) UpdateResul
 		case UpdateNoChange:
 			status = "unchanged"
 		}
-		if newManifest.Commit != nil {
-			logc.Printf(ctx, "update %s ok: %s %s", webRoot, status, *newManifest.Commit)
+		if storedManifest.Commit != nil {
+			logc.Printf(ctx, "update %s ok: %s %s", webRoot, status, *storedManifest.Commit)
 		} else {
 			logc.Printf(ctx, "update %s ok: %s", webRoot, status)
 		}
@@ -78,7 +82,7 @@ func Update(ctx context.Context, webRoot string, manifest *Manifest) UpdateResul
 		logc.Printf(ctx, "update %s err: %s", webRoot, err)
 	}
 
-	return UpdateResult{outcome, newManifest, err}
+	return UpdateResult{outcome, storedManifest, err}
 }
 
 func UpdateFromRepository(
@@ -92,16 +96,16 @@ func UpdateFromRepository(
 
 	logc.Printf(ctx, "update %s: %s %s\n", webRoot, repoURL, branch)
 
-	oldManifest, _, _ := backend.GetManifest(ctx, webRoot, GetManifestOptions{})
 	// Ignore errors; worst case we have to re-fetch all of the blobs.
+	oldManifest, _, _ := backend.GetManifest(ctx, webRoot, GetManifestOptions{})
 
-	manifest, err := FetchRepository(ctx, repoURL, branch, oldManifest)
+	newManifest, err := FetchRepository(ctx, repoURL, branch, oldManifest)
 	if errors.Is(err, context.DeadlineExceeded) {
 		result = UpdateResult{UpdateTimeout, nil, fmt.Errorf("update timeout")}
 	} else if err != nil {
 		result = UpdateResult{UpdateError, nil, err}
 	} else {
-		result = Update(ctx, webRoot, manifest)
+		result = Update(ctx, webRoot, oldManifest, newManifest, ModifyManifestOptions{})
 	}
 
 	observeUpdateResult(result)
@@ -116,22 +120,25 @@ func UpdateFromArchive(
 	contentType string,
 	reader io.Reader,
 ) (result UpdateResult) {
-	var manifest *Manifest
 	var err error
 
+	// Ignore errors; here the old manifest is used only to determine the update outcome.
+	oldManifest, _, _ := backend.GetManifest(ctx, webRoot, GetManifestOptions{})
+
+	var newManifest *Manifest
 	switch contentType {
 	case "application/x-tar":
 		logc.Printf(ctx, "update %s: (tar)", webRoot)
-		manifest, err = ExtractTar(reader) // yellow?
+		newManifest, err = ExtractTar(reader) // yellow?
 	case "application/x-tar+gzip":
 		logc.Printf(ctx, "update %s: (tar.gz)", webRoot)
-		manifest, err = ExtractGzip(reader, ExtractTar) // definitely yellow.
+		newManifest, err = ExtractGzip(reader, ExtractTar) // definitely yellow.
 	case "application/x-tar+zstd":
 		logc.Printf(ctx, "update %s: (tar.zst)", webRoot)
-		manifest, err = ExtractZstd(reader, ExtractTar)
+		newManifest, err = ExtractZstd(reader, ExtractTar)
 	case "application/zip":
 		logc.Printf(ctx, "update %s: (zip)", webRoot)
-		manifest, err = ExtractZip(reader)
+		newManifest, err = ExtractZip(reader)
 	default:
 		err = errArchiveFormat
 	}
@@ -140,7 +147,70 @@ func UpdateFromArchive(
 		logc.Printf(ctx, "update %s err: %s", webRoot, err)
 		result = UpdateResult{UpdateError, nil, err}
 	} else {
-		result = Update(ctx, webRoot, manifest)
+		result = Update(ctx, webRoot, oldManifest, newManifest, ModifyManifestOptions{})
+	}
+
+	observeUpdateResult(result)
+	return
+}
+
+func PartialUpdateFromArchive(
+	ctx context.Context,
+	webRoot string,
+	contentType string,
+	reader io.Reader,
+) (result UpdateResult) {
+	var err error
+
+	// Here the old manifest is used both as a substrate to which a patch is applied, as well
+	// as a "load linked" operation for a future "store conditional" update which, taken together,
+	// create an atomic compare-and-swap operation.
+	oldManifest, oldManifestMtime, err := backend.GetManifest(ctx, webRoot,
+		GetManifestOptions{BypassCache: true})
+	if err != nil {
+		logc.Printf(ctx, "patch %s err: %s", webRoot, err)
+		return UpdateResult{UpdateError, nil, err}
+	}
+
+	applyTarPatch := func(reader io.Reader) (*Manifest, error) {
+		// Clone the manifest before starting to mutate it. `GetManifest` may return cached
+		// `*Manifest` objects, which should never be mutated.
+		newManifest := &Manifest{}
+		proto.Merge(newManifest, oldManifest)
+		if err := ApplyTarPatch(newManifest, reader); err != nil {
+			return nil, err
+		} else {
+			return newManifest, nil
+		}
+	}
+
+	var newManifest *Manifest
+	switch contentType {
+	case "application/x-tar":
+		logc.Printf(ctx, "patch %s: (tar)", webRoot)
+		newManifest, err = applyTarPatch(reader)
+	case "application/x-tar+gzip":
+		logc.Printf(ctx, "patch %s: (tar.gz)", webRoot)
+		newManifest, err = ExtractGzip(reader, applyTarPatch)
+	case "application/x-tar+zstd":
+		logc.Printf(ctx, "patch %s: (tar.zst)", webRoot)
+		newManifest, err = ExtractZstd(reader, applyTarPatch)
+	default:
+		err = errArchiveFormat
+	}
+
+	if err != nil {
+		logc.Printf(ctx, "patch %s err: %s", webRoot, err)
+		result = UpdateResult{UpdateError, nil, err}
+	} else {
+		result = Update(ctx, webRoot, oldManifest, newManifest,
+			ModifyManifestOptions{IfUnmodifiedSince: oldManifestMtime})
+		// The `If-Unmodified-Since` precondition is internally generated here, which means its
+		// failure shouldn't be surfaced as-is in the HTTP response. If we also accepted options
+		// from the client, then that precondition failure should surface in the response.
+		if errors.Is(result.err, ErrPreconditionFailed) {
+			result.err = ErrWriteConflict
+		}
 	}
 
 	observeUpdateResult(result)

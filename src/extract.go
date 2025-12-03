@@ -77,7 +77,7 @@ func ExtractTar(reader io.Reader) (*Manifest, error) {
 		case tar.TypeDir:
 			AddDirectory(manifest, fileName)
 		default:
-			AddProblem(manifest, fileName, "unsupported type '%c'", header.Typeflag)
+			AddProblem(manifest, fileName, "tar: unsupported type '%c'", header.Typeflag)
 			continue
 		}
 	}

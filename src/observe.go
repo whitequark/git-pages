@@ -403,16 +403,20 @@ func (backend *observedBackend) StageManifest(ctx context.Context, manifest *Man
 	return
 }
 
-func (backend *observedBackend) CommitManifest(ctx context.Context, name string, manifest *Manifest) (err error) {
+func (backend *observedBackend) HasAtomicCAS(ctx context.Context) bool {
+	return backend.inner.HasAtomicCAS(ctx)
+}
+
+func (backend *observedBackend) CommitManifest(ctx context.Context, name string, manifest *Manifest, opts ModifyManifestOptions) (err error) {
 	span, ctx := ObserveFunction(ctx, "CommitManifest", "manifest.name", name)
-	err = backend.inner.CommitManifest(ctx, name, manifest)
+	err = backend.inner.CommitManifest(ctx, name, manifest, opts)
 	span.Finish()
 	return
 }
 
-func (backend *observedBackend) DeleteManifest(ctx context.Context, name string) (err error) {
+func (backend *observedBackend) DeleteManifest(ctx context.Context, name string, opts ModifyManifestOptions) (err error) {
 	span, ctx := ObserveFunction(ctx, "DeleteManifest", "manifest.name", name)
-	err = backend.inner.DeleteManifest(ctx, name)
+	err = backend.inner.DeleteManifest(ctx, name, opts)
 	span.Finish()
 	return
 }
