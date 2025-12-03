@@ -125,10 +125,10 @@ func UpdateFromArchive(
 		manifest, err = ExtractTar(reader) // yellow?
 	case "application/x-tar+gzip":
 		logc.Printf(ctx, "update %s: (tar.gz)", webRoot)
-		manifest, err = ExtractTarGzip(reader) // definitely yellow.
+		manifest, err = ExtractGzip(reader, ExtractTar) // definitely yellow.
 	case "application/x-tar+zstd":
 		logc.Printf(ctx, "update %s: (tar.zst)", webRoot)
-		manifest, err = ExtractTarZstd(reader)
+		manifest, err = ExtractZstd(reader, ExtractTar)
 	case "application/zip":
 		logc.Printf(ctx, "update %s: (zip)", webRoot)
 		manifest, err = ExtractZip(reader)

@@ -18,13 +18,33 @@ import (
 
 var ErrArchiveTooLarge = errors.New("archive too large")
 
-func ExtractTar(reader io.Reader) (*Manifest, error) {
-	// If the tar stream is itself compressed, both the outer and the inner bounds checks
-	// are load-bearing.
-	boundedReader := ReadAtMost(reader, int64(config.Limits.MaxSiteSize.Bytes()),
+func boundArchiveStream(reader io.Reader) io.Reader {
+	return ReadAtMost(reader, int64(config.Limits.MaxSiteSize.Bytes()),
 		fmt.Errorf("%w: %s limit exceeded", ErrArchiveTooLarge, config.Limits.MaxSiteSize.HR()))
+}
 
-	archive := tar.NewReader(boundedReader)
+func ExtractGzip(reader io.Reader, next func(io.Reader) (*Manifest, error)) (*Manifest, error) {
+	stream, err := gzip.NewReader(reader)
+	if err != nil {
+		return nil, err
+	}
+	defer stream.Close()
+
+	return next(boundArchiveStream(stream))
+}
+
+func ExtractZstd(reader io.Reader, next func(io.Reader) (*Manifest, error)) (*Manifest, error) {
+	stream, err := zstd.NewReader(reader)
+	if err != nil {
+		return nil, err
+	}
+	defer stream.Close()
+
+	return next(boundArchiveStream(stream))
+}
+
+func ExtractTar(reader io.Reader) (*Manifest, error) {
+	archive := tar.NewReader(reader)
 
 	manifest := Manifest{
 		Contents: map[string]*Entry{
@@ -82,28 +102,6 @@ func ExtractTar(reader io.Reader) (*Manifest, error) {
 		manifest.Contents[fileName] = &manifestEntry
 	}
 	return &manifest, nil
-}
-
-func ExtractTarGzip(reader io.Reader) (*Manifest, error) {
-	stream, err := gzip.NewReader(reader)
-	if err != nil {
-		return nil, err
-	}
-	defer stream.Close()
-
-	// stream length is limited in `ExtractTar`
-	return ExtractTar(stream)
-}
-
-func ExtractTarZstd(reader io.Reader) (*Manifest, error) {
-	stream, err := zstd.NewReader(reader)
-	if err != nil {
-		return nil, err
-	}
-	defer stream.Close()
-
-	// stream length is limited in `ExtractTar`
-	return ExtractTar(stream)
 }
 
 func ExtractZip(reader io.Reader) (*Manifest, error) {
