@@ -205,6 +205,11 @@ func setConfigValue(reflValue reflect.Value, repr string) (err error) {
 		if valueCast, err = strconv.ParseBool(repr); err == nil {
 			reflValue.SetBool(valueCast)
 		}
+	case int:
+		var parsed int64
+		if parsed, err = strconv.ParseInt(repr, 10, strconv.IntSize); err == nil {
+			reflValue.SetInt(parsed)
+		}
 	case uint:
 		var parsed uint64
 		if parsed, err = strconv.ParseUint(repr, 10, strconv.IntSize); err == nil {
