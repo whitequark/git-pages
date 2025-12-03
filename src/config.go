@@ -41,6 +41,7 @@ type Config struct {
 	LogLevel      string              `toml:"log-level" default:"info"`
 	Server        ServerConfig        `toml:"server"`
 	Wildcard      []WildcardConfig    `toml:"wildcard"`
+	Fallback      FallbackConfig      `toml:"fallback"`
 	Storage       StorageConfig       `toml:"storage"`
 	Limits        LimitsConfig        `toml:"limits"`
 	Observability ObservabilityConfig `toml:"observability"`
@@ -53,13 +54,16 @@ type ServerConfig struct {
 }
 
 type WildcardConfig struct {
-	Domain           string   `toml:"domain"`
-	CloneURL         string   `toml:"clone-url"`
-	IndexRepos       []string `toml:"index-repos" default:"[]"`
-	IndexRepoBranch  string   `toml:"index-repo-branch" default:"pages"`
-	Authorization    string   `toml:"authorization"`
-	FallbackProxyTo  string   `toml:"fallback-proxy-to"`
-	FallbackInsecure bool     `toml:"fallback-insecure"`
+	Domain          string   `toml:"domain"`
+	CloneURL        string   `toml:"clone-url"`
+	IndexRepos      []string `toml:"index-repos" default:"[]"`
+	IndexRepoBranch string   `toml:"index-repo-branch" default:"pages"`
+	Authorization   string   `toml:"authorization"`
+}
+
+type FallbackConfig struct {
+	ProxyTo  string `toml:"proxy-to"`
+	Insecure bool   `toml:"insecure"`
 }
 
 type CacheConfig struct {

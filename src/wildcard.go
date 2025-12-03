@@ -1,11 +1,7 @@
 package git_pages
 
 import (
-	"crypto/tls"
 	"fmt"
-	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"slices"
 	"strings"
 
@@ -18,8 +14,6 @@ type WildcardPattern struct {
 	IndexRepos    []*fasttemplate.Template
 	IndexBranch   string
 	Authorization bool
-	FallbackURL   *url.URL
-	Fallback      http.Handler
 }
 
 func (pattern *WildcardPattern) GetHost() string {
@@ -78,30 +72,6 @@ func (pattern *WildcardPattern) ApplyTemplate(userName string, projectName strin
 	return repoURLs, branch
 }
 
-func (pattern *WildcardPattern) IsFallbackFor(host string) bool {
-	if pattern.Fallback == nil {
-		return false
-	}
-	_, found := pattern.Matches(host)
-	return found
-}
-
-func HandleWildcardFallback(w http.ResponseWriter, r *http.Request) (bool, error) {
-	host, err := GetHost(r)
-	if err != nil {
-		return false, err
-	}
-
-	for _, pattern := range wildcards {
-		if pattern.IsFallbackFor(host) {
-			logc.Printf(r.Context(), "proxy: %s via %s", pattern.GetHost(), pattern.FallbackURL)
-			pattern.Fallback.ServeHTTP(w, r)
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 func TranslateWildcards(configs []WildcardConfig) ([]*WildcardPattern, error) {
 	var wildcardPatterns []*WildcardPattern
 	for _, config := range configs {
@@ -134,36 +104,12 @@ func TranslateWildcards(configs []WildcardConfig) ([]*WildcardPattern, error) {
 			}
 		}
 
-		var fallbackURL *url.URL
-		var fallback http.Handler
-		if config.FallbackProxyTo != "" {
-			fallbackURL, err = url.Parse(config.FallbackProxyTo)
-			if err != nil {
-				return nil, fmt.Errorf("wildcard pattern: fallback URL: %w", err)
-			}
-
-			fallback = &httputil.ReverseProxy{
-				Rewrite: func(r *httputil.ProxyRequest) {
-					r.SetURL(fallbackURL)
-					r.Out.Host = r.In.Host
-					r.Out.Header["X-Forwarded-For"] = r.In.Header["X-Forwarded-For"]
-				},
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: config.FallbackInsecure,
-					},
-				},
-			}
-		}
-
 		wildcardPatterns = append(wildcardPatterns, &WildcardPattern{
 			Domain:        strings.Split(config.Domain, "."),
 			CloneURL:      cloneURLTemplate,
 			IndexRepos:    indexRepoTemplates,
 			IndexBranch:   indexRepoBranch,
 			Authorization: authorization,
-			FallbackURL:   fallbackURL,
-			Fallback:      fallback,
 		})
 	}
 	return wildcardPatterns, nil

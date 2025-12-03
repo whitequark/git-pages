@@ -1,6 +1,7 @@
 package git_pages
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -34,31 +35,9 @@ func ServeCaddy(w http.ResponseWriter, r *http.Request) {
 		// Pages v2, which would under some circumstances return certificates with subjectAltName
 		// not valid for the SNI. Go's TLS stack makes `tls.Dial` return an error for these,
 		// thankfully making it unnecessary to examine X.509 certificates manually here.)
-		for _, wildcardConfig := range config.Wildcard {
-			if wildcardConfig.FallbackProxyTo == "" {
-				continue
-			}
-			fallbackURL, err := url.Parse(wildcardConfig.FallbackProxyTo)
-			if err != nil {
-				continue
-			}
-			if fallbackURL.Scheme != "https" {
-				continue
-			}
-			connectHost := fallbackURL.Host
-			if fallbackURL.Port() != "" {
-				connectHost += ":" + fallbackURL.Port()
-			} else {
-				connectHost += ":443"
-			}
-			logc.Printf(r.Context(), "caddy: check TLS %s", fallbackURL)
-			connection, err := tls.Dial("tcp", connectHost, &tls.Config{ServerName: domain})
-			if err != nil {
-				continue
-			}
-			connection.Close()
-			found = true
-			break
+		found, err = tryDialWithSNI(r.Context(), domain)
+		if err != nil {
+			logc.Printf(r.Context(), "caddy err: check SNI: %s\n", err)
 		}
 	}
 
@@ -73,4 +52,33 @@ func ServeCaddy(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintln(w, err)
 	}
+}
+
+func tryDialWithSNI(ctx context.Context, domain string) (bool, error) {
+	if config.Fallback.ProxyTo == "" {
+		return false, nil
+	}
+
+	fallbackURL, err := url.Parse(config.Fallback.ProxyTo)
+	if err != nil {
+		return false, err
+	}
+	if fallbackURL.Scheme != "https" {
+		return false, nil
+	}
+
+	connectHost := fallbackURL.Host
+	if fallbackURL.Port() != "" {
+		connectHost += ":" + fallbackURL.Port()
+	} else {
+		connectHost += ":443"
+	}
+
+	logc.Printf(ctx, "caddy: check TLS %s", fallbackURL)
+	connection, err := tls.Dial("tcp", connectHost, &tls.Config{ServerName: domain})
+	if err != nil {
+		return false, err
+	}
+	connection.Close()
+	return true, nil
 }

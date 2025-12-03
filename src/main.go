@@ -2,6 +2,7 @@ package git_pages
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"flag"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"runtime/debug"
@@ -22,6 +24,7 @@ import (
 
 var config *Config
 var wildcards []*WildcardPattern
+var fallback http.Handler
 var backend Backend
 
 func configureFeatures() (err error) {
@@ -61,6 +64,31 @@ func configureWildcards() (err error) {
 		wildcards = newWildcards
 		return nil
 	}
+}
+
+func configureFallback() (err error) {
+	if config.Fallback.ProxyTo != "" {
+		var fallbackURL *url.URL
+		fallbackURL, err = url.Parse(config.Fallback.ProxyTo)
+		if err != nil {
+			err = fmt.Errorf("fallback: %w", err)
+			return
+		}
+
+		fallback = &httputil.ReverseProxy{
+			Rewrite: func(r *httputil.ProxyRequest) {
+				r.SetURL(fallbackURL)
+				r.Out.Host = r.In.Host
+				r.Out.Header["X-Forwarded-For"] = r.In.Header["X-Forwarded-For"]
+			},
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: config.Fallback.Insecure,
+				},
+			},
+		}
+	}
+	return
 }
 
 func listen(name string, listen string) net.Listener {
@@ -230,6 +258,7 @@ func Main() {
 		configureFeatures(),
 		configureMemLimit(),
 		configureWildcards(),
+		configureFallback(),
 	); err != nil {
 		log.Fatalln(err)
 	}
@@ -392,6 +421,7 @@ func Main() {
 					configureFeatures(),
 					configureMemLimit(),
 					configureWildcards(),
+					configureFallback(),
 				); err != nil {
 					// At this point the configuration is in an in-between, corrupted state, so
 					// the only reasonable choice is to crash.

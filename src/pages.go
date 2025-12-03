@@ -136,8 +136,10 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		result := <-indexManifestCh
 		manifest, manifestMtime, err = result.manifest, result.manifestMtime, result.err
 		if manifest == nil && errors.Is(err, ErrObjectNotFound) {
-			if found, fallbackErr := HandleWildcardFallback(w, r); found {
-				return fallbackErr
+			if fallback != nil {
+				logc.Printf(r.Context(), "fallback: %s via %s", host, config.Fallback.ProxyTo)
+				fallback.ServeHTTP(w, r)
+				return nil
 			} else {
 				w.WriteHeader(http.StatusNotFound)
 				fmt.Fprintf(w, "site not found\n")
