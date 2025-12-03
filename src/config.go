@@ -44,6 +44,7 @@ type Config struct {
 	Fallback      FallbackConfig      `toml:"fallback"`
 	Storage       StorageConfig       `toml:"storage"`
 	Limits        LimitsConfig        `toml:"limits"`
+	Audit         AuditConfig         `toml:"audit"`
 	Observability ObservabilityConfig `toml:"observability"`
 }
 
@@ -119,6 +120,13 @@ type LimitsConfig struct {
 	// e.g. `Foo-Bar`. Setting this option permits including this custom header in `_headers`,
 	// unless it is fundamentally unsafe.
 	AllowedCustomHeaders []string `toml:"allowed-custom-headers" default:"[\"X-Clacks-Overhead\"]"`
+}
+
+type AuditConfig struct {
+	// Globally unique node identifier (0 to 1023 inclusive).
+	NodeID int `toml:"node-id"`
+	// Whether audit reports should be stored whenever an audit event occurs.
+	Collect bool `toml:"collect"`
 }
 
 type ObservabilityConfig struct {

@@ -14,8 +14,9 @@ import (
 )
 
 type FSBackend struct {
-	blobRoot *os.Root
-	siteRoot *os.Root
+	blobRoot  *os.Root
+	siteRoot  *os.Root
+	auditRoot *os.Root
 }
 
 var _ Backend = (*FSBackend)(nil)
@@ -63,7 +64,11 @@ func NewFSBackend(config *FSConfig) (*FSBackend, error) {
 	if err != nil {
 		return nil, fmt.Errorf("site: %w", err)
 	}
-	return &FSBackend{blobRoot, siteRoot}, nil
+	auditRoot, err := maybeCreateOpenRoot(config.Root, "audit")
+	if err != nil {
+		return nil, fmt.Errorf("audit: %w", err)
+	}
+	return &FSBackend{blobRoot, siteRoot, auditRoot}, nil
 }
 
 func (fs *FSBackend) Backend() Backend {
@@ -286,4 +291,12 @@ func (fs *FSBackend) FreezeDomain(ctx context.Context, domain string, freeze boo
 			return err
 		}
 	}
+}
+
+func (fs *FSBackend) AppendAuditRecord(ctx context.Context, id string, record *AuditRecord) error {
+	if _, err := fs.auditRoot.Stat(id); err == nil {
+		panic(fmt.Errorf("audit ID collision: %s", id))
+	}
+
+	return fs.auditRoot.WriteFile(id, EncodeAuditRecord(record), 0o644)
 }

@@ -68,18 +68,18 @@ func CompareManifest(left *Manifest, right *Manifest) bool {
 	return true
 }
 
-func EncodeManifest(manifest *Manifest) []byte {
-	result, err := proto.MarshalOptions{Deterministic: true}.Marshal(manifest)
+func EncodeManifest(manifest *Manifest) (data []byte) {
+	data, err := proto.MarshalOptions{Deterministic: true}.Marshal(manifest)
 	if err != nil {
 		panic(err)
 	}
-	return result
+	return
 }
 
-func DecodeManifest(data []byte) (*Manifest, error) {
-	manifest := Manifest{}
-	err := proto.Unmarshal(data, &manifest)
-	return &manifest, err
+func DecodeManifest(data []byte) (manifest *Manifest, err error) {
+	manifest = &Manifest{}
+	err = proto.Unmarshal(data, manifest)
+	return
 }
 
 func AddProblem(manifest *Manifest, path, format string, args ...any) error {

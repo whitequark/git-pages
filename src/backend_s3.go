@@ -630,3 +630,21 @@ func (s3 *S3Backend) FreezeDomain(ctx context.Context, domain string, freeze boo
 		}
 	}
 }
+
+func auditObjectName(id string) string {
+	return fmt.Sprintf("audit/%s", id)
+}
+
+func (s3 *S3Backend) AppendAuditRecord(ctx context.Context, id string, record *AuditRecord) error {
+	name := auditObjectName(id)
+	data := EncodeAuditRecord(record)
+
+	options := minio.PutObjectOptions{}
+	options.SetMatchETagExcept("*") // may or may not be supported
+	_, err := s3.client.PutObject(ctx, s3.bucket, name,
+		bytes.NewReader(data), int64(len(data)), options)
+	if errResp := minio.ToErrorResponse(err); errResp.StatusCode == 412 {
+		panic(fmt.Errorf("audit ID collision: %s", name))
+	}
+	return err
+}

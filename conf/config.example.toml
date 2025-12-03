@@ -54,5 +54,9 @@ forbidden-domains = []
 # allowed-repository-url-prefixes = <nil>
 allowed-custom-headers = ["X-Clacks-Overhead"]
 
+[audit]
+node-id = 0
+collect = false
+
 [observability]
 slow-response-threshold = "500ms"

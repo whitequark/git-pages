@@ -75,12 +75,15 @@ type Backend interface {
 	// Check whether a domain has any deployments.
 	CheckDomain(ctx context.Context, domain string) (found bool, err error)
 
-	// Creates a domain. This allows us to start serving content for the domain.
+	// Create a domain. This allows us to start serving content for the domain.
 	CreateDomain(ctx context.Context, domain string) error
 
 	// Freeze or thaw a domain. This allows a site to be administratively locked, e.g. if it
 	// is discovered serving abusive content.
 	FreezeDomain(ctx context.Context, domain string, freeze bool) error
+
+	// Append an audit record to the log.
+	AppendAuditRecord(ctx context.Context, id string, record *AuditRecord) error
 }
 
 func CreateBackend(config *StorageConfig) (backend Backend, err error) {
@@ -96,5 +99,6 @@ func CreateBackend(config *StorageConfig) (backend Backend, err error) {
 	default:
 		err = fmt.Errorf("unknown backend: %s", config.Type)
 	}
+	backend = NewAuditedBackend(backend)
 	return
 }

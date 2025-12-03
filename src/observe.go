@@ -436,3 +436,10 @@ func (backend *observedBackend) FreezeDomain(ctx context.Context, domain string,
 	span.Finish()
 	return
 }
+
+func (backend *observedBackend) AppendAuditRecord(ctx context.Context, id string, record *AuditRecord) (err error) {
+	span, ctx := ObserveFunction(ctx, "AppendAudit", "audit.id", id)
+	err = backend.inner.AppendAuditRecord(ctx, id, record)
+	span.Finish()
+	return
+}

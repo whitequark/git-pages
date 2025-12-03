@@ -2,9 +2,11 @@ edition = "2023";
 
 option go_package = "codeberg.org/git-pages/git-pages/git_pages";
 
+import "google/protobuf/timestamp.proto";
+
 enum Type {
 	// Invalid entry.
-	Invalid = 0;
+	InvalidEntry = 0;
 	// Directory.
 	Directory = 1;
 	// Inline file. `Blob.Data` contains file contents.
@@ -80,21 +82,47 @@ message Problem {
 }
 
 message Manifest {
-	// Source metadata
+	// Source metadata.
 	string repo_url = 1;
 	string branch = 2;
 	string commit = 3;
 
-	// Contents
+	// Site contents.
 	map<string, Entry> contents = 4;
 	int64 original_size = 10; // sum of each `entry.original_size`
 	int64 compressed_size = 5; // sum of each `entry.compressed_size`
 	int64 stored_size = 8; // sum of deduplicated `entry.compressed_size` for external files only
 
-	// Netlify-style `_redirects` and `_headers`
+	// Netlify-style `_redirects` and `_headers` rules.
 	repeated RedirectRule redirects = 6;
 	repeated HeaderRule headers = 9;
 
-	// Diagnostics for non-fatal errors
+	// Diagnostics for non-fatal errors.
 	repeated Problem problems = 7;
+}
+
+enum AuditEvent {
+	// Invalid event.
+	InvalidEvent = 0;
+	// A manifest was committed (a site was created or updated).
+	CommitManifest = 1;
+	// A manifest was deleted (a site was deleted).
+	DeleteManifest = 2;
+	// A domain was frozen.
+	FreezeDomain = 3;
+	// A domain was thawed.
+	UnfreezeDomain = 4;
+}
+
+message AuditRecord {
+	// Audit event metadata.
+	AuditEvent event = 1;
+	google.protobuf.Timestamp timestamp = 2;
+
+	// Affected resource.
+	string domain = 10;
+	string project = 11; // only for `*Manifest` events
+
+	// Snapshot of site manifest.
+	Manifest manifest = 12;  // only for `*Manifest` events
 }

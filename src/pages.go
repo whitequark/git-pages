@@ -241,7 +241,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		entry = manifest.Contents[entryPath]
 		if !appliedRedirect {
 			redirectKind := RedirectAny
-			if entry != nil && entry.GetType() != Type_Invalid {
+			if entry != nil && entry.GetType() != Type_InvalidEntry {
 				redirectKind = RedirectForce
 			}
 			originalURL := (&url.URL{Host: r.Host}).ResolveReference(r.URL)
@@ -258,7 +258,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				continue
 			}
 		}
-		if entry == nil || entry.GetType() == Type_Invalid {
+		if entry == nil || entry.GetType() == Type_InvalidEntry {
 			status = 404
 			if entryPath != notFoundPage {
 				entryPath = notFoundPage

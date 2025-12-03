@@ -9,6 +9,7 @@ package git_pages
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -25,7 +26,7 @@ type Type int32
 
 const (
 	// Invalid entry.
-	Type_Invalid Type = 0
+	Type_InvalidEntry Type = 0
 	// Directory.
 	Type_Directory Type = 1
 	// Inline file. `Blob.Data` contains file contents.
@@ -39,14 +40,14 @@ const (
 // Enum value maps for Type.
 var (
 	Type_name = map[int32]string{
-		0: "Invalid",
+		0: "InvalidEntry",
 		1: "Directory",
 		2: "InlineFile",
 		3: "ExternalFile",
 		4: "Symlink",
 	}
 	Type_value = map[string]int32{
-		"Invalid":      0,
+		"InvalidEntry": 0,
 		"Directory":    1,
 		"InlineFile":   2,
 		"ExternalFile": 3,
@@ -130,6 +131,66 @@ func (Transform) EnumDescriptor() ([]byte, []int) {
 	return file_schema_proto_rawDescGZIP(), []int{1}
 }
 
+type AuditEvent int32
+
+const (
+	// Invalid event.
+	AuditEvent_InvalidEvent AuditEvent = 0
+	// A manifest was committed (a site was created or updated).
+	AuditEvent_CommitManifest AuditEvent = 1
+	// A manifest was deleted (a site was deleted).
+	AuditEvent_DeleteManifest AuditEvent = 2
+	// A domain was frozen.
+	AuditEvent_FreezeDomain AuditEvent = 3
+	// A domain was thawed.
+	AuditEvent_UnfreezeDomain AuditEvent = 4
+)
+
+// Enum value maps for AuditEvent.
+var (
+	AuditEvent_name = map[int32]string{
+		0: "InvalidEvent",
+		1: "CommitManifest",
+		2: "DeleteManifest",
+		3: "FreezeDomain",
+		4: "UnfreezeDomain",
+	}
+	AuditEvent_value = map[string]int32{
+		"InvalidEvent":   0,
+		"CommitManifest": 1,
+		"DeleteManifest": 2,
+		"FreezeDomain":   3,
+		"UnfreezeDomain": 4,
+	}
+)
+
+func (x AuditEvent) Enum() *AuditEvent {
+	p := new(AuditEvent)
+	*p = x
+	return p
+}
+
+func (x AuditEvent) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AuditEvent) Descriptor() protoreflect.EnumDescriptor {
+	return file_schema_proto_enumTypes[2].Descriptor()
+}
+
+func (AuditEvent) Type() protoreflect.EnumType {
+	return &file_schema_proto_enumTypes[2]
+}
+
+func (x AuditEvent) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AuditEvent.Descriptor instead.
+func (AuditEvent) EnumDescriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{2}
+}
+
 type Entry struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Type  *Type                  `protobuf:"varint,1,opt,name=type,enum=Type" json:"type,omitempty"`
@@ -198,7 +259,7 @@ func (x *Entry) GetType() Type {
 	if x != nil && x.Type != nil {
 		return *x.Type
 	}
-	return Type_Invalid
+	return Type_InvalidEntry
 }
 
 func (x *Entry) GetOriginalSize() int64 {
@@ -472,19 +533,19 @@ func (x *Problem) GetCause() string {
 
 type Manifest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Source metadata
+	// Source metadata.
 	RepoUrl *string `protobuf:"bytes,1,opt,name=repo_url,json=repoUrl" json:"repo_url,omitempty"`
 	Branch  *string `protobuf:"bytes,2,opt,name=branch" json:"branch,omitempty"`
 	Commit  *string `protobuf:"bytes,3,opt,name=commit" json:"commit,omitempty"`
-	// Contents
+	// Site contents.
 	Contents       map[string]*Entry `protobuf:"bytes,4,rep,name=contents" json:"contents,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	OriginalSize   *int64            `protobuf:"varint,10,opt,name=original_size,json=originalSize" json:"original_size,omitempty"`      // total size of entries before compression
-	CompressedSize *int64            `protobuf:"varint,5,opt,name=compressed_size,json=compressedSize" json:"compressed_size,omitempty"` // simple sum of each `entry.size`
-	StoredSize     *int64            `protobuf:"varint,8,opt,name=stored_size,json=storedSize" json:"stored_size,omitempty"`             // total size of (deduplicated) external objects
-	// Netlify-style `_redirects` and `_headers`
+	OriginalSize   *int64            `protobuf:"varint,10,opt,name=original_size,json=originalSize" json:"original_size,omitempty"`      // sum of each `entry.original_size`
+	CompressedSize *int64            `protobuf:"varint,5,opt,name=compressed_size,json=compressedSize" json:"compressed_size,omitempty"` // sum of each `entry.compressed_size`
+	StoredSize     *int64            `protobuf:"varint,8,opt,name=stored_size,json=storedSize" json:"stored_size,omitempty"`             // sum of deduplicated `entry.compressed_size` for external files only
+	// Netlify-style `_redirects` and `_headers` rules.
 	Redirects []*RedirectRule `protobuf:"bytes,6,rep,name=redirects" json:"redirects,omitempty"`
 	Headers   []*HeaderRule   `protobuf:"bytes,9,rep,name=headers" json:"headers,omitempty"`
-	// Diagnostics for non-fatal errors
+	// Diagnostics for non-fatal errors.
 	Problems      []*Problem `protobuf:"bytes,7,rep,name=problems" json:"problems,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -590,11 +651,90 @@ func (x *Manifest) GetProblems() []*Problem {
 	return nil
 }
 
+type AuditRecord struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Audit event metadata.
+	Event     *AuditEvent            `protobuf:"varint,1,opt,name=event,enum=AuditEvent" json:"event,omitempty"`
+	Timestamp *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=timestamp" json:"timestamp,omitempty"`
+	// Affected resource.
+	Domain  *string `protobuf:"bytes,10,opt,name=domain" json:"domain,omitempty"`
+	Project *string `protobuf:"bytes,11,opt,name=project" json:"project,omitempty"` // only for `*Manifest` events
+	// Snapshot of site manifest.
+	Manifest      *Manifest `protobuf:"bytes,12,opt,name=manifest" json:"manifest,omitempty"` // only for `*Manifest` events
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuditRecord) Reset() {
+	*x = AuditRecord{}
+	mi := &file_schema_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuditRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuditRecord) ProtoMessage() {}
+
+func (x *AuditRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_schema_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuditRecord.ProtoReflect.Descriptor instead.
+func (*AuditRecord) Descriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *AuditRecord) GetEvent() AuditEvent {
+	if x != nil && x.Event != nil {
+		return *x.Event
+	}
+	return AuditEvent_InvalidEvent
+}
+
+func (x *AuditRecord) GetTimestamp() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Timestamp
+	}
+	return nil
+}
+
+func (x *AuditRecord) GetDomain() string {
+	if x != nil && x.Domain != nil {
+		return *x.Domain
+	}
+	return ""
+}
+
+func (x *AuditRecord) GetProject() string {
+	if x != nil && x.Project != nil {
+		return *x.Project
+	}
+	return ""
+}
+
+func (x *AuditRecord) GetManifest() *Manifest {
+	if x != nil {
+		return x.Manifest
+	}
+	return nil
+}
+
 var File_schema_proto protoreflect.FileDescriptor
 
 const file_schema_proto_rawDesc = "" +
 	"\n" +
-	"\fschema.proto\"\xec\x01\n" +
+	"\fschema.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xec\x01\n" +
 	"\x05Entry\x12\x19\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x05.TypeR\x04type\x12#\n" +
 	"\roriginal_size\x18\a \x01(\x03R\foriginalSize\x12'\n" +
@@ -635,9 +775,16 @@ const file_schema_proto_rawDesc = "" +
 	"\bproblems\x18\a \x03(\v2\b.ProblemR\bproblems\x1aC\n" +
 	"\rContentsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x1c\n" +
-	"\x05value\x18\x02 \x01(\v2\x06.EntryR\x05value:\x028\x01*Q\n" +
-	"\x04Type\x12\v\n" +
-	"\aInvalid\x10\x00\x12\r\n" +
+	"\x05value\x18\x02 \x01(\v2\x06.EntryR\x05value:\x028\x01\"\xc3\x01\n" +
+	"\vAuditRecord\x12!\n" +
+	"\x05event\x18\x01 \x01(\x0e2\v.AuditEventR\x05event\x128\n" +
+	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x16\n" +
+	"\x06domain\x18\n" +
+	" \x01(\tR\x06domain\x12\x18\n" +
+	"\aproject\x18\v \x01(\tR\aproject\x12%\n" +
+	"\bmanifest\x18\f \x01(\v2\t.ManifestR\bmanifest*V\n" +
+	"\x04Type\x12\x10\n" +
+	"\fInvalidEntry\x10\x00\x12\r\n" +
 	"\tDirectory\x10\x01\x12\x0e\n" +
 	"\n" +
 	"InlineFile\x10\x02\x12\x10\n" +
@@ -645,7 +792,14 @@ const file_schema_proto_rawDesc = "" +
 	"\aSymlink\x10\x04*#\n" +
 	"\tTransform\x12\f\n" +
 	"\bIdentity\x10\x00\x12\b\n" +
-	"\x04Zstd\x10\x01B,Z*codeberg.org/git-pages/git-pages/git_pagesb\beditionsp\xe8\a"
+	"\x04Zstd\x10\x01*l\n" +
+	"\n" +
+	"AuditEvent\x12\x10\n" +
+	"\fInvalidEvent\x10\x00\x12\x12\n" +
+	"\x0eCommitManifest\x10\x01\x12\x12\n" +
+	"\x0eDeleteManifest\x10\x02\x12\x10\n" +
+	"\fFreezeDomain\x10\x03\x12\x12\n" +
+	"\x0eUnfreezeDomain\x10\x04B,Z*codeberg.org/git-pages/git-pages/git_pagesb\beditionsp\xe8\a"
 
 var (
 	file_schema_proto_rawDescOnce sync.Once
@@ -659,33 +813,39 @@ func file_schema_proto_rawDescGZIP() []byte {
 	return file_schema_proto_rawDescData
 }
 
-var file_schema_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_schema_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_schema_proto_goTypes = []any{
-	(Type)(0),            // 0: Type
-	(Transform)(0),       // 1: Transform
-	(*Entry)(nil),        // 2: Entry
-	(*RedirectRule)(nil), // 3: RedirectRule
-	(*Header)(nil),       // 4: Header
-	(*HeaderRule)(nil),   // 5: HeaderRule
-	(*Problem)(nil),      // 6: Problem
-	(*Manifest)(nil),     // 7: Manifest
-	nil,                  // 8: Manifest.ContentsEntry
+	(Type)(0),                     // 0: Type
+	(Transform)(0),                // 1: Transform
+	(AuditEvent)(0),               // 2: AuditEvent
+	(*Entry)(nil),                 // 3: Entry
+	(*RedirectRule)(nil),          // 4: RedirectRule
+	(*Header)(nil),                // 5: Header
+	(*HeaderRule)(nil),            // 6: HeaderRule
+	(*Problem)(nil),               // 7: Problem
+	(*Manifest)(nil),              // 8: Manifest
+	(*AuditRecord)(nil),           // 9: AuditRecord
+	nil,                           // 10: Manifest.ContentsEntry
+	(*timestamppb.Timestamp)(nil), // 11: google.protobuf.Timestamp
 }
 var file_schema_proto_depIdxs = []int32{
-	0, // 0: Entry.type:type_name -> Type
-	1, // 1: Entry.transform:type_name -> Transform
-	4, // 2: HeaderRule.header_map:type_name -> Header
-	8, // 3: Manifest.contents:type_name -> Manifest.ContentsEntry
-	3, // 4: Manifest.redirects:type_name -> RedirectRule
-	5, // 5: Manifest.headers:type_name -> HeaderRule
-	6, // 6: Manifest.problems:type_name -> Problem
-	2, // 7: Manifest.ContentsEntry.value:type_name -> Entry
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	0,  // 0: Entry.type:type_name -> Type
+	1,  // 1: Entry.transform:type_name -> Transform
+	5,  // 2: HeaderRule.header_map:type_name -> Header
+	10, // 3: Manifest.contents:type_name -> Manifest.ContentsEntry
+	4,  // 4: Manifest.redirects:type_name -> RedirectRule
+	6,  // 5: Manifest.headers:type_name -> HeaderRule
+	7,  // 6: Manifest.problems:type_name -> Problem
+	2,  // 7: AuditRecord.event:type_name -> AuditEvent
+	11, // 8: AuditRecord.timestamp:type_name -> google.protobuf.Timestamp
+	8,  // 9: AuditRecord.manifest:type_name -> Manifest
+	3,  // 10: Manifest.ContentsEntry.value:type_name -> Entry
+	11, // [11:11] is the sub-list for method output_type
+	11, // [11:11] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_schema_proto_init() }
@@ -698,8 +858,8 @@ func file_schema_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_schema_proto_rawDesc), len(file_schema_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   7,
+			NumEnums:      3,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
