@@ -204,10 +204,9 @@ func FetchRepository(
 	}
 
 	logc.Printf(ctx,
-		"fetch: %s from old manifest, %s from git checkout, %s from git transport\n",
+		"fetch: %s reused, %s received\n",
 		datasize.ByteSize(dataBytesFromOldManifest).HR(),
-		datasize.ByteSize(dataBytesFromGitCheckout).HR(),
-		datasize.ByteSize(dataBytesFromGitTransport).HR(),
+		datasize.ByteSize(dataBytesFromGitCheckout+dataBytesFromGitTransport).HR(),
 	)
 
 	return manifest, nil
