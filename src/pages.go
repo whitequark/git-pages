@@ -188,7 +188,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			w.Header().Add("Last-Modified", lastModified)
 			w.Header().Add("ETag", fmt.Sprintf("\"%s-manifest\"", metadata.ETag))
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(ManifestDebugJSON(manifest)))
+			w.Write(ManifestJSON(manifest))
 			return nil
 
 		case metadataPath == "archive.tar" && config.Feature("archive-site"):

@@ -74,7 +74,7 @@ func Update(
 			status = "unchanged"
 		}
 		if storedManifest.Commit != nil {
-			logc.Printf(ctx, "update %s ok: %s %s", webRoot, status, *storedManifest.Commit)
+			logc.Printf(ctx, "update %s ok: %s %s", webRoot, *storedManifest.Commit, status)
 		} else {
 			logc.Printf(ctx, "update %s ok: %s", webRoot, status)
 		}

@@ -174,6 +174,8 @@ func usage() {
 		"git-pages [-config <file>|-no-config]\n")
 	fmt.Fprintf(os.Stderr, "(admin)  "+
 		"git-pages {-run-migration <name>|-freeze-domain <domain>|-unfreeze-domain <domain>}\n")
+	fmt.Fprintf(os.Stderr, "(audit)  "+
+		"git-pages {-audit-read <id>}\n")
 	fmt.Fprintf(os.Stderr, "(info)   "+
 		"git-pages {-print-config-env-vars|-print-config}\n")
 	fmt.Fprintf(os.Stderr, "(cli)    "+
@@ -207,32 +209,28 @@ func Main() {
 		"prevent any site uploads to a given `domain`")
 	unfreezeDomain := flag.String("unfreeze-domain", "",
 		"allow site uploads to a `domain` again after it has been frozen")
+	auditRead := flag.String("audit-read", "",
+		"extract contents of audit record `id` to files '<id>-*'")
 	flag.Parse()
 
 	var cliOperations int
-	if *runMigration != "" {
-		cliOperations += 1
-	}
-	if *getBlob != "" {
-		cliOperations += 1
-	}
-	if *getManifest != "" {
-		cliOperations += 1
-	}
-	if *getArchive != "" {
-		cliOperations += 1
-	}
-	if *updateSite != "" {
-		cliOperations += 1
-	}
-	if *freezeDomain != "" {
-		cliOperations += 1
-	}
-	if *unfreezeDomain != "" {
-		cliOperations += 1
+	for _, selected := range []bool{
+		*runMigration != "",
+		*getBlob != "",
+		*getManifest != "",
+		*getArchive != "",
+		*updateSite != "",
+		*freezeDomain != "",
+		*unfreezeDomain != "",
+		*auditRead != "",
+	} {
+		if selected {
+			cliOperations++
+		}
 	}
 	if cliOperations > 1 {
-		logc.Fatalln(ctx, "-get-blob, -get-manifest, -get-archive, -update-site, -freeze, and -unfreeze are mutually exclusive")
+		logc.Fatalln(ctx, "-get-blob, -get-manifest, -get-archive, -update-site, "+
+			"-freeze, -unfreeze, -audit-log, and -audit-read are mutually exclusive")
 	}
 
 	if *configTomlPath != "" && *noConfig {
@@ -301,7 +299,7 @@ func Main() {
 		if err != nil {
 			logc.Fatalln(ctx, err)
 		}
-		fmt.Fprintln(fileOutputArg(), ManifestDebugJSON(manifest))
+		fmt.Fprintln(fileOutputArg(), string(ManifestJSON(manifest)))
 
 	case *getArchive != "":
 		if backend, err = CreateBackend(&config.Storage); err != nil {
@@ -402,9 +400,37 @@ func Main() {
 			logc.Fatalln(ctx, err)
 		}
 		if freeze {
-			log.Println("frozen")
+			logc.Println(ctx, "frozen")
 		} else {
-			log.Println("thawed")
+			logc.Println(ctx, "thawed")
+		}
+
+	case *auditRead != "":
+		if backend, err = CreateBackend(&config.Storage); err != nil {
+			logc.Fatalln(ctx, err)
+		}
+
+		id, err := ParseAuditID(*auditRead)
+		if err != nil {
+			logc.Fatalln(ctx, err)
+		}
+
+		record, err := backend.QueryAuditLog(ctx, id)
+		if err != nil {
+			logc.Fatalln(ctx, err)
+		}
+
+		errEvent := os.WriteFile(fmt.Sprintf("%s-event.json", id),
+			AuditRecordJSON(record, AuditRecordNoManifest), 0o400)
+		errManifest := os.WriteFile(fmt.Sprintf("%s-manifest.json", id),
+			ManifestJSON(record.Manifest), 0o400)
+		fileArchive, errArchive := os.OpenFile(fmt.Sprintf("%s-archive.tar", id),
+			os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o400)
+		if err = errors.Join(errEvent, errManifest, errArchive); err != nil {
+			logc.Fatalln(ctx, err)
+		}
+		if err = CollectTar(ctx, fileArchive, record.Manifest, ManifestMetadata{}); err != nil {
+			logc.Fatalln(ctx, err)
 		}
 
 	default:

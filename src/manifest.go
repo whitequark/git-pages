@@ -139,15 +139,15 @@ func GetProblemReport(manifest *Manifest) []string {
 	return report
 }
 
-func ManifestDebugJSON(manifest *Manifest) string {
-	result, err := protojson.MarshalOptions{
+func ManifestJSON(manifest *Manifest) []byte {
+	json, err := protojson.MarshalOptions{
 		Multiline:         true,
 		EmitDefaultValues: true,
 	}.Marshal(manifest)
 	if err != nil {
 		panic(err)
 	}
-	return string(result)
+	return json
 }
 
 var ErrSymlinkLoop = errors.New("symbolic link loop")

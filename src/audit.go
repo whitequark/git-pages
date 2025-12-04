@@ -13,6 +13,7 @@ import (
 	"github.com/kankanreno/go-snowflake"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -72,18 +73,47 @@ func (id AuditID) CompareTime(when time.Time) int {
 	return cmp.Compare(idMillis, whenMillis)
 }
 
-func EncodeAuditRecord(auditRecord *AuditRecord) (data []byte) {
-	data, err := proto.MarshalOptions{Deterministic: true}.Marshal(auditRecord)
+func EncodeAuditRecord(record *AuditRecord) (data []byte) {
+	data, err := proto.MarshalOptions{Deterministic: true}.Marshal(record)
 	if err != nil {
 		panic(err)
 	}
 	return
 }
 
-func DecodeAuditRecord(data []byte) (auditRecord *AuditRecord, err error) {
-	auditRecord = &AuditRecord{}
-	err = proto.Unmarshal(data, auditRecord)
+func DecodeAuditRecord(data []byte) (record *AuditRecord, err error) {
+	record = &AuditRecord{}
+	err = proto.Unmarshal(data, record)
 	return
+}
+
+type AuditRecordScope int
+
+const (
+	AuditRecordComplete AuditRecordScope = iota
+	AuditRecordNoManifest
+)
+
+func AuditRecordJSON(record *AuditRecord, scope AuditRecordScope) []byte {
+	switch scope {
+	case AuditRecordComplete:
+		// as-is
+	case AuditRecordNoManifest:
+		// trim the manifest
+		newRecord := &AuditRecord{}
+		proto.Merge(newRecord, record)
+		newRecord.Manifest = nil
+		record = newRecord
+	}
+
+	json, err := protojson.MarshalOptions{
+		Multiline:         true,
+		EmitDefaultValues: true,
+	}.Marshal(record)
+	if err != nil {
+		panic(err)
+	}
+	return json
 }
 
 type auditedBackend struct {
