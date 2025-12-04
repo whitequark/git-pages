@@ -8,7 +8,7 @@ It is implemented in Go and has no other mandatory dependencies, although it is 
 The included Docker container provides everything needed to deploy a Pages service, including zero-configuration on-demand provisioning of TLS certificates from [Let's Encrypt](https://letsencrypt.org/), and runs on any commodity cloud infrastructure.
 
 > [!TIP]
-> If you would like to publish a site using _git-pages_ to an existing service like Codeberg Pages or [Grebedoc][grebedoc], consider using the [CLI tool][git-pages-cli] or [Forgejo Action][git-pages-action].
+> If you want to publish a site using _git-pages_ to an existing service like Codeberg Pages or [Grebedoc][grebedoc], consider using the [CLI tool][git-pages-cli] or the [Forgejo Action][git-pages-action].
 
 [caddy]: https://caddyserver.com/
 [git-pages-cli]: https://codeberg.org/git-pages/git-pages-cli
