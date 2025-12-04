@@ -452,7 +452,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	updateCtx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
+	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
 	defer cancel()
 
 	contentType := getMediaType(r.Header.Get("Content-Type"))
@@ -486,7 +486,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 			return nil
 		}
 
-		result = UpdateFromRepository(updateCtx, webRoot, repoURL, branch)
+		result = UpdateFromRepository(ctx, webRoot, repoURL, branch)
 
 	default:
 		_, err := AuthorizeUpdateFromArchive(r)
@@ -500,7 +500,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 
 		// request body contains archive
 		reader := http.MaxBytesReader(w, r.Body, int64(config.Limits.MaxSiteSize.Bytes()))
-		result = UpdateFromArchive(updateCtx, webRoot, contentType, reader)
+		result = UpdateFromArchive(ctx, webRoot, contentType, reader)
 	}
 
 	return reportUpdateResult(w, result)
@@ -554,12 +554,23 @@ func patchPage(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 
-	updateCtx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
+	var parents CreateParentsMode
+	switch r.Header.Get("Create-Parents") {
+	case "", "no":
+		parents = RequireParents
+	case "yes":
+		parents = CreateParents
+	default:
+		http.Error(w, "malformed Create-Parents: header", http.StatusBadRequest)
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
 	defer cancel()
 
 	contentType := getMediaType(r.Header.Get("Content-Type"))
 	reader := http.MaxBytesReader(w, r.Body, int64(config.Limits.MaxSiteSize.Bytes()))
-	result := PartialUpdateFromArchive(updateCtx, webRoot, contentType, reader)
+	result := PartialUpdateFromArchive(ctx, webRoot, contentType, reader, parents)
 	return reportUpdateResult(w, result)
 }
 

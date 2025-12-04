@@ -79,7 +79,8 @@ Features
         - A character device entry with major 0 and minor 0 is treated as a "whiteout marker" (following [unionfs][whiteout]): it causes any existing file or directory with the same name to be deleted.
         - A directory entry replaces any existing file or directory with the same name (if any), recursively removing the old contents.
         - A file or symlink entry replaces any existing file or directory with the same name (if any).
-        - In any case, the parent of an entry must exist and be a directory.
+        - If there is no `Create-Parents:` header or a `Create-Parents: no` header is present, the parent path of an entry must exist and refer to a directory.
+        - If a `Create-Parents: yes` header is present, any missing segments in the parent path of an entry will be created (like `mkdir -p`). Any existing segments refer to directories.
     - The request must have a `Atomic: yes` or `Atomic: no` header. Not every backend configuration makes it possible to perform atomic compare-and-swap operations; on backends without atomic CAS support, `Atomic: yes` requests will fail, while `Atomic: no` requests will provide a best-effort approximation.
     - If a `PATCH` request loses a race against another content update request, it may return `409 Conflict`. This is true regardless of the `Atomic:` header value. Whenever this happens, resubmit the request as-is.
     - If the site has no contents after the update is applied, performs the same action as `DELETE`.

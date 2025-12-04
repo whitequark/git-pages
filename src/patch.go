@@ -12,12 +12,19 @@ import (
 
 var ErrMalformedPatch = errors.New("malformed patch")
 
+type CreateParentsMode int
+
+const (
+	RequireParents CreateParentsMode = iota
+	CreateParents
+)
+
 // Mutates `manifest` according to a tar stream and the following rules:
 //   - A character device with major 0 and minor 0 is a "whiteout marker".  When placed
 //     at a given path, this path and its entire subtree (if any) are removed from the manifest.
 //   - When a directory is placed at a given path, this path and its entire subtree (if any) are
 //     removed from the manifest and replaced with the contents of the directory.
-func ApplyTarPatch(manifest *Manifest, reader io.Reader) error {
+func ApplyTarPatch(manifest *Manifest, reader io.Reader, parents CreateParentsMode) error {
 	type Node struct {
 		entry    *Entry
 		children map[string]*Node
@@ -72,11 +79,18 @@ func ApplyTarPatch(manifest *Manifest, reader io.Reader) error {
 				return fmt.Errorf("%w: %s: not a directory", ErrMalformedPatch, dirName)
 			}
 			if _, exists := node.children[segment]; !exists {
-				nodeName := strings.Join(segments[:index+1], "/")
-				return fmt.Errorf("%w: %s: path not found", ErrMalformedPatch, nodeName)
-			} else {
-				node = node.children[segment]
+				switch parents {
+				case RequireParents:
+					nodeName := strings.Join(segments[:index+1], "/")
+					return fmt.Errorf("%w: %s: path not found", ErrMalformedPatch, nodeName)
+				case CreateParents:
+					node.children[segment] = &Node{
+						entry:    NewManifestEntry(Type_Directory, nil),
+						children: map[string]*Node{},
+					}
+				}
 			}
+			node = node.children[segment]
 		}
 		if node.children == nil {
 			dirName := strings.Join(segments[:len(segments)-1], "/")

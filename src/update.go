@@ -159,6 +159,7 @@ func PartialUpdateFromArchive(
 	webRoot string,
 	contentType string,
 	reader io.Reader,
+	parents CreateParentsMode,
 ) (result UpdateResult) {
 	var err error
 
@@ -177,7 +178,7 @@ func PartialUpdateFromArchive(
 		// `*Manifest` objects, which should never be mutated.
 		newManifest := &Manifest{}
 		proto.Merge(newManifest, oldManifest)
-		if err := ApplyTarPatch(newManifest, reader); err != nil {
+		if err := ApplyTarPatch(newManifest, reader, parents); err != nil {
 			return nil, err
 		} else {
 			return newManifest, nil
