@@ -37,10 +37,19 @@ type GetManifestOptions struct {
 	BypassCache bool
 }
 
+type ManifestMetadata struct {
+	LastModified time.Time
+	ETag         string
+}
+
 type ModifyManifestOptions struct {
 	// If non-zero, the request will only succeed if the manifest hasn't been changed since
 	// the given time. Whether this is racy or not is can be determined via `HasAtomicCAS()`.
 	IfUnmodifiedSince time.Time
+	// If non-empty, the request will only succeed if the manifest hasn't changed from
+	// the state corresponding to the ETag. Whether this is racy or not is can be determined
+	// via `HasAtomicCAS()`.
+	IfMatch string
 }
 
 type QueryAuditLogOptions struct {
@@ -81,7 +90,7 @@ type Backend interface {
 
 	// Retrieve a manifest.
 	GetManifest(ctx context.Context, name string, opts GetManifestOptions) (
-		manifest *Manifest, mtime time.Time, err error,
+		manifest *Manifest, metadata ManifestMetadata, err error,
 	)
 
 	// Stage a manifest. This operation stores a new version of a manifest, locking any blobs

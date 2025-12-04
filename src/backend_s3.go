@@ -117,8 +117,7 @@ func (c *CachedBlob) Weight() uint32 { return uint32(len(c.blob)) }
 type CachedManifest struct {
 	manifest *Manifest
 	weight   uint32
-	mtime    time.Time
-	etag     string
+	metadata ManifestMetadata
 	err      error
 }
 
@@ -423,8 +422,8 @@ func (l s3ManifestLoader) load(
 
 	loader := func() (*CachedManifest, error) {
 		opts := minio.GetObjectOptions{}
-		if oldManifest != nil && oldManifest.etag != "" {
-			opts.SetMatchETagExcept(oldManifest.etag)
+		if oldManifest != nil && oldManifest.metadata.ETag != "" {
+			opts.SetMatchETagExcept(oldManifest.metadata.ETag)
 		}
 		object, err := l.s3.client.GetObject(ctx, l.s3.bucket, manifestObjectName(name), opts)
 		// Note that many errors (e.g. NoSuchKey) will be reported only after this point.
@@ -448,7 +447,11 @@ func (l s3ManifestLoader) load(
 			return nil, err
 		}
 
-		return &CachedManifest{manifest, uint32(len(data)), stat.LastModified, stat.ETag, nil}, nil
+		metadata := ManifestMetadata{
+			LastModified: stat.LastModified,
+			ETag:         stat.ETag,
+		}
+		return &CachedManifest{manifest, uint32(len(data)), metadata, nil}, nil
 	}
 
 	observer := func() (*CachedManifest, error) {
@@ -471,7 +474,7 @@ func (l s3ManifestLoader) load(
 		errResp := minio.ToErrorResponse(err)
 		if errResp.Code == "NoSuchKey" {
 			err = fmt.Errorf("%w: %s", ErrObjectNotFound, errResp.Key)
-			return &CachedManifest{nil, 1, time.Time{}, "", err}, nil
+			return &CachedManifest{nil, 1, ManifestMetadata{}, err}, nil
 		} else if errResp.StatusCode == http.StatusNotModified && oldManifest != nil {
 			return oldManifest, nil
 		} else {
@@ -485,7 +488,7 @@ func (l s3ManifestLoader) load(
 func (s3 *S3Backend) GetManifest(
 	ctx context.Context, name string, opts GetManifestOptions,
 ) (
-	manifest *Manifest, mtime time.Time, err error,
+	manifest *Manifest, metadata ManifestMetadata, err error,
 ) {
 	if opts.BypassCache {
 		entry, found := s3.siteCache.Cache.GetEntry(name)
@@ -500,7 +503,7 @@ func (s3 *S3Backend) GetManifest(
 		return
 	} else {
 		// This could be `manifest, mtime, nil` or `nil, time.Time{}, ErrObjectNotFound`.
-		manifest, mtime, err = cached.manifest, cached.mtime, cached.err
+		manifest, metadata, err = cached.manifest, cached.metadata, cached.err
 		return
 	}
 }

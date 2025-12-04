@@ -14,7 +14,7 @@ type Flusher interface {
 
 // Inverse of `ExtractTar`.
 func CollectTar(
-	context context.Context, writer io.Writer, manifest *Manifest, manifestMtime time.Time,
+	context context.Context, writer io.Writer, manifest *Manifest, metadata ManifestMetadata,
 ) (
 	err error,
 ) {
@@ -52,13 +52,13 @@ func CollectTar(
 		case Type_Directory:
 			header.Typeflag = tar.TypeDir
 			header.Mode = 0755
-			header.ModTime = manifestMtime
+			header.ModTime = metadata.LastModified
 			err = appendFile(&header, nil, Transform_Identity)
 
 		case Type_InlineFile:
 			header.Typeflag = tar.TypeReg
 			header.Mode = 0644
-			header.ModTime = manifestMtime
+			header.ModTime = metadata.LastModified
 			err = appendFile(&header, entry.GetData(), entry.GetTransform())
 
 		case Type_ExternalFile:
@@ -78,7 +78,7 @@ func CollectTar(
 		case Type_Symlink:
 			header.Typeflag = tar.TypeSymlink
 			header.Mode = 0644
-			header.ModTime = manifestMtime
+			header.ModTime = metadata.LastModified
 			err = appendFile(&header, entry.GetData(), Transform_Identity)
 
 		default:
@@ -94,7 +94,7 @@ func CollectTar(
 			Name:     RedirectsFileName,
 			Typeflag: tar.TypeReg,
 			Mode:     0644,
-			ModTime:  manifestMtime,
+			ModTime:  metadata.LastModified,
 		}, []byte(redirects), Transform_Identity)
 		if err != nil {
 			return err
@@ -106,7 +106,7 @@ func CollectTar(
 			Name:     HeadersFileName,
 			Typeflag: tar.TypeReg,
 			Mode:     0644,
-			ModTime:  manifestMtime,
+			ModTime:  metadata.LastModified,
 		}, []byte(headers), Transform_Identity)
 		if err != nil {
 			return err

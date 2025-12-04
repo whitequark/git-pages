@@ -309,12 +309,12 @@ func Main() {
 		}
 
 		webRoot := webRootArg(*getArchive)
-		manifest, manifestMtime, err :=
+		manifest, metadata, err :=
 			backend.GetManifest(ctx, webRoot, GetManifestOptions{})
 		if err != nil {
 			logc.Fatalln(ctx, err)
 		}
-		CollectTar(ctx, fileOutputArg(), manifest, manifestMtime)
+		CollectTar(ctx, fileOutputArg(), manifest, metadata)
 
 	case *updateSite != "":
 		if backend, err = CreateBackend(&config.Storage); err != nil {

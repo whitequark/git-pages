@@ -383,13 +383,13 @@ func (backend *observedBackend) ListManifests(ctx context.Context) (manifests []
 func (backend *observedBackend) GetManifest(
 	ctx context.Context, name string, opts GetManifestOptions,
 ) (
-	manifest *Manifest, mtime time.Time, err error,
+	manifest *Manifest, metadata ManifestMetadata, err error,
 ) {
 	span, ctx := ObserveFunction(ctx, "GetManifest",
 		"manifest.name", name,
 		"manifest.bypass_cache", opts.BypassCache,
 	)
-	if manifest, mtime, err = backend.inner.GetManifest(ctx, name, opts); err == nil {
+	if manifest, metadata, err = backend.inner.GetManifest(ctx, name, opts); err == nil {
 		manifestsRetrievedCount.Inc()
 	}
 	span.Finish()

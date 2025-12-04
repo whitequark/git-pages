@@ -196,7 +196,7 @@ func (fs *FSBackend) ListManifests(ctx context.Context) (manifests []string, err
 func (fs *FSBackend) GetManifest(
 	ctx context.Context, name string, opts GetManifestOptions,
 ) (
-	manifest *Manifest, mtime time.Time, err error,
+	manifest *Manifest, metadata ManifestMetadata, err error,
 ) {
 	stat, err := fs.siteRoot.Stat(name)
 	if errors.Is(err, os.ErrNotExist) {
@@ -215,7 +215,9 @@ func (fs *FSBackend) GetManifest(
 	if err != nil {
 		return
 	}
-	return manifest, stat.ModTime(), nil
+	return manifest, ManifestMetadata{
+		LastModified: stat.ModTime(),
+	}, nil
 }
 
 func stagedManifestName(manifestData []byte) string {

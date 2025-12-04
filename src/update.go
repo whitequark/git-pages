@@ -165,7 +165,7 @@ func PartialUpdateFromArchive(
 	// Here the old manifest is used both as a substrate to which a patch is applied, as well
 	// as a "load linked" operation for a future "store conditional" update which, taken together,
 	// create an atomic compare-and-swap operation.
-	oldManifest, oldManifestMtime, err := backend.GetManifest(ctx, webRoot,
+	oldManifest, oldMetadata, err := backend.GetManifest(ctx, webRoot,
 		GetManifestOptions{BypassCache: true})
 	if err != nil {
 		logc.Printf(ctx, "patch %s err: %s", webRoot, err)
@@ -204,7 +204,7 @@ func PartialUpdateFromArchive(
 		result = UpdateResult{UpdateError, nil, err}
 	} else {
 		result = Update(ctx, webRoot, oldManifest, newManifest,
-			ModifyManifestOptions{IfUnmodifiedSince: oldManifestMtime})
+			ModifyManifestOptions{IfUnmodifiedSince: oldMetadata.LastModified})
 		// The `If-Unmodified-Since` precondition is internally generated here, which means its
 		// failure shouldn't be surfaced as-is in the HTTP response. If we also accepted options
 		// from the client, then that precondition failure should surface in the response.

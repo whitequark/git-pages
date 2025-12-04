@@ -82,7 +82,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	var err error
 	var sitePath string
 	var manifest *Manifest
-	var manifestMtime time.Time
+	var metadata ManifestMetadata
 
 	cacheControl, err := cacheobject.ParseRequestCacheControl(r.Header.Get("Cache-Control"))
 	if err != nil {
@@ -101,25 +101,25 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	type indexManifestResult struct {
-		manifest      *Manifest
-		manifestMtime time.Time
-		err           error
+		manifest *Manifest
+		metadata ManifestMetadata
+		err      error
 	}
 	indexManifestCh := make(chan indexManifestResult, 1)
 	go func() {
-		manifest, mtime, err := backend.GetManifest(
+		manifest, metadata, err := backend.GetManifest(
 			r.Context(), makeWebRoot(host, ".index"),
 			GetManifestOptions{BypassCache: bypassCache},
 		)
-		indexManifestCh <- (indexManifestResult{manifest, mtime, err})
+		indexManifestCh <- (indexManifestResult{manifest, metadata, err})
 	}()
 
 	err = nil
 	sitePath = strings.TrimPrefix(r.URL.Path, "/")
 	if projectName, projectPath, hasProjectSlash := strings.Cut(sitePath, "/"); projectName != "" {
 		var projectManifest *Manifest
-		var projectManifestMtime time.Time
-		projectManifest, projectManifestMtime, err = backend.GetManifest(
+		var projectMetadata ManifestMetadata
+		projectManifest, projectMetadata, err = backend.GetManifest(
 			r.Context(), makeWebRoot(host, projectName),
 			GetManifestOptions{BypassCache: bypassCache},
 		)
@@ -128,12 +128,12 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				writeRedirect(w, http.StatusFound, r.URL.Path+"/")
 				return nil
 			}
-			sitePath, manifest, manifestMtime = projectPath, projectManifest, projectManifestMtime
+			sitePath, manifest, metadata = projectPath, projectManifest, projectMetadata
 		}
 	}
 	if manifest == nil && (err == nil || errors.Is(err, ErrObjectNotFound)) {
 		result := <-indexManifestCh
-		manifest, manifestMtime, err = result.manifest, result.manifestMtime, result.err
+		manifest, metadata, err = result.manifest, result.metadata, result.err
 		if manifest == nil && errors.Is(err, ErrObjectNotFound) {
 			if fallback != nil {
 				logc.Printf(r.Context(), "fallback: %s via %s", host, config.Fallback.ProxyTo)
@@ -165,10 +165,11 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 	if metadataPath, found := strings.CutPrefix(sitePath, ".git-pages/"); found {
-		lastModified := manifestMtime.UTC().Format(http.TimeFormat)
+		lastModified := metadata.LastModified.UTC().Format(http.TimeFormat)
 		switch {
 		case metadataPath == "health":
 			w.Header().Add("Last-Modified", lastModified)
+			w.Header().Add("ETag", fmt.Sprintf("\"%s\"", metadata.ETag))
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, "ok\n")
 			return nil
@@ -183,6 +184,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 
 			w.Header().Add("Content-Type", "application/json; charset=utf-8")
 			w.Header().Add("Last-Modified", lastModified)
+			w.Header().Add("ETag", fmt.Sprintf("\"%s-manifest\"", metadata.ETag))
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(ManifestDebugJSON(manifest)))
 			return nil
@@ -203,6 +205,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			}
 			w.Header().Add("Content-Type", "application/x-tar")
 			w.Header().Add("Last-Modified", lastModified)
+			w.Header().Add("ETag", fmt.Sprintf("\"%s-archive\"", metadata.ETag))
 			w.Header().Add("Transfer-Encoding", "chunked")
 			w.WriteHeader(http.StatusOK)
 			var iow io.Writer
@@ -214,7 +217,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			case "zstd":
 				iow, _ = zstd.NewWriter(w)
 			}
-			return CollectTar(r.Context(), iow, manifest, manifestMtime)
+			return CollectTar(r.Context(), iow, manifest, metadata)
 
 		default:
 			w.WriteHeader(http.StatusNotFound)
