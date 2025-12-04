@@ -553,16 +553,17 @@ func (s3 *S3Backend) HasAtomicCAS(ctx context.Context) bool {
 func (s3 *S3Backend) checkManifestPrecondition(
 	ctx context.Context, name string, opts ModifyManifestOptions,
 ) error {
-	if !opts.IfUnmodifiedSince.IsZero() {
-		stat, err := s3.client.StatObject(ctx, s3.bucket, manifestObjectName(name),
-			minio.GetObjectOptions{})
-		if err != nil {
-			return fmt.Errorf("stat: %w", err)
-		}
+	stat, err := s3.client.StatObject(ctx, s3.bucket, manifestObjectName(name),
+		minio.GetObjectOptions{})
+	if err != nil {
+		return err
+	}
 
-		if stat.LastModified.Compare(opts.IfUnmodifiedSince) > 0 {
-			return fmt.Errorf("%w: If-Unmodified-Since", ErrPreconditionFailed)
-		}
+	if !opts.IfUnmodifiedSince.IsZero() && stat.LastModified.Compare(opts.IfUnmodifiedSince) > 0 {
+		return fmt.Errorf("%w: If-Unmodified-Since", ErrPreconditionFailed)
+	}
+	if opts.IfMatch != "" && stat.ETag != opts.IfMatch {
+		return fmt.Errorf("%w: If-Match", ErrPreconditionFailed)
 	}
 
 	return nil
@@ -585,8 +586,16 @@ func (s3 *S3Backend) CommitManifest(
 
 	// Remove staged object unconditionally (whether commit succeeded or failed), since
 	// the upper layer has to retry the complete operation anyway.
+	putOptions := minio.PutObjectOptions{}
+	putOptions.Header().Add("X-Tigris-Consistent", "true")
+	if opts.IfMatch != "" {
+		// Not guaranteed to do anything (see `HasAtomicCAS`), but let's try anyway;
+		// this is a "belt and suspenders" approach, together with `checkManifestPrecondition`.
+		// It does reliably work on MinIO at least.
+		putOptions.SetMatchETag(opts.IfMatch)
+	}
 	_, putErr := s3.client.PutObject(ctx, s3.bucket, manifestObjectName(name),
-		bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{})
+		bytes.NewReader(data), int64(len(data)), putOptions)
 	removeErr := s3.client.RemoveObject(ctx, s3.bucket, stagedManifestObjectName(data),
 		minio.RemoveObjectOptions{})
 	s3.siteCache.Cache.Invalidate(name)

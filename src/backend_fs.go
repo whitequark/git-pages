@@ -217,6 +217,7 @@ func (fs *FSBackend) GetManifest(
 	}
 	return manifest, ManifestMetadata{
 		LastModified: stat.ModTime(),
+		ETag:         fmt.Sprintf("%x", sha256.Sum256(data)),
 	}, nil
 }
 
@@ -304,6 +305,17 @@ func (fs *FSBackend) checkManifestPrecondition(
 
 		if stat.ModTime().Compare(opts.IfUnmodifiedSince) > 0 {
 			return fmt.Errorf("%w: If-Unmodified-Since", ErrPreconditionFailed)
+		}
+	}
+
+	if opts.IfMatch != "" {
+		data, err := fs.siteRoot.ReadFile(name)
+		if err != nil {
+			return fmt.Errorf("read: %w", err)
+		}
+
+		if fmt.Sprintf("%x", sha256.Sum256(data)) != opts.IfMatch {
+			return fmt.Errorf("%w: If-Match", ErrPreconditionFailed)
 		}
 	}
 

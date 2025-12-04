@@ -204,7 +204,10 @@ func PartialUpdateFromArchive(
 		result = UpdateResult{UpdateError, nil, err}
 	} else {
 		result = Update(ctx, webRoot, oldManifest, newManifest,
-			ModifyManifestOptions{IfUnmodifiedSince: oldMetadata.LastModified})
+			ModifyManifestOptions{
+				IfUnmodifiedSince: oldMetadata.LastModified,
+				IfMatch:           oldMetadata.ETag,
+			})
 		// The `If-Unmodified-Since` precondition is internally generated here, which means its
 		// failure shouldn't be surfaced as-is in the HTTP response. If we also accepted options
 		// from the client, then that precondition failure should surface in the response.
