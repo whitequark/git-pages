@@ -28,6 +28,22 @@ var (
 	})
 )
 
+type principalKey struct{}
+
+var PrincipalKey = principalKey{}
+
+func WithPrincipal(ctx context.Context) context.Context {
+	principal := &Principal{}
+	return context.WithValue(ctx, PrincipalKey, principal)
+}
+
+func GetPrincipal(ctx context.Context) *Principal {
+	if principal, ok := ctx.Value(PrincipalKey).(*Principal); ok {
+		return principal
+	}
+	return nil
+}
+
 type AuditID int64
 
 func GenerateAuditID() AuditID {
@@ -95,6 +111,7 @@ func (audited *auditedBackend) appendNewAuditRecord(ctx context.Context, record 
 		id := GenerateAuditID()
 		record.Id = proto.Int64(int64(id))
 		record.Timestamp = timestamppb.Now()
+		record.Principal = GetPrincipal(ctx)
 
 		err = audited.Backend.AppendAuditLog(ctx, id, record)
 		if err != nil {

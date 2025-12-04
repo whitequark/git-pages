@@ -657,6 +657,7 @@ type AuditRecord struct {
 	Id        *int64                 `protobuf:"varint,1,opt,name=id" json:"id,omitempty"`
 	Timestamp *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=timestamp" json:"timestamp,omitempty"`
 	Event     *AuditEvent            `protobuf:"varint,3,opt,name=event,enum=AuditEvent" json:"event,omitempty"`
+	Principal *Principal             `protobuf:"bytes,4,opt,name=principal" json:"principal,omitempty"`
 	// Affected resource.
 	Domain  *string `protobuf:"bytes,10,opt,name=domain" json:"domain,omitempty"`
 	Project *string `protobuf:"bytes,11,opt,name=project" json:"project,omitempty"` // only for `*Manifest` events
@@ -717,6 +718,13 @@ func (x *AuditRecord) GetEvent() AuditEvent {
 	return AuditEvent_InvalidEvent
 }
 
+func (x *AuditRecord) GetPrincipal() *Principal {
+	if x != nil {
+		return x.Principal
+	}
+	return nil
+}
+
 func (x *AuditRecord) GetDomain() string {
 	if x != nil && x.Domain != nil {
 		return *x.Domain
@@ -736,6 +744,50 @@ func (x *AuditRecord) GetManifest() *Manifest {
 		return x.Manifest
 	}
 	return nil
+}
+
+type Principal struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IpAddress     *string                `protobuf:"bytes,1,opt,name=ip_address,json=ipAddress" json:"ip_address,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Principal) Reset() {
+	*x = Principal{}
+	mi := &file_schema_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Principal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Principal) ProtoMessage() {}
+
+func (x *Principal) ProtoReflect() protoreflect.Message {
+	mi := &file_schema_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Principal.ProtoReflect.Descriptor instead.
+func (*Principal) Descriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *Principal) GetIpAddress() string {
+	if x != nil && x.IpAddress != nil {
+		return *x.IpAddress
+	}
+	return ""
 }
 
 var File_schema_proto protoreflect.FileDescriptor
@@ -783,15 +835,20 @@ const file_schema_proto_rawDesc = "" +
 	"\bproblems\x18\a \x03(\v2\b.ProblemR\bproblems\x1aC\n" +
 	"\rContentsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x1c\n" +
-	"\x05value\x18\x02 \x01(\v2\x06.EntryR\x05value:\x028\x01\"\xd3\x01\n" +
+	"\x05value\x18\x02 \x01(\v2\x06.EntryR\x05value:\x028\x01\"\xfd\x01\n" +
 	"\vAuditRecord\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x128\n" +
 	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12!\n" +
-	"\x05event\x18\x03 \x01(\x0e2\v.AuditEventR\x05event\x12\x16\n" +
+	"\x05event\x18\x03 \x01(\x0e2\v.AuditEventR\x05event\x12(\n" +
+	"\tprincipal\x18\x04 \x01(\v2\n" +
+	".PrincipalR\tprincipal\x12\x16\n" +
 	"\x06domain\x18\n" +
 	" \x01(\tR\x06domain\x12\x18\n" +
 	"\aproject\x18\v \x01(\tR\aproject\x12%\n" +
-	"\bmanifest\x18\f \x01(\v2\t.ManifestR\bmanifest*V\n" +
+	"\bmanifest\x18\f \x01(\v2\t.ManifestR\bmanifest\"*\n" +
+	"\tPrincipal\x12\x1d\n" +
+	"\n" +
+	"ip_address\x18\x01 \x01(\tR\tipAddress*V\n" +
 	"\x04Type\x12\x10\n" +
 	"\fInvalidEntry\x10\x00\x12\r\n" +
 	"\tDirectory\x10\x01\x12\x0e\n" +
@@ -823,7 +880,7 @@ func file_schema_proto_rawDescGZIP() []byte {
 }
 
 var file_schema_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_schema_proto_goTypes = []any{
 	(Type)(0),                     // 0: Type
 	(Transform)(0),                // 1: Transform
@@ -835,26 +892,28 @@ var file_schema_proto_goTypes = []any{
 	(*Problem)(nil),               // 7: Problem
 	(*Manifest)(nil),              // 8: Manifest
 	(*AuditRecord)(nil),           // 9: AuditRecord
-	nil,                           // 10: Manifest.ContentsEntry
-	(*timestamppb.Timestamp)(nil), // 11: google.protobuf.Timestamp
+	(*Principal)(nil),             // 10: Principal
+	nil,                           // 11: Manifest.ContentsEntry
+	(*timestamppb.Timestamp)(nil), // 12: google.protobuf.Timestamp
 }
 var file_schema_proto_depIdxs = []int32{
 	0,  // 0: Entry.type:type_name -> Type
 	1,  // 1: Entry.transform:type_name -> Transform
 	5,  // 2: HeaderRule.header_map:type_name -> Header
-	10, // 3: Manifest.contents:type_name -> Manifest.ContentsEntry
+	11, // 3: Manifest.contents:type_name -> Manifest.ContentsEntry
 	4,  // 4: Manifest.redirects:type_name -> RedirectRule
 	6,  // 5: Manifest.headers:type_name -> HeaderRule
 	7,  // 6: Manifest.problems:type_name -> Problem
-	11, // 7: AuditRecord.timestamp:type_name -> google.protobuf.Timestamp
+	12, // 7: AuditRecord.timestamp:type_name -> google.protobuf.Timestamp
 	2,  // 8: AuditRecord.event:type_name -> AuditEvent
-	8,  // 9: AuditRecord.manifest:type_name -> Manifest
-	3,  // 10: Manifest.ContentsEntry.value:type_name -> Entry
-	11, // [11:11] is the sub-list for method output_type
-	11, // [11:11] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	10, // 9: AuditRecord.principal:type_name -> Principal
+	8,  // 10: AuditRecord.manifest:type_name -> Manifest
+	3,  // 11: Manifest.ContentsEntry.value:type_name -> Entry
+	12, // [12:12] is the sub-list for method output_type
+	12, // [12:12] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_schema_proto_init() }
@@ -868,7 +927,7 @@ func file_schema_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_schema_proto_rawDesc), len(file_schema_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

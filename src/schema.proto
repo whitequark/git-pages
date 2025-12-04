@@ -119,6 +119,7 @@ message AuditRecord {
 	int64 id = 1;
 	google.protobuf.Timestamp timestamp = 2;
 	AuditEvent event = 3;
+	Principal principal = 4;
 
 	// Affected resource.
 	string domain = 10;
@@ -126,4 +127,8 @@ message AuditRecord {
 
 	// Snapshot of site manifest.
 	Manifest manifest = 12;  // only for `*Manifest` events
+}
+
+message Principal {
+	string ip_address = 1;
 }
