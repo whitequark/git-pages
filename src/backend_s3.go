@@ -553,6 +553,10 @@ func (s3 *S3Backend) HasAtomicCAS(ctx context.Context) bool {
 func (s3 *S3Backend) checkManifestPrecondition(
 	ctx context.Context, name string, opts ModifyManifestOptions,
 ) error {
+	if opts.IfUnmodifiedSince.IsZero() && opts.IfMatch == "" {
+		return nil
+	}
+
 	stat, err := s3.client.StatObject(ctx, s3.bucket, manifestObjectName(name),
 		minio.GetObjectOptions{})
 	if err != nil {
