@@ -421,14 +421,30 @@ func Main() {
 			logc.Fatalln(ctx, err)
 		}
 
+		ch := make(chan *AuditRecord)
+		ids := []AuditID{}
 		for id, err := range backend.SearchAuditLog(ctx, SearchAuditLogOptions{}) {
 			if err != nil {
 				logc.Fatalln(ctx, err)
 			}
-			record, err := backend.QueryAuditLog(ctx, id)
-			if err != nil {
-				logc.Fatalln(ctx, err)
-			}
+			go func() {
+				if record, err := backend.QueryAuditLog(ctx, id); err != nil {
+					logc.Fatalln(ctx, err)
+				} else {
+					ch <- record
+				}
+			}()
+			ids = append(ids, id)
+		}
+
+		records := map[AuditID]*AuditRecord{}
+		for len(records) < len(ids) {
+			record := <-ch
+			records[record.GetAuditID()] = record
+		}
+
+		for _, id := range ids {
+			record := records[id]
 			fmt.Fprintf(color.Output, "%s %s %s %s %s\n",
 				record.GetAuditID().String(),
 				color.HiWhiteString(record.GetTimestamp().AsTime().UTC().Format(time.RFC3339)),
