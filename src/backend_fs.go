@@ -141,6 +141,12 @@ func (fs *FSBackend) PutBlob(ctx context.Context, name string, data []byte) erro
 	blobPath := filepath.Join(splitBlobName(name)...)
 	blobDir := filepath.Dir(blobPath)
 
+	if _, err := fs.blobRoot.Stat(blobPath); err == nil {
+		// Blob already exists. While on Linux it would be benign to write and replace a blob
+		// that already exists, on Windows this is liable to cause access errors.
+		return nil
+	}
+
 	tempPath, err := createTempInRoot(fs.blobRoot, name, data)
 	if err != nil {
 		return err
@@ -318,10 +324,12 @@ func (fs *FSBackend) checkManifestPrecondition(
 func (fs *FSBackend) CommitManifest(
 	ctx context.Context, name string, manifest *Manifest, opts ModifyManifestOptions,
 ) error {
-	if guard, err := lockManifest(fs.siteRoot, name); err != nil {
-		return err
-	} else {
-		defer guard.Unlock()
+	if fs.hasAtomicCAS {
+		if guard, err := lockManifest(fs.siteRoot, name); err != nil {
+			return err
+		} else {
+			defer guard.Unlock()
+		}
 	}
 
 	domain := filepath.Dir(name)
@@ -354,10 +362,12 @@ func (fs *FSBackend) CommitManifest(
 func (fs *FSBackend) DeleteManifest(
 	ctx context.Context, name string, opts ModifyManifestOptions,
 ) error {
-	if guard, err := lockManifest(fs.siteRoot, name); err != nil {
-		return err
-	} else {
-		defer guard.Unlock()
+	if fs.hasAtomicCAS {
+		if guard, err := lockManifest(fs.siteRoot, name); err != nil {
+			return err
+		} else {
+			defer guard.Unlock()
+		}
 	}
 
 	domain := filepath.Dir(name)
