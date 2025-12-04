@@ -537,19 +537,19 @@ func patchPage(w http.ResponseWriter, r *http.Request) error {
 	// on the backend in use and its configuration, but for applications where a mostly-atomic
 	// compare-and-swap operation is good enough (e.g. generating page previews) we don't want
 	// to prevent the use of partial updates.
-	wantRaceFree := r.Header.Get("Race-Free")
+	wantAtomicCAS := r.Header.Get("Atomic")
 	hasAtomicCAS := backend.HasAtomicCAS(r.Context())
 	switch {
-	case wantRaceFree == "yes" && hasAtomicCAS || wantRaceFree == "no":
+	case wantAtomicCAS == "yes" && hasAtomicCAS || wantAtomicCAS == "no":
 		// all good
-	case wantRaceFree == "yes":
-		http.Error(w, "race free partial updates unsupported", http.StatusPreconditionFailed)
+	case wantAtomicCAS == "yes":
+		http.Error(w, "atomic partial updates unsupported", http.StatusPreconditionFailed)
 		return nil
-	case wantRaceFree == "":
-		http.Error(w, "must provide \"Race-Free: yes|no\" header", http.StatusPreconditionRequired)
+	case wantAtomicCAS == "":
+		http.Error(w, "must provide \"Atomic: yes|no\" header", http.StatusPreconditionRequired)
 		return nil
 	default:
-		http.Error(w, "malformed Race-Free: header", http.StatusBadRequest)
+		http.Error(w, "malformed Atomic: header", http.StatusBadRequest)
 		return nil
 	}
 

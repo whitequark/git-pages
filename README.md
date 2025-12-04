@@ -80,8 +80,8 @@ Features
         - A directory entry replaces any existing file or directory with the same name (if any), recursively removing the old contents.
         - A file or symlink entry replaces any existing file or directory with the same name (if any).
         - In any case, the parent of an entry must exist and be a directory.
-    - The request must have a `Race-Free: yes` or `Race-Free: no` header. Not every backend configuration makes it possible to perform atomic compare-and-swap operations; on backends without atomic CAS support, `Race-Free: yes` requests will fail, while `Race-Free: no` requests will provide a best-effort approximation.
-    - If a `PATCH` request loses a race against another content update request, it may return `409 Conflict`. This is true regardless of the `Race-Free:` header value. Whenever this happens, resubmit the request as-is.
+    - The request must have a `Atomic: yes` or `Atomic: no` header. Not every backend configuration makes it possible to perform atomic compare-and-swap operations; on backends without atomic CAS support, `Atomic: yes` requests will fail, while `Atomic: no` requests will provide a best-effort approximation.
+    - If a `PATCH` request loses a race against another content update request, it may return `409 Conflict`. This is true regardless of the `Atomic:` header value. Whenever this happens, resubmit the request as-is.
     - If the site has no contents after the update is applied, performs the same action as `DELETE`.
 * In response to a `DELETE` request, the server unpublishes a site. The URL of the request must be the root URL of the site that is being unpublished. Site data remains stored for an indeterminate period of time, but becomes completely inaccessible.
 * If a `Dry-Run: yes` header is provided with a `PUT`, `PATCH`, `DELETE`, or `POST` request, only the authorization checks are run; no destructive updates are made. Note that this functionality was added in _git-pages_ v0.2.0.

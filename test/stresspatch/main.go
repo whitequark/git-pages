@@ -57,7 +57,7 @@ func patchRequest(n int) int {
 		panic(err)
 	}
 
-	req.Header.Add("Race-Free", "no")
+	req.Header.Add("Atomic", "no")
 	req.Header.Add("Content-Type", "application/x-tar")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
