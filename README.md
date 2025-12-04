@@ -1,13 +1,20 @@
 git-pages
 =========
 
-_git-pages_ is a static site server for use with Git forges (i.e. a GitHub Pages replacement). It is written with efficiency in mind, scaling horizontally to any number of deployed sites and concurrent requests and serving sites up to hundreds of megabytes in size, while being equally suitable for single-user deployments.
+_git-pages_ is a static site server for use with Git forges (i.e. a GitHub Pages replacement). It is written with efficiency in mind, scaling horizontally to any number of machines and serving sites up to multiple gigabytes in size, while being equally suitable for small single-user deployments.
 
-It is implemented in Go and has no other mandatory dependencies, although it is designed to be used together with the [Caddy server][caddy] (for TLS termination) and an [Amazon S3](https://aws.amazon.com/s3/) compatible object store (for horizontal scalability of storage).
+It is implemented in Go and has no other mandatory dependencies, although it is designed to be used together with the [Caddy server][caddy] for TLS termination. Site data may be stored on the filesystem or in an [Amazon S3](https://aws.amazon.com/s3/) compatible object store.
 
-The included Docker container provides everything needed to deploy a Pages service, including zero-configuration on-demand provisioning of TLS certificates from [Let's Encrypt](https://letsencrypt.org/), and runs on any commodity cloud infrastructure. There is also a first-party deployment of _git-pages_ at [grebedoc.dev](https://grebedoc.dev).
+The included Docker container provides everything needed to deploy a Pages service, including zero-configuration on-demand provisioning of TLS certificates from [Let's Encrypt](https://letsencrypt.org/), and runs on any commodity cloud infrastructure.
+
+> [!TIP]
+> If you would like to publish a site using _git-pages_ to an existing service like Codeberg Pages or [Grebedoc][grebedoc], consider using the [CLI tool][git-pages-cli] or [Forgejo Action][git-pages-action].
 
 [caddy]: https://caddyserver.com/
+[git-pages-cli]: https://codeberg.org/git-pages/git-pages-cli
+[git-pages-action]: https://codeberg.org/git-pages/action
+[codeberg-pages]: https://codeberg.page
+[grebedoc]: https://grebedoc.dev
 
 
 Quickstart
@@ -31,8 +38,6 @@ b70644b523c4aaf4efd206a588087a1d406cb047
 ```
 
 The `pages` branch of the repository is now available at http://localhost:3000/!
-
-[git-pages-cli]: https://codeberg.org/git-pages/git-pages-cli
 
 
 Deployment
