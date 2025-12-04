@@ -131,4 +131,5 @@ message AuditRecord {
 
 message Principal {
 	string ip_address = 1;
+	bool cli_admin = 2;
 }

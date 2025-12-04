@@ -20,8 +20,10 @@ import (
 
 	automemlimit "github.com/KimMachineGun/automemlimit/memlimit"
 	"github.com/c2h5oh/datasize"
+	"github.com/fatih/color"
 	"github.com/kankanreno/go-snowflake"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"google.golang.org/protobuf/proto"
 )
 
 var config *Config
@@ -175,7 +177,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "(admin)  "+
 		"git-pages {-run-migration <name>|-freeze-domain <domain>|-unfreeze-domain <domain>}\n")
 	fmt.Fprintf(os.Stderr, "(audit)  "+
-		"git-pages {-audit-read <id>}\n")
+		"git-pages {-audit-log|-audit-read <id>}\n")
 	fmt.Fprintf(os.Stderr, "(info)   "+
 		"git-pages {-print-config-env-vars|-print-config}\n")
 	fmt.Fprintf(os.Stderr, "(cli)    "+
@@ -209,6 +211,8 @@ func Main() {
 		"prevent any site uploads to a given `domain`")
 	unfreezeDomain := flag.String("unfreeze-domain", "",
 		"allow site uploads to a `domain` again after it has been frozen")
+	auditLog := flag.Bool("audit-log", false,
+		"display audit log")
 	auditRead := flag.String("audit-read", "",
 		"extract contents of audit record `id` to files '<id>-*'")
 	flag.Parse()
@@ -222,6 +226,7 @@ func Main() {
 		*updateSite != "",
 		*freezeDomain != "",
 		*unfreezeDomain != "",
+		*auditLog,
 		*auditRead != "",
 	} {
 		if selected {
@@ -270,7 +275,7 @@ func Main() {
 
 	switch {
 	case *runMigration != "":
-		if backend, err = CreateBackend(&config.Storage); err != nil {
+		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
 			logc.Fatalln(ctx, err)
 		}
 
@@ -279,7 +284,7 @@ func Main() {
 		}
 
 	case *getBlob != "":
-		if backend, err = CreateBackend(&config.Storage); err != nil {
+		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
 			logc.Fatalln(ctx, err)
 		}
 
@@ -290,7 +295,7 @@ func Main() {
 		io.Copy(fileOutputArg(), reader)
 
 	case *getManifest != "":
-		if backend, err = CreateBackend(&config.Storage); err != nil {
+		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
 			logc.Fatalln(ctx, err)
 		}
 
@@ -302,7 +307,7 @@ func Main() {
 		fmt.Fprintln(fileOutputArg(), string(ManifestJSON(manifest)))
 
 	case *getArchive != "":
-		if backend, err = CreateBackend(&config.Storage); err != nil {
+		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
 			logc.Fatalln(ctx, err)
 		}
 
@@ -317,7 +322,10 @@ func Main() {
 		}
 
 	case *updateSite != "":
-		if backend, err = CreateBackend(&config.Storage); err != nil {
+		ctx = WithPrincipal(ctx)
+		GetPrincipal(ctx).CliAdmin = proto.Bool(true)
+
+		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
 			logc.Fatalln(ctx, err)
 		}
 
@@ -382,6 +390,9 @@ func Main() {
 		}
 
 	case *freezeDomain != "" || *unfreezeDomain != "":
+		ctx = WithPrincipal(ctx)
+		GetPrincipal(ctx).CliAdmin = proto.Bool(true)
+
 		var domain string
 		var freeze bool
 		if *freezeDomain != "" {
@@ -392,7 +403,7 @@ func Main() {
 			freeze = false
 		}
 
-		if backend, err = CreateBackend(&config.Storage); err != nil {
+		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
 			logc.Fatalln(ctx, err)
 		}
 
@@ -405,8 +416,30 @@ func Main() {
 			logc.Println(ctx, "thawed")
 		}
 
+	case *auditLog:
+		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
+			logc.Fatalln(ctx, err)
+		}
+
+		for id, err := range backend.SearchAuditLog(ctx, SearchAuditLogOptions{}) {
+			if err != nil {
+				logc.Fatalln(ctx, err)
+			}
+			record, err := backend.QueryAuditLog(ctx, id)
+			if err != nil {
+				logc.Fatalln(ctx, err)
+			}
+			fmt.Fprintf(color.Output, "%s %s %s %s %s\n",
+				record.GetAuditID().String(),
+				color.HiWhiteString(record.GetTimestamp().AsTime().UTC().Format(time.RFC3339)),
+				color.HiMagentaString(record.DescribePrincipal()),
+				color.HiGreenString(record.DescribeResource()),
+				record.GetEvent(),
+			)
+		}
+
 	case *auditRead != "":
-		if backend, err = CreateBackend(&config.Storage); err != nil {
+		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
 			logc.Fatalln(ctx, err)
 		}
 
@@ -475,7 +508,7 @@ func Main() {
 		caddyListener := listen(ctx, "caddy", config.Server.Caddy)
 		metricsListener := listen(ctx, "metrics", config.Server.Metrics)
 
-		if backend, err = CreateBackend(&config.Storage); err != nil {
+		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
 			logc.Fatalln(ctx, err)
 		}
 		backend = NewObservedBackend(backend)

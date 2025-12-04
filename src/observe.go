@@ -457,15 +457,15 @@ func (backend *observedBackend) QueryAuditLog(ctx context.Context, id AuditID) (
 }
 
 func (backend *observedBackend) SearchAuditLog(
-	ctx context.Context, opts QueryAuditLogOptions,
-) iter.Seq[QueryAuditLogResult] {
-	return func(yield func(QueryAuditLogResult) bool) {
+	ctx context.Context, opts SearchAuditLogOptions,
+) iter.Seq2[AuditID, error] {
+	return func(yield func(AuditID, error) bool) {
 		span, ctx := ObserveFunction(ctx, "SearchAuditLog",
 			"audit.search.since", opts.Since,
 			"audit.search.until", opts.Until,
 		)
-		for result := range backend.inner.SearchAuditLog(ctx, opts) {
-			if !yield(result) {
+		for id, err := range backend.inner.SearchAuditLog(ctx, opts) {
+			if !yield(id, err) {
 				break
 			}
 		}

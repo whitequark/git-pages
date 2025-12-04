@@ -52,7 +52,7 @@ type ModifyManifestOptions struct {
 	IfMatch string
 }
 
-type QueryAuditLogOptions struct {
+type SearchAuditLogOptions struct {
 	// Inclusive lower bound on returned audit records, per their Snowflake ID (which may differ
 	// slightly from the embedded timestamp). If zero, audit records are returned since beginning
 	// of time.
@@ -63,7 +63,7 @@ type QueryAuditLogOptions struct {
 	Until time.Time
 }
 
-type QueryAuditLogResult struct {
+type SearchAuditLogResult struct {
 	ID  AuditID
 	Err error
 }
@@ -130,17 +130,17 @@ type Backend interface {
 	QueryAuditLog(ctx context.Context, id AuditID) (record *AuditRecord, err error)
 
 	// Retrieve records from the audit log by time range.
-	SearchAuditLog(ctx context.Context, opts QueryAuditLogOptions) iter.Seq[QueryAuditLogResult]
+	SearchAuditLog(ctx context.Context, opts SearchAuditLogOptions) iter.Seq2[AuditID, error]
 }
 
-func CreateBackend(config *StorageConfig) (backend Backend, err error) {
+func CreateBackend(ctx context.Context, config *StorageConfig) (backend Backend, err error) {
 	switch config.Type {
 	case "fs":
-		if backend, err = NewFSBackend(context.Background(), &config.FS); err != nil {
+		if backend, err = NewFSBackend(ctx, &config.FS); err != nil {
 			err = fmt.Errorf("fs backend: %w", err)
 		}
 	case "s3":
-		if backend, err = NewS3Backend(context.Background(), &config.S3); err != nil {
+		if backend, err = NewS3Backend(ctx, &config.S3); err != nil {
 			err = fmt.Errorf("s3 backend: %w", err)
 		}
 	default:

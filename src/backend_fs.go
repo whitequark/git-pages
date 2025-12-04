@@ -434,30 +434,28 @@ func (fs *FSBackend) QueryAuditLog(ctx context.Context, id AuditID) (*AuditRecor
 }
 
 func (fs *FSBackend) SearchAuditLog(
-	ctx context.Context, opts QueryAuditLogOptions,
-) iter.Seq[QueryAuditLogResult] {
-	return func(yield func(QueryAuditLogResult) bool) {
+	ctx context.Context, opts SearchAuditLogOptions,
+) iter.Seq2[AuditID, error] {
+	return func(yield func(AuditID, error) bool) {
 		iofs.WalkDir(fs.auditRoot.FS(), ".",
 			func(path string, entry iofs.DirEntry, err error) error {
 				if path == "." {
-					return nil
+					return nil // skip
 				}
-				var result QueryAuditLogResult
+				var id AuditID
 				if err != nil {
-					result.Err = err
-				} else if id, err := ParseAuditID(path); err != nil {
-					result.Err = err
+					// report error
+				} else if id, err = ParseAuditID(path); err != nil {
+					// report error
 				} else if !opts.Since.IsZero() && id.CompareTime(opts.Since) < 0 {
-					return nil
+					return nil // skip
 				} else if !opts.Until.IsZero() && id.CompareTime(opts.Until) > 0 {
-					return nil
-				} else {
-					result.ID = id
+					return nil // skip
 				}
-				if !yield(result) {
-					return iofs.SkipAll
+				if !yield(id, err) {
+					return iofs.SkipAll // break
 				} else {
-					return nil
+					return nil // continue
 				}
 			})
 	}

@@ -734,9 +734,9 @@ func (s3 *S3Backend) QueryAuditLog(ctx context.Context, id AuditID) (*AuditRecor
 }
 
 func (s3 *S3Backend) SearchAuditLog(
-	ctx context.Context, opts QueryAuditLogOptions,
-) iter.Seq[QueryAuditLogResult] {
-	return func(yield func(QueryAuditLogResult) bool) {
+	ctx context.Context, opts SearchAuditLogOptions,
+) iter.Seq2[AuditID, error] {
+	return func(yield func(AuditID, error) bool) {
 		logc.Printf(ctx, "s3: query audit\n")
 
 		ctx, cancel := context.WithCancel(ctx)
@@ -746,15 +746,14 @@ func (s3 *S3Backend) SearchAuditLog(
 		for object := range s3.client.ListObjectsIter(ctx, s3.bucket, minio.ListObjectsOptions{
 			Prefix: prefix,
 		}) {
-			var result QueryAuditLogResult
+			var id AuditID
+			var err error
 			if object.Err != nil {
-				result.Err = object.Err
-			} else if id, err := ParseAuditID(strings.TrimPrefix(object.Key, prefix)); err != nil {
-				result.Err = err
+				err = object.Err
 			} else {
-				result.ID = id
+				id, err = ParseAuditID(strings.TrimPrefix(object.Key, prefix))
 			}
-			if !yield(result) {
+			if !yield(id, err) {
 				break
 			}
 		}

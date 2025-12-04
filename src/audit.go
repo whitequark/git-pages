@@ -87,6 +87,37 @@ func DecodeAuditRecord(data []byte) (record *AuditRecord, err error) {
 	return
 }
 
+func (record *AuditRecord) GetAuditID() AuditID {
+	return AuditID(record.GetId())
+}
+
+func (record *AuditRecord) DescribePrincipal() string {
+	var items []string
+	if record.Principal != nil {
+		if record.Principal.GetIpAddress() != "" {
+			items = append(items, record.Principal.GetIpAddress())
+		}
+		if record.Principal.GetCliAdmin() {
+			items = append(items, "<cli-admin>")
+		}
+	}
+	if len(items) > 0 {
+		return strings.Join(items, ";")
+	} else {
+		return "<unknown>"
+	}
+}
+
+func (record *AuditRecord) DescribeResource() string {
+	desc := "<unknown>"
+	if record.Domain != nil && record.Project != nil {
+		desc = fmt.Sprintf("%s/%s", *record.Domain, *record.Project)
+	} else if record.Domain != nil {
+		desc = *record.Domain
+	}
+	return desc
+}
+
 type AuditRecordScope int
 
 const (

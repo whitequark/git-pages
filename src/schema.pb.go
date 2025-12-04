@@ -749,6 +749,7 @@ func (x *AuditRecord) GetManifest() *Manifest {
 type Principal struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	IpAddress     *string                `protobuf:"bytes,1,opt,name=ip_address,json=ipAddress" json:"ip_address,omitempty"`
+	CliAdmin      *bool                  `protobuf:"varint,2,opt,name=cli_admin,json=cliAdmin" json:"cli_admin,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -788,6 +789,13 @@ func (x *Principal) GetIpAddress() string {
 		return *x.IpAddress
 	}
 	return ""
+}
+
+func (x *Principal) GetCliAdmin() bool {
+	if x != nil && x.CliAdmin != nil {
+		return *x.CliAdmin
+	}
+	return false
 }
 
 var File_schema_proto protoreflect.FileDescriptor
@@ -845,10 +853,11 @@ const file_schema_proto_rawDesc = "" +
 	"\x06domain\x18\n" +
 	" \x01(\tR\x06domain\x12\x18\n" +
 	"\aproject\x18\v \x01(\tR\aproject\x12%\n" +
-	"\bmanifest\x18\f \x01(\v2\t.ManifestR\bmanifest\"*\n" +
+	"\bmanifest\x18\f \x01(\v2\t.ManifestR\bmanifest\"G\n" +
 	"\tPrincipal\x12\x1d\n" +
 	"\n" +
-	"ip_address\x18\x01 \x01(\tR\tipAddress*V\n" +
+	"ip_address\x18\x01 \x01(\tR\tipAddress\x12\x1b\n" +
+	"\tcli_admin\x18\x02 \x01(\bR\bcliAdmin*V\n" +
 	"\x04Type\x12\x10\n" +
 	"\fInvalidEntry\x10\x00\x12\r\n" +
 	"\tDirectory\x10\x01\x12\x0e\n" +
