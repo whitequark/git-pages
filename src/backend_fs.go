@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -263,10 +262,6 @@ func (fs *FSBackend) HasAtomicCAS(ctx context.Context) bool {
 	return fs.hasAtomicCAS
 }
 
-// Right now updates aren't very common, so this lock is essentially entirely uncontended.
-// If it ever becomes a bottleneck it should be replaced with a per-manifest lock.
-var sharedManifestLock = sync.Mutex{}
-
 type manifestLockGuard struct {
 	file *os.File
 }
@@ -282,7 +277,6 @@ func lockManifest(fs *os.Root, name string) (*manifestLockGuard, error) {
 		file.Close()
 		return nil, fmt.Errorf("flock(LOCK_EX): %w", err)
 	}
-	sharedManifestLock.Lock()
 	return &manifestLockGuard{file}, nil
 }
 
@@ -290,7 +284,6 @@ func (guard *manifestLockGuard) Unlock() {
 	if guard.file != nil {
 		FileUnlock(guard.file)
 		guard.file.Close()
-		sharedManifestLock.Unlock()
 	}
 }
 
