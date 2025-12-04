@@ -70,6 +70,20 @@ func makeWebRoot(host string, projectName string) string {
 	return fmt.Sprintf("%s/%s", strings.ToLower(host), projectName)
 }
 
+func getWebRoot(r *http.Request) (string, error) {
+	host, err := GetHost(r)
+	if err != nil {
+		return "", err
+	}
+
+	projectName, err := GetProjectName(r)
+	if err != nil {
+		return "", err
+	}
+
+	return makeWebRoot(host, projectName), nil
+}
+
 func writeRedirect(w http.ResponseWriter, code int, path string) {
 	w.Header().Set("Location", path)
 	w.WriteHeader(code)
@@ -433,17 +447,10 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	host, err := GetHost(r)
+	webRoot, err := getWebRoot(r)
 	if err != nil {
 		return err
 	}
-
-	projectName, err := GetProjectName(r)
-	if err != nil {
-		return err
-	}
-
-	webRoot := makeWebRoot(host, projectName)
 
 	updateCtx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
 	defer cancel()
@@ -514,23 +521,17 @@ func patchPage(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	host, err := GetHost(r)
+	webRoot, err := getWebRoot(r)
 	if err != nil {
 		return err
 	}
-
-	projectName, err := GetProjectName(r)
-	if err != nil {
-		return err
-	}
-
-	webRoot := makeWebRoot(host, projectName)
-
-	updateCtx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
-	defer cancel()
 
 	if _, err = AuthorizeUpdateFromArchive(r); err != nil {
 		return err
+	}
+
+	if checkDryRun(w, r) {
+		return nil
 	}
 
 	// Providing atomic compare-and-swap operations might be difficult or impossible depending
@@ -553,9 +554,8 @@ func patchPage(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 
-	if checkDryRun(w, r) {
-		return nil
-	}
+	updateCtx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
+	defer cancel()
 
 	contentType := getMediaType(r.Header.Get("Content-Type"))
 	reader := http.MaxBytesReader(w, r.Body, int64(config.Limits.MaxSiteSize.Bytes()))
@@ -613,17 +613,12 @@ func reportUpdateResult(w http.ResponseWriter, result UpdateResult) error {
 }
 
 func deletePage(w http.ResponseWriter, r *http.Request) error {
-	_, err := AuthorizeUpdateFromRepository(r)
+	webRoot, err := getWebRoot(r)
 	if err != nil {
 		return err
 	}
 
-	host, err := GetHost(r)
-	if err != nil {
-		return err
-	}
-
-	projectName, err := GetProjectName(r)
+	_, err = AuthorizeUpdateFromRepository(r)
 	if err != nil {
 		return err
 	}
@@ -632,16 +627,12 @@ func deletePage(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 
-	err = backend.DeleteManifest(r.Context(), makeWebRoot(host, projectName),
-		ModifyManifestOptions{})
-	if err != nil {
+	if err = backend.DeleteManifest(r.Context(), webRoot, ModifyManifestOptions{}); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintln(w, err)
 	} else {
 		w.Header().Add("Update-Result", "deleted")
 		w.WriteHeader(http.StatusOK)
-	}
-	if err != nil {
-		fmt.Fprintln(w, err)
 	}
 	return err
 }
@@ -651,22 +642,15 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 	requestTimeout := 3 * time.Second
 	requestTimer := time.NewTimer(requestTimeout)
 
+	webRoot, err := getWebRoot(r)
+	if err != nil {
+		return err
+	}
+
 	auth, err := AuthorizeUpdateFromRepository(r)
 	if err != nil {
 		return err
 	}
-
-	host, err := GetHost(r)
-	if err != nil {
-		return err
-	}
-
-	projectName, err := GetProjectName(r)
-	if err != nil {
-		return err
-	}
-
-	webRoot := makeWebRoot(host, projectName)
 
 	eventName := ""
 	for _, header := range []string{
