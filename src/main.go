@@ -314,7 +314,9 @@ func Main() {
 		if err != nil {
 			logc.Fatalln(ctx, err)
 		}
-		CollectTar(ctx, fileOutputArg(), manifest, metadata)
+		if err = CollectTar(ctx, fileOutputArg(), manifest, metadata); err != nil {
+			logc.Fatalln(ctx, err)
+		}
 
 	case *updateSite != "":
 		if backend, err = CreateBackend(&config.Storage); err != nil {

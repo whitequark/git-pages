@@ -26,18 +26,21 @@ func CollectTar(
 		case Transform_Zstd:
 			data, err = zstdDecoder.DecodeAll(data, []byte{})
 			if err != nil {
-				return err
+				return fmt.Errorf("zstd: %s: %w", header.Name, err)
 			}
 		default:
-			return fmt.Errorf("unexpected transform")
+			return fmt.Errorf("%s: unexpected transform", header.Name)
 		}
 		header.Size = int64(len(data))
 
 		err = archive.WriteHeader(header)
 		if err != nil {
-			return
+			return fmt.Errorf("tar: %w", err)
 		}
 		_, err = archive.Write(data)
+		if err != nil {
+			return fmt.Errorf("tar: %w", err)
+		}
 		return
 	}
 
@@ -82,7 +85,8 @@ func CollectTar(
 			err = appendFile(&header, entry.GetData(), Transform_Identity)
 
 		default:
-			return fmt.Errorf("unexpected entry type")
+			panic(fmt.Errorf("CollectTar encountered invalid entry: %v, %v",
+				entry.GetType(), entry.GetTransform()))
 		}
 		if err != nil {
 			return err
@@ -115,7 +119,7 @@ func CollectTar(
 
 	err = archive.Flush()
 	if err != nil {
-		return err
+		return fmt.Errorf("tar: %w", err)
 	}
 
 	flusher, ok := writer.(Flusher)
