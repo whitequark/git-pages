@@ -131,9 +131,8 @@ func FetchRepository(
 	}
 
 	// Collect checkout statistics.
-	var dataBytesFromOldManifest int64
-	var dataBytesFromGitCheckout int64
-	var dataBytesFromGitTransport int64
+	var dataBytesRecycled int64
+	var dataBytesTransferred int64
 
 	// First, see if we can extract the blobs from the old manifest. This is the preferred option
 	// because it avoids both network transfers and recompression. Note that we do not request
@@ -143,7 +142,7 @@ func FetchRepository(
 			if manifestEntry, found := blobsNeeded[hash]; found {
 				manifestEntry.Reset()
 				proto.Merge(manifestEntry, oldManifestEntry)
-				dataBytesFromOldManifest += oldManifestEntry.GetOriginalSize()
+				dataBytesRecycled += oldManifestEntry.GetOriginalSize()
 				delete(blobsNeeded, hash)
 			}
 		}
@@ -154,7 +153,7 @@ func FetchRepository(
 	// clone despite asking for a partial clone.
 	for hash, manifestEntry := range blobsNeeded {
 		if err := readGitBlob(repo, hash, manifestEntry); err == nil {
-			dataBytesFromGitCheckout += manifestEntry.GetOriginalSize()
+			dataBytesTransferred += manifestEntry.GetOriginalSize()
 			delete(blobsNeeded, hash)
 		}
 	}
@@ -197,15 +196,15 @@ func FetchRepository(
 			if err := readGitBlob(repo, hash, manifestEntry); err != nil {
 				return nil, err
 			}
-			dataBytesFromGitTransport += manifestEntry.GetOriginalSize()
+			dataBytesTransferred += manifestEntry.GetOriginalSize()
 			delete(blobsNeeded, hash)
 		}
 	}
 
 	logc.Printf(ctx,
-		"fetch: %s reused, %s received\n",
-		datasize.ByteSize(dataBytesFromOldManifest).HR(),
-		datasize.ByteSize(dataBytesFromGitCheckout+dataBytesFromGitTransport).HR(),
+		"reuse: %s recycled, %s transferred\n",
+		datasize.ByteSize(dataBytesRecycled).HR(),
+		datasize.ByteSize(dataBytesTransferred).HR(),
 	)
 
 	return manifest, nil

@@ -125,24 +125,24 @@ func UpdateFromArchive(
 	// Ignore errors; worst case we have to re-fetch all of the blobs.
 	oldManifest, _, _ := backend.GetManifest(ctx, webRoot, GetManifestOptions{})
 
-	extractTar := func(reader io.Reader) (*Manifest, error) {
-		return ExtractTar(reader, oldManifest)
+	extractTar := func(ctx context.Context, reader io.Reader) (*Manifest, error) {
+		return ExtractTar(ctx, reader, oldManifest)
 	}
 
 	var newManifest *Manifest
 	switch contentType {
 	case "application/x-tar":
 		logc.Printf(ctx, "update %s: (tar)", webRoot)
-		newManifest, err = extractTar(reader) // yellow?
+		newManifest, err = extractTar(ctx, reader) // yellow?
 	case "application/x-tar+gzip":
 		logc.Printf(ctx, "update %s: (tar.gz)", webRoot)
-		newManifest, err = ExtractGzip(reader, extractTar) // definitely yellow.
+		newManifest, err = ExtractGzip(ctx, reader, extractTar) // definitely yellow.
 	case "application/x-tar+zstd":
 		logc.Printf(ctx, "update %s: (tar.zst)", webRoot)
-		newManifest, err = ExtractZstd(reader, extractTar)
+		newManifest, err = ExtractZstd(ctx, reader, extractTar)
 	case "application/zip":
 		logc.Printf(ctx, "update %s: (zip)", webRoot)
-		newManifest, err = ExtractZip(reader, oldManifest)
+		newManifest, err = ExtractZip(ctx, reader, oldManifest)
 	default:
 		err = errArchiveFormat
 	}
@@ -177,7 +177,7 @@ func PartialUpdateFromArchive(
 		return UpdateResult{UpdateError, nil, err}
 	}
 
-	applyTarPatch := func(reader io.Reader) (*Manifest, error) {
+	applyTarPatch := func(ctx context.Context, reader io.Reader) (*Manifest, error) {
 		// Clone the manifest before starting to mutate it. `GetManifest` may return cached
 		// `*Manifest` objects, which should never be mutated.
 		newManifest := &Manifest{}
@@ -193,13 +193,13 @@ func PartialUpdateFromArchive(
 	switch contentType {
 	case "application/x-tar":
 		logc.Printf(ctx, "patch %s: (tar)", webRoot)
-		newManifest, err = applyTarPatch(reader)
+		newManifest, err = applyTarPatch(ctx, reader)
 	case "application/x-tar+gzip":
 		logc.Printf(ctx, "patch %s: (tar.gz)", webRoot)
-		newManifest, err = ExtractGzip(reader, applyTarPatch)
+		newManifest, err = ExtractGzip(ctx, reader, applyTarPatch)
 	case "application/x-tar+zstd":
 		logc.Printf(ctx, "patch %s: (tar.zst)", webRoot)
-		newManifest, err = ExtractZstd(reader, applyTarPatch)
+		newManifest, err = ExtractZstd(ctx, reader, applyTarPatch)
 	default:
 		err = errArchiveFormat
 	}

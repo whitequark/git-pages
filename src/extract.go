@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -25,24 +26,30 @@ func boundArchiveStream(reader io.Reader) io.Reader {
 		fmt.Errorf("%w: %s limit exceeded", ErrArchiveTooLarge, config.Limits.MaxSiteSize.HR()))
 }
 
-func ExtractGzip(reader io.Reader, next func(io.Reader) (*Manifest, error)) (*Manifest, error) {
+func ExtractGzip(
+	ctx context.Context, reader io.Reader,
+	next func(context.Context, io.Reader) (*Manifest, error),
+) (*Manifest, error) {
 	stream, err := gzip.NewReader(reader)
 	if err != nil {
 		return nil, err
 	}
 	defer stream.Close()
 
-	return next(boundArchiveStream(stream))
+	return next(ctx, boundArchiveStream(stream))
 }
 
-func ExtractZstd(reader io.Reader, next func(io.Reader) (*Manifest, error)) (*Manifest, error) {
+func ExtractZstd(
+	ctx context.Context, reader io.Reader,
+	next func(context.Context, io.Reader) (*Manifest, error),
+) (*Manifest, error) {
 	stream, err := zstd.NewReader(reader)
 	if err != nil {
 		return nil, err
 	}
 	defer stream.Close()
 
-	return next(boundArchiveStream(stream))
+	return next(ctx, boundArchiveStream(stream))
 }
 
 // Returns a map of git hash to entry. If `manifest` is nil, returns an empty map.
@@ -62,20 +69,25 @@ func indexManifestByGitHash(manifest *Manifest) map[string]*Entry {
 
 func addSymlinkOrBlobReference(
 	manifest *Manifest, fileName string, target string, index map[string]*Entry,
-) {
+) *Entry {
 	if hash, found := strings.CutPrefix(target, BlobReferencePrefix); found {
 		if entry, found := index[hash]; found {
 			manifest.Contents[fileName] = entry
+			return entry
 		} else {
 			AddProblem(manifest, fileName, "unresolved reference: %s", target)
+			return nil
 		}
 	} else {
-		AddSymlink(manifest, fileName, target)
+		return AddSymlink(manifest, fileName, target)
 	}
 }
 
-func ExtractTar(reader io.Reader, oldManifest *Manifest) (*Manifest, error) {
+func ExtractTar(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*Manifest, error) {
 	archive := tar.NewReader(reader)
+
+	var dataBytesRecycled int64
+	var dataBytesTransferred int64
 
 	index := indexManifestByGitHash(oldManifest)
 	manifest := NewManifest()
@@ -105,8 +117,10 @@ func ExtractTar(reader io.Reader, oldManifest *Manifest) (*Manifest, error) {
 				return nil, fmt.Errorf("tar: %s: %w", fileName, err)
 			}
 			AddFile(manifest, fileName, fileData)
+			dataBytesTransferred += int64(len(fileData))
 		case tar.TypeSymlink:
-			addSymlinkOrBlobReference(manifest, fileName, header.Linkname, index)
+			entry := addSymlinkOrBlobReference(manifest, fileName, header.Linkname, index)
+			dataBytesRecycled += entry.GetOriginalSize()
 		case tar.TypeDir:
 			AddDirectory(manifest, fileName)
 		default:
@@ -114,10 +128,17 @@ func ExtractTar(reader io.Reader, oldManifest *Manifest) (*Manifest, error) {
 			continue
 		}
 	}
+
+	logc.Printf(ctx,
+		"reuse: %s recycled, %s transferred\n",
+		datasize.ByteSize(dataBytesRecycled).HR(),
+		datasize.ByteSize(dataBytesTransferred).HR(),
+	)
+
 	return manifest, nil
 }
 
-func ExtractZip(reader io.Reader, oldManifest *Manifest) (*Manifest, error) {
+func ExtractZip(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*Manifest, error) {
 	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
@@ -141,6 +162,9 @@ func ExtractZip(reader io.Reader, oldManifest *Manifest) (*Manifest, error) {
 		)
 	}
 
+	var dataBytesRecycled int64
+	var dataBytesTransferred int64
+
 	index := indexManifestByGitHash(oldManifest)
 	manifest := NewManifest()
 	for _, file := range archive.File {
@@ -159,11 +183,20 @@ func ExtractZip(reader io.Reader, oldManifest *Manifest) (*Manifest, error) {
 			}
 
 			if file.Mode()&os.ModeSymlink != 0 {
-				addSymlinkOrBlobReference(manifest, file.Name, string(fileData), index)
+				entry := addSymlinkOrBlobReference(manifest, file.Name, string(fileData), index)
+				dataBytesRecycled += entry.GetOriginalSize()
 			} else {
 				AddFile(manifest, file.Name, fileData)
+				dataBytesTransferred += int64(len(fileData))
 			}
 		}
 	}
+
+	logc.Printf(ctx,
+		"reuse: %s recycled, %s transferred\n",
+		datasize.ByteSize(dataBytesRecycled).HR(),
+		datasize.ByteSize(dataBytesTransferred).HR(),
+	)
+
 	return manifest, nil
 }
