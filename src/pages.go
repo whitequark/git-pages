@@ -575,7 +575,7 @@ func patchPage(w http.ResponseWriter, r *http.Request) error {
 func reportUpdateResult(w http.ResponseWriter, r *http.Request, result UpdateResult) error {
 	var unresolvedRefErr UnresolvedRefError
 	if result.outcome == UpdateError && errors.As(result.err, &unresolvedRefErr) {
-		offeredContentTypes := []string{"application/vnd.git-pages.unresolved", "text/plain"}
+		offeredContentTypes := []string{"text/plain", "application/vnd.git-pages.unresolved"}
 		acceptedContentTypes := ParseAcceptHeader(r.Header.Get("Accept"))
 		switch acceptedContentTypes.Negotiate(offeredContentTypes...) {
 		default:

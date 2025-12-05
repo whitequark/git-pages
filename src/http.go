@@ -55,6 +55,9 @@ type HTTPContentTypes struct {
 }
 
 func ParseAcceptHeader(headerValue string) (result HTTPContentTypes) {
+	if headerValue == "" {
+		headerValue = "*/*"
+	}
 	result = HTTPContentTypes{parseGenericAcceptHeader(headerValue)}
 	return
 }
@@ -65,7 +68,7 @@ func (e *HTTPContentTypes) Negotiate(offers ...string) string {
 		prefs[code] = 0
 	}
 	for _, ctyp := range e.contentTypes {
-		if ctyp.code == "*" || ctyp.code == "*/*" {
+		if ctyp.code == "*/*" {
 			for code := range prefs {
 				prefs[code] = ctyp.qval
 			}
