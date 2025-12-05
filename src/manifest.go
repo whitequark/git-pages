@@ -350,7 +350,10 @@ func StoreManifest(
 	wg := sync.WaitGroup{}
 	ch := make(chan error, len(extManifest.Contents))
 	for name, entry := range extManifest.Contents {
-		if entry.GetType() == Type_ExternalFile {
+		// Upload external entries (those that were decided as ineligible for being stored inline).
+		// If the entry in the original manifest is already an external reference, there's no need
+		// to externalize it (and no way for us to do so, since the entry only contains the blob name).
+		if entry.GetType() == Type_ExternalFile && manifest.Contents[name].GetType() == Type_InlineFile {
 			wg.Go(func() {
 				err := backend.PutBlob(ctx, string(entry.Data), manifest.Contents[name].Data)
 				if err != nil {
