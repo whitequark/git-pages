@@ -170,14 +170,16 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "Usage:\n")
 	fmt.Fprintf(os.Stderr, "(server) "+
 		"git-pages [-config <file>|-no-config]\n")
+	fmt.Fprintf(os.Stderr, "(debug)  "+
+		"git-pages {-list-blobs}\n")
+	fmt.Fprintf(os.Stderr, "(debug)  "+
+		"git-pages {-get-blob|-get-manifest|-get-archive|-update-site} <ref> [file]\n")
 	fmt.Fprintf(os.Stderr, "(admin)  "+
 		"git-pages {-run-migration <name>|-freeze-domain <domain>|-unfreeze-domain <domain>}\n")
 	fmt.Fprintf(os.Stderr, "(audit)  "+
 		"git-pages {-audit-log|-audit-read <id>|-audit-server <endpoint> <program> [args...]}\n")
 	fmt.Fprintf(os.Stderr, "(info)   "+
 		"git-pages {-print-config-env-vars|-print-config}\n")
-	fmt.Fprintf(os.Stderr, "(cli)    "+
-		"git-pages {-get-blob|-get-manifest|-get-archive|-update-site} <ref> [file]\n")
 	flag.PrintDefaults()
 }
 
@@ -197,6 +199,8 @@ func Main() {
 		"run a store `migration` (one of: create-domain-markers)")
 	getBlob := flag.String("get-blob", "",
 		"write contents of `blob` ('sha256-xxxxxxx...xxx')")
+	listBlobs := flag.Bool("list-blobs", false,
+		"enumerate every blob with its metadata")
 	getManifest := flag.String("get-manifest", "",
 		"write manifest for `site` (either 'domain.tld' or 'domain.tld/dir') as ProtoJSON")
 	getArchive := flag.String("get-archive", "",
@@ -219,6 +223,7 @@ func Main() {
 	for _, selected := range []bool{
 		*runMigration != "",
 		*getBlob != "",
+		*listBlobs,
 		*getManifest != "",
 		*getArchive != "",
 		*updateSite != "",
@@ -272,32 +277,39 @@ func Main() {
 		logc.Fatalln(ctx, err)
 	}
 
-	switch {
-	case *runMigration != "":
+	// The server has its own logic for creating the backend.
+	if cliOperations > 0 {
 		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
 			logc.Fatalln(ctx, err)
 		}
+	}
 
+	switch {
+	case *runMigration != "":
 		if err := RunMigration(ctx, *runMigration); err != nil {
 			logc.Fatalln(ctx, err)
 		}
 
 	case *getBlob != "":
-		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
-			logc.Fatalln(ctx, err)
-		}
-
 		reader, _, err := backend.GetBlob(ctx, *getBlob)
 		if err != nil {
 			logc.Fatalln(ctx, err)
 		}
 		io.Copy(fileOutputArg(), reader)
 
-	case *getManifest != "":
-		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
-			logc.Fatalln(ctx, err)
+	case *listBlobs:
+		for metadata, err := range backend.EnumerateBlobs(ctx) {
+			if err != nil {
+				logc.Fatalln(ctx, err)
+			}
+			fmt.Fprintf(color.Output, "%s %s %s\n",
+				metadata.Name,
+				color.HiWhiteString(metadata.LastModified.UTC().Format(time.RFC3339)),
+				color.HiGreenString(fmt.Sprint(metadata.Size)),
+			)
 		}
 
+	case *getManifest != "":
 		webRoot := webRootArg(*getManifest)
 		manifest, _, err := backend.GetManifest(ctx, webRoot, GetManifestOptions{})
 		if err != nil {
@@ -306,10 +318,6 @@ func Main() {
 		fmt.Fprintln(fileOutputArg(), string(ManifestJSON(manifest)))
 
 	case *getArchive != "":
-		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
-			logc.Fatalln(ctx, err)
-		}
-
 		webRoot := webRootArg(*getArchive)
 		manifest, metadata, err :=
 			backend.GetManifest(ctx, webRoot, GetManifestOptions{})
@@ -323,10 +331,6 @@ func Main() {
 	case *updateSite != "":
 		ctx = WithPrincipal(ctx)
 		GetPrincipal(ctx).CliAdmin = proto.Bool(true)
-
-		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
-			logc.Fatalln(ctx, err)
-		}
 
 		if flag.NArg() != 1 {
 			logc.Fatalln(ctx, "update source must be provided as the argument")
@@ -402,10 +406,6 @@ func Main() {
 			freeze = false
 		}
 
-		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
-			logc.Fatalln(ctx, err)
-		}
-
 		if err = backend.FreezeDomain(ctx, domain, freeze); err != nil {
 			logc.Fatalln(ctx, err)
 		}
@@ -416,10 +416,6 @@ func Main() {
 		}
 
 	case *auditLog:
-		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
-			logc.Fatalln(ctx, err)
-		}
-
 		ch := make(chan *AuditRecord)
 		ids := []AuditID{}
 		for id, err := range backend.SearchAuditLog(ctx, SearchAuditLogOptions{}) {
@@ -454,10 +450,6 @@ func Main() {
 		}
 
 	case *auditRead != "":
-		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
-			logc.Fatalln(ctx, err)
-		}
-
 		id, err := ParseAuditID(*auditRead)
 		if err != nil {
 			logc.Fatalln(ctx, err)
@@ -473,10 +465,6 @@ func Main() {
 		}
 
 	case *auditServer != "":
-		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
-			logc.Fatalln(ctx, err)
-		}
-
 		if flag.NArg() < 1 {
 			logc.Fatalln(ctx, "handler path not provided")
 		}

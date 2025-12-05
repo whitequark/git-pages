@@ -316,6 +316,7 @@ func (s3 *S3Backend) GetBlob(
 		}
 	} else {
 		reader = bytes.NewReader(cached.blob)
+		metadata.Name = name
 		metadata.Size = int64(len(cached.blob))
 		metadata.LastModified = cached.mtime
 	}
@@ -355,6 +356,37 @@ func (s3 *S3Backend) DeleteBlob(ctx context.Context, name string) error {
 
 	return s3.client.RemoveObject(ctx, s3.bucket, blobObjectName(name),
 		minio.RemoveObjectOptions{})
+}
+
+func (s3 *S3Backend) EnumerateBlobs(ctx context.Context) iter.Seq2[BlobMetadata, error] {
+	return func(yield func(BlobMetadata, error) bool) {
+		logc.Print(ctx, "s3: enumerate blobs")
+
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		prefix := "blob/"
+		for object := range s3.client.ListObjectsIter(ctx, s3.bucket, minio.ListObjectsOptions{
+			Prefix:    prefix,
+			Recursive: true,
+		}) {
+			var metadata BlobMetadata
+			var err error
+			if err = object.Err; err == nil {
+				key := strings.TrimPrefix(object.Key, prefix)
+				if strings.HasSuffix(key, "/") {
+					continue // directory; skip
+				} else {
+					metadata.Name = joinBlobName(strings.Split(key, "/"))
+					metadata.Size = object.Size
+					metadata.LastModified = object.LastModified
+				}
+			}
+			if !yield(metadata, err) {
+				break
+			}
+		}
+	}
 }
 
 func manifestObjectName(name string) string {

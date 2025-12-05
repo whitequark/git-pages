@@ -133,7 +133,7 @@ func (fs *FSBackend) GetBlob(
 		err = fmt.Errorf("open: %w", err)
 		return
 	}
-	return file, BlobMetadata{int64(stat.Size()), stat.ModTime()}, nil
+	return file, BlobMetadata{name, int64(stat.Size()), stat.ModTime()}, nil
 }
 
 func (fs *FSBackend) PutBlob(ctx context.Context, name string, data []byte) error {
@@ -179,6 +179,32 @@ again:
 func (fs *FSBackend) DeleteBlob(ctx context.Context, name string) error {
 	blobPath := filepath.Join(splitBlobName(name)...)
 	return fs.blobRoot.Remove(blobPath)
+}
+
+func (fs *FSBackend) EnumerateBlobs(ctx context.Context) iter.Seq2[BlobMetadata, error] {
+	return func(yield func(BlobMetadata, error) bool) {
+		iofs.WalkDir(fs.blobRoot.FS(), ".",
+			func(path string, entry iofs.DirEntry, err error) error {
+				var metadata BlobMetadata
+				if err != nil {
+					// report error
+				} else if entry.IsDir() {
+					// skip directory
+					return nil
+				} else if info, err := entry.Info(); err != nil {
+					// report error
+				} else {
+					// report blob
+					metadata.Name = joinBlobName(strings.Split(path, "/"))
+					metadata.Size = info.Size()
+					metadata.LastModified = info.ModTime()
+				}
+				if !yield(metadata, err) {
+					return iofs.SkipAll
+				}
+				return nil
+			})
+	}
 }
 
 func (fs *FSBackend) ListManifests(ctx context.Context) (manifests []string, err error) {

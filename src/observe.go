@@ -373,6 +373,18 @@ func (backend *observedBackend) DeleteBlob(ctx context.Context, name string) (er
 	return
 }
 
+func (backend *observedBackend) EnumerateBlobs(ctx context.Context) iter.Seq2[BlobMetadata, error] {
+	return func(yield func(BlobMetadata, error) bool) {
+		span, ctx := ObserveFunction(ctx, "EnumerateBlobs")
+		for metadata, err := range backend.inner.EnumerateBlobs(ctx) {
+			if !yield(metadata, err) {
+				break
+			}
+		}
+		span.Finish()
+	}
+}
+
 func (backend *observedBackend) ListManifests(ctx context.Context) (manifests []string, err error) {
 	span, ctx := ObserveFunction(ctx, "ListManifests")
 	manifests, err = backend.inner.ListManifests(ctx)

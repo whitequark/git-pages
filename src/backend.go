@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"slices"
 	"strings"
 	"time"
 )
@@ -17,12 +16,15 @@ var ErrWriteConflict = errors.New("write conflict")
 var ErrDomainFrozen = errors.New("domain administratively frozen")
 
 func splitBlobName(name string) []string {
-	algo, hash, found := strings.Cut(name, "-")
-	if found {
-		return slices.Concat([]string{algo}, splitBlobName(hash))
+	if algo, hash, found := strings.Cut(name, "-"); found {
+		return []string{algo, hash[0:2], hash[2:4], hash[4:]}
 	} else {
-		return []string{name[0:2], name[2:4], name[4:]}
+		panic("malformed blob name")
 	}
+}
+
+func joinBlobName(parts []string) string {
+	return fmt.Sprintf("%s-%s", parts[0], strings.Join(parts[1:], ""))
 }
 
 type BackendFeature string
@@ -32,6 +34,7 @@ const (
 )
 
 type BlobMetadata struct {
+	Name         string
 	Size         int64
 	LastModified time.Time
 }
@@ -92,6 +95,10 @@ type Backend interface {
 
 	// Delete a blob. This is an unconditional operation that can break integrity of manifests.
 	DeleteBlob(ctx context.Context, name string) error
+
+	// Iterate through all blobs. Whether blobs that are newly added during iteration will appear
+	// in the results is unspecified.
+	EnumerateBlobs(ctx context.Context) iter.Seq2[BlobMetadata, error]
 
 	// Retrieve a manifest.
 	GetManifest(ctx context.Context, name string, opts GetManifestOptions) (
