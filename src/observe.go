@@ -344,13 +344,13 @@ func (backend *observedBackend) EnableFeature(ctx context.Context, feature Backe
 func (backend *observedBackend) GetBlob(
 	ctx context.Context, name string,
 ) (
-	reader io.ReadSeeker, size uint64, mtime time.Time, err error,
+	reader io.ReadSeeker, metadata BlobMetadata, err error,
 ) {
 	span, ctx := ObserveFunction(ctx, "GetBlob", "blob.name", name)
-	if reader, size, mtime, err = backend.inner.GetBlob(ctx, name); err == nil {
-		ObserveData(ctx, "blob.size", size)
+	if reader, metadata, err = backend.inner.GetBlob(ctx, name); err == nil {
+		ObserveData(ctx, "blob.size", metadata.Size)
 		blobsRetrievedCount.Inc()
-		blobsRetrievedBytes.Add(float64(size))
+		blobsRetrievedBytes.Add(float64(metadata.Size))
 	}
 	span.Finish()
 	return

@@ -292,13 +292,15 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				w.WriteHeader(http.StatusNotModified)
 				return nil
 			} else {
-				reader, _, mtime, err = backend.GetBlob(r.Context(), string(entry.Data))
+				var metadata BlobMetadata
+				reader, metadata, err = backend.GetBlob(r.Context(), string(entry.Data))
 				if err != nil {
 					ObserveError(err) // all storage errors must be reported
 					w.WriteHeader(http.StatusInternalServerError)
 					fmt.Fprintf(w, "internal server error: %s\n", err)
 					return err
 				}
+				mtime = metadata.LastModified
 				w.Header().Set("ETag", etag)
 			}
 		} else if entry.GetType() == Type_Directory {

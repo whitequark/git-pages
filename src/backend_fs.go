@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 type FSBackend struct {
@@ -118,7 +117,7 @@ func (fs *FSBackend) EnableFeature(ctx context.Context, feature BackendFeature) 
 func (fs *FSBackend) GetBlob(
 	ctx context.Context, name string,
 ) (
-	reader io.ReadSeeker, size uint64, mtime time.Time, err error,
+	reader io.ReadSeeker, metadata BlobMetadata, err error,
 ) {
 	blobPath := filepath.Join(splitBlobName(name)...)
 	stat, err := fs.blobRoot.Stat(blobPath)
@@ -134,7 +133,7 @@ func (fs *FSBackend) GetBlob(
 		err = fmt.Errorf("open: %w", err)
 		return
 	}
-	return file, uint64(stat.Size()), stat.ModTime(), nil
+	return file, BlobMetadata{int64(stat.Size()), stat.ModTime()}, nil
 }
 
 func (fs *FSBackend) PutBlob(ctx context.Context, name string, data []byte) error {

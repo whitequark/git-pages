@@ -287,7 +287,7 @@ func Main() {
 			logc.Fatalln(ctx, err)
 		}
 
-		reader, _, _, err := backend.GetBlob(ctx, *getBlob)
+		reader, _, err := backend.GetBlob(ctx, *getBlob)
 		if err != nil {
 			logc.Fatalln(ctx, err)
 		}

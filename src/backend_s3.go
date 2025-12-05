@@ -266,7 +266,7 @@ func (s3 *S3Backend) EnableFeature(ctx context.Context, feature BackendFeature) 
 func (s3 *S3Backend) GetBlob(
 	ctx context.Context, name string,
 ) (
-	reader io.ReadSeeker, size uint64, mtime time.Time, err error,
+	reader io.ReadSeeker, metadata BlobMetadata, err error,
 ) {
 	loader := func(ctx context.Context, name string) (*CachedBlob, error) {
 		logc.Printf(ctx, "s3: get blob %s\n", name)
@@ -316,8 +316,8 @@ func (s3 *S3Backend) GetBlob(
 		}
 	} else {
 		reader = bytes.NewReader(cached.blob)
-		size = uint64(len(cached.blob))
-		mtime = cached.mtime
+		metadata.Size = int64(len(cached.blob))
+		metadata.LastModified = cached.mtime
 	}
 	return
 }

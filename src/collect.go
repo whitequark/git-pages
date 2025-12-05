@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"time"
 )
 
 type Flusher interface {
@@ -66,16 +65,19 @@ func CollectTar(
 
 		case Type_ExternalFile:
 			var blobReader io.Reader
-			var blobMtime time.Time
+			var blobMetadata BlobMetadata
 			var blobData []byte
-			blobReader, _, blobMtime, err = backend.GetBlob(context, string(entry.Data))
+			blobReader, blobMetadata, err = backend.GetBlob(context, string(entry.Data))
 			if err != nil {
 				return
 			}
-			blobData, _ = io.ReadAll(blobReader)
+			blobData, err = io.ReadAll(blobReader)
+			if err != nil {
+				return
+			}
 			header.Typeflag = tar.TypeReg
 			header.Mode = 0644
-			header.ModTime = blobMtime
+			header.ModTime = blobMetadata.LastModified
 			err = appendFile(&header, blobData, entry.GetTransform())
 
 		case Type_Symlink:

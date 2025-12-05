@@ -31,6 +31,11 @@ const (
 	FeatureCheckDomainMarker BackendFeature = "check-domain-marker"
 )
 
+type BlobMetadata struct {
+	Size         int64
+	LastModified time.Time
+}
+
 type GetManifestOptions struct {
 	// If true and the manifest is past the cache `MaxAge`, `GetManifest` blocks and returns
 	// a fresh object instead of revalidating in background and returning a stale object.
@@ -77,7 +82,7 @@ type Backend interface {
 
 	// Retrieve a blob. Returns `reader, size, mtime, err`.
 	GetBlob(ctx context.Context, name string) (
-		reader io.ReadSeeker, size uint64, mtime time.Time, err error,
+		reader io.ReadSeeker, metadata BlobMetadata, err error,
 	)
 
 	// Store a blob. If a blob called `name` already exists, this function returns `nil` without
