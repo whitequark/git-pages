@@ -122,23 +122,27 @@ func UpdateFromArchive(
 ) (result UpdateResult) {
 	var err error
 
-	// Ignore errors; here the old manifest is used only to determine the update outcome.
+	// Ignore errors; worst case we have to re-fetch all of the blobs.
 	oldManifest, _, _ := backend.GetManifest(ctx, webRoot, GetManifestOptions{})
+
+	extractTar := func(reader io.Reader) (*Manifest, error) {
+		return ExtractTar(reader, oldManifest)
+	}
 
 	var newManifest *Manifest
 	switch contentType {
 	case "application/x-tar":
 		logc.Printf(ctx, "update %s: (tar)", webRoot)
-		newManifest, err = ExtractTar(reader) // yellow?
+		newManifest, err = extractTar(reader) // yellow?
 	case "application/x-tar+gzip":
 		logc.Printf(ctx, "update %s: (tar.gz)", webRoot)
-		newManifest, err = ExtractGzip(reader, ExtractTar) // definitely yellow.
+		newManifest, err = ExtractGzip(reader, extractTar) // definitely yellow.
 	case "application/x-tar+zstd":
 		logc.Printf(ctx, "update %s: (tar.zst)", webRoot)
-		newManifest, err = ExtractZstd(reader, ExtractTar)
+		newManifest, err = ExtractZstd(reader, extractTar)
 	case "application/zip":
 		logc.Printf(ctx, "update %s: (zip)", webRoot)
-		newManifest, err = ExtractZip(reader)
+		newManifest, err = ExtractZip(reader, oldManifest)
 	default:
 		err = errArchiveFormat
 	}

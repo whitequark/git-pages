@@ -12,10 +12,13 @@ import (
 	"strings"
 
 	"github.com/c2h5oh/datasize"
+	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/klauspost/compress/zstd"
 )
 
 var ErrArchiveTooLarge = errors.New("archive too large")
+
+const BlobReferencePrefix = "/git/blobs/"
 
 func boundArchiveStream(reader io.Reader) io.Reader {
 	return ReadAtMost(reader, int64(config.Limits.MaxSiteSize.Bytes()),
@@ -42,9 +45,39 @@ func ExtractZstd(reader io.Reader, next func(io.Reader) (*Manifest, error)) (*Ma
 	return next(boundArchiveStream(stream))
 }
 
-func ExtractTar(reader io.Reader) (*Manifest, error) {
+// Returns a map of git hash to entry. If `manifest` is nil, returns an empty map.
+func indexManifestByGitHash(manifest *Manifest) map[string]*Entry {
+	index := map[string]*Entry{}
+	for _, entry := range manifest.GetContents() {
+		if hash := entry.GetGitHash(); hash != "" {
+			if _, ok := plumbing.FromHex(hash); ok {
+				index[hash] = entry
+			} else {
+				panic(fmt.Errorf("index: malformed hash: %s", hash))
+			}
+		}
+	}
+	return index
+}
+
+func addSymlinkOrBlobReference(
+	manifest *Manifest, fileName string, target string, index map[string]*Entry,
+) {
+	if hash, found := strings.CutPrefix(target, BlobReferencePrefix); found {
+		if entry, found := index[hash]; found {
+			manifest.Contents[fileName] = entry
+		} else {
+			AddProblem(manifest, fileName, "unresolved reference: %s", target)
+		}
+	} else {
+		AddSymlink(manifest, fileName, target)
+	}
+}
+
+func ExtractTar(reader io.Reader, oldManifest *Manifest) (*Manifest, error) {
 	archive := tar.NewReader(reader)
 
+	index := indexManifestByGitHash(oldManifest)
 	manifest := NewManifest()
 	for {
 		header, err := archive.Next()
@@ -73,7 +106,7 @@ func ExtractTar(reader io.Reader) (*Manifest, error) {
 			}
 			AddFile(manifest, fileName, fileData)
 		case tar.TypeSymlink:
-			AddSymlink(manifest, fileName, header.Linkname)
+			addSymlinkOrBlobReference(manifest, fileName, header.Linkname, index)
 		case tar.TypeDir:
 			AddDirectory(manifest, fileName)
 		default:
@@ -84,7 +117,7 @@ func ExtractTar(reader io.Reader) (*Manifest, error) {
 	return manifest, nil
 }
 
-func ExtractZip(reader io.Reader) (*Manifest, error) {
+func ExtractZip(reader io.Reader, oldManifest *Manifest) (*Manifest, error) {
 	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
@@ -108,6 +141,7 @@ func ExtractZip(reader io.Reader) (*Manifest, error) {
 		)
 	}
 
+	index := indexManifestByGitHash(oldManifest)
 	manifest := NewManifest()
 	for _, file := range archive.File {
 		if strings.HasSuffix(file.Name, "/") {
@@ -125,7 +159,7 @@ func ExtractZip(reader io.Reader) (*Manifest, error) {
 			}
 
 			if file.Mode()&os.ModeSymlink != 0 {
-				AddSymlink(manifest, file.Name, string(fileData))
+				addSymlinkOrBlobReference(manifest, file.Name, string(fileData), index)
 			} else {
 				AddFile(manifest, file.Name, fileData)
 			}

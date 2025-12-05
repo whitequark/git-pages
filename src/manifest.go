@@ -104,7 +104,7 @@ func NewManifestEntry(type_ Type, data []byte) *Entry {
 	return entry
 }
 
-func AddFile(manifest *Manifest, path string, data []byte) *Entry {
+func AddFile(manifest *Manifest, fileName string, data []byte) *Entry {
 	// Fill in `git_hash` even for files not originating from git using the SHA256 algorithm;
 	// we use this primarily for incremental archive uploads, but when support for git SHA256
 	// repositories is complete, archive uploads and git checkouts will have cross-support for
@@ -113,30 +113,35 @@ func AddFile(manifest *Manifest, path string, data []byte) *Entry {
 	hasher.Write(data)
 	entry := NewManifestEntry(Type_InlineFile, data)
 	entry.GitHash = proto.String(hasher.Sum().String())
-	manifest.Contents[path] = entry
+	manifest.Contents[fileName] = entry
 	return entry
 }
 
-func AddSymlink(manifest *Manifest, path string, target string) *Entry {
-	entry := NewManifestEntry(Type_Symlink, []byte(target))
-	manifest.Contents[path] = entry
-	return entry
+func AddSymlink(manifest *Manifest, fileName string, target string) *Entry {
+	if path.IsAbs(target) {
+		AddProblem(manifest, fileName, "absolute symlink: %s", target)
+		return nil
+	} else {
+		entry := NewManifestEntry(Type_Symlink, []byte(target))
+		manifest.Contents[fileName] = entry
+		return entry
+	}
 }
 
-func AddDirectory(manifest *Manifest, path string) *Entry {
-	path = strings.TrimSuffix(path, "/")
+func AddDirectory(manifest *Manifest, dirName string) *Entry {
+	dirName = strings.TrimSuffix(dirName, "/")
 	entry := NewManifestEntry(Type_Directory, nil)
-	manifest.Contents[path] = entry
+	manifest.Contents[dirName] = entry
 	return entry
 }
 
-func AddProblem(manifest *Manifest, path, format string, args ...any) error {
+func AddProblem(manifest *Manifest, pathName, format string, args ...any) error {
 	cause := fmt.Sprintf(format, args...)
 	manifest.Problems = append(manifest.Problems, &Problem{
-		Path:  proto.String(path),
+		Path:  proto.String(pathName),
 		Cause: proto.String(cause),
 	})
-	return fmt.Errorf("%s: %s", path, cause)
+	return fmt.Errorf("%s: %s", pathName, cause)
 }
 
 func GetProblemReport(manifest *Manifest) []string {
