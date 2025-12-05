@@ -5,6 +5,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  FORGE: codeberg.org
+
 jobs:
   check:
     runs-on: codeberg-small-lazy
@@ -79,25 +82,26 @@ jobs:
           apt-get -y install buildah ca-certificates
       - name: Check out source code
         uses: https://code.forgejo.org/actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      - name: Authenticate with Docker
+        run: |
+          buildah login --authfile=/tmp/authfile-${FORGE}.json \
+            -u ${{ vars.PACKAGES_USER }} -p ${{ secrets.PACKAGES_TOKEN }} ${FORGE}
       - name: Build container
         run: |
           printf '[storage]\ndriver="vfs"\nrunroot="/run/containers/storage"\ngraphroot="/var/lib/containers/storage"\n' | tee /etc/containers/storage.conf
-          buildah build --arch=amd64 --tag=container:${VER}-amd64 .
-          buildah build --arch=arm64 --tag=container:${VER}-arm64 .
+          buildah build ${CACHE} --arch=amd64 --tag=container:${VER}-amd64
+          buildah build ${CACHE} --arch=arm64 --tag=container:${VER}-arm64
           buildah manifest create container:${VER} \
             container:${VER}-amd64 \
             container:${VER}-arm64
         env:
           BUILDAH_ISOLATION: chroot
           VER: ${{ startsWith(forge.event.ref, 'refs/tags/v') && forge.ref_name || 'latest' }}
+          CACHE: ${{ format('--authfile=/tmp/authfile-{0}.json --layers --cache-from {0}/{1}/cache --cache-to {0}/{1}/cache', env.FORGE, forge.repository) }}
       - if: ${{ forge.repository == 'git-pages/git-pages' }}
         name: Push container to Codeberg
         run: |
-          buildah login --authfile=/tmp/authfile-${FORGE}.json \
-            -u ${{ vars.PACKAGES_USER }} -p ${{ secrets.PACKAGES_TOKEN }} ${FORGE}
           buildah manifest push --authfile=/tmp/authfile-${FORGE}.json \
             --all container:${VER} "docker://${FORGE}/${{ forge.repository }}:${VER/v/}"
         env:
-          BUILDAH_ISOLATION: chroot
-          FORGE: codeberg.org
           VER: ${{ startsWith(forge.event.ref, 'refs/tags/v') && forge.ref_name || 'latest' }}
