@@ -137,9 +137,7 @@ func serve(ctx context.Context, listener net.Listener, handler http.Handler) {
 		server := http.Server{Handler: handler}
 		server.Protocols = new(http.Protocols)
 		server.Protocols.SetHTTP1(true)
-		if config.Feature("serve-h2c") {
-			server.Protocols.SetUnencryptedHTTP2(true)
-		}
+		server.Protocols.SetUnencryptedHTTP2(true)
 		logc.Fatalln(ctx, server.Serve(listener))
 	}
 }
