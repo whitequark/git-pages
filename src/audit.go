@@ -217,6 +217,8 @@ func AuditEventProcessor(command string, args []string) (http.Handler, error) {
 			logc.Printf(ctx, "audit process err: malformed query\n")
 			http.Error(w, "malformed query", http.StatusBadRequest)
 			return
+		} else {
+			logc.Printf(ctx, "audit process %s", id)
 		}
 
 		record, err := backend.QueryAuditLog(ctx, id)
