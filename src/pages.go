@@ -377,6 +377,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("unexpected transform")
 	}
 	if !negotiatedEncoding {
+		w.Header().Set("Accept-Encoding", strings.Join(offeredEncodings, ", "))
 		w.WriteHeader(http.StatusNotAcceptable)
 		return fmt.Errorf("no supported content encodings (Accept-Encoding: %q)",
 			r.Header.Get("Accept-Encoding"))
