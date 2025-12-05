@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/c2h5oh/datasize"
+	"github.com/go-git/go-git/v6/plumbing"
+	format "github.com/go-git/go-git/v6/plumbing/format/config"
 	"github.com/klauspost/compress/zstd"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -103,7 +105,14 @@ func NewManifestEntry(type_ Type, data []byte) *Entry {
 }
 
 func AddFile(manifest *Manifest, path string, data []byte) *Entry {
+	// Fill in `git_hash` even for files not originating from git using the SHA256 algorithm;
+	// we use this primarily for incremental archive uploads, but when support for git SHA256
+	// repositories is complete, archive uploads and git checkouts will have cross-support for
+	// incremental updates.
+	hasher := plumbing.NewHasher(format.SHA256, plumbing.BlobObject, int64(len(data)))
+	hasher.Write(data)
 	entry := NewManifestEntry(Type_InlineFile, data)
+	entry.GitHash = proto.String(hasher.Sum().String())
 	manifest.Contents[path] = entry
 	return entry
 }
