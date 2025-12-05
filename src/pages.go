@@ -583,6 +583,7 @@ func reportUpdateResult(w http.ResponseWriter, r *http.Request, result UpdateRes
 			w.WriteHeader(http.StatusNotAcceptable)
 			return fmt.Errorf("no supported content types (Accept: %s)", r.Header.Get("Accept"))
 		case "application/vnd.git-pages.unresolved":
+			w.Header().Set("Content-Type", "application/vnd.git-pages.unresolved")
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			for _, missingRef := range unresolvedRefErr.missing {
 				fmt.Fprintln(w, missingRef)
