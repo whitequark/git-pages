@@ -57,7 +57,7 @@ allowed-custom-headers = ["X-Clacks-Overhead"]
 [audit]
 node-id = 0
 collect = false
-include-ip = false
+include-ip = ""
 notify-url = ""
 
 [observability]

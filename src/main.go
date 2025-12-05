@@ -132,8 +132,6 @@ func panicHandler(handler http.Handler) http.Handler {
 
 func serve(ctx context.Context, listener net.Listener, handler http.Handler) {
 	if listener != nil {
-		handler = panicHandler(handler)
-
 		server := http.Server{Handler: handler}
 		server.Protocols = new(http.Protocols)
 		server.Protocols.SetHTTP1(true)
@@ -537,8 +535,13 @@ func Main() {
 		}
 		backend = NewObservedBackend(backend)
 
-		go serve(ctx, pagesListener, ObserveHTTPHandler(http.HandlerFunc(ServePages)))
-		go serve(ctx, caddyListener, ObserveHTTPHandler(http.HandlerFunc(ServeCaddy)))
+		middleware := chainHTTPMiddleware(
+			panicHandler,
+			remoteAddrMiddleware,
+			ObserveHTTPHandler,
+		)
+		go serve(ctx, pagesListener, middleware(http.HandlerFunc(ServePages)))
+		go serve(ctx, caddyListener, middleware(http.HandlerFunc(ServeCaddy)))
 		go serve(ctx, metricsListener, promhttp.Handler())
 
 		if config.Insecure {

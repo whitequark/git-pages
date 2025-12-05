@@ -2,6 +2,9 @@ package git_pages
 
 import (
 	"cmp"
+	"fmt"
+	"net"
+	"net/http"
 	"regexp"
 	"slices"
 	"strconv"
@@ -128,4 +131,47 @@ func (e *HTTPEncodings) Negotiate(offers ...string) string {
 		encs[idx] = httpAcceptOffer{code, prefs[code]}
 	}
 	return preferredAcceptOffer(encs)
+}
+
+func chainHTTPMiddleware(middleware ...func(http.Handler) http.Handler) func(http.Handler) http.Handler {
+	return func(handler http.Handler) http.Handler {
+		for idx := len(middleware) - 1; idx >= 0; idx-- {
+			handler = middleware[idx](handler)
+		}
+		return handler
+	}
+}
+
+func remoteAddrMiddleware(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var readXForwardedFor bool
+		switch config.Audit.IncludeIPs {
+		case "X-Forwarded-For":
+			readXForwardedFor = true
+		case "RemoteAddr", "":
+			readXForwardedFor = false
+		default:
+			panic(fmt.Errorf("config.Audit.IncludeIPs is set to an unknown value (%q)",
+				config.Audit.IncludeIPs))
+		}
+
+		usingOriginalRemoteAddr := true
+		if readXForwardedFor {
+			forwardedFor := strings.Split(r.Header.Get("X-Forwarded-For"), ",")
+			if len(forwardedFor) > 0 {
+				remoteAddr := strings.TrimSpace(forwardedFor[len(forwardedFor)-1])
+				if remoteAddr != "" {
+					r.RemoteAddr = remoteAddr
+					usingOriginalRemoteAddr = false
+				}
+			}
+		}
+		if usingOriginalRemoteAddr {
+			if ipAddress, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+				r.RemoteAddr = ipAddress
+			}
+		}
+
+		handler.ServeHTTP(w, r)
+	})
 }

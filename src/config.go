@@ -152,8 +152,11 @@ type AuditConfig struct {
 	NodeID int `toml:"node-id"`
 	// Whether audit reports should be stored whenever an audit event occurs.
 	Collect bool `toml:"collect"`
-	// Whether audit reports should include principal's IP address.
-	IncludeIPs bool `toml:"include-ip"`
+	// If not empty, includes the principal's IP address in audit reports, with the value specifying
+	// the source of the IP address. If the value is "X-Forwarded-For", the last item of the
+	// corresponding header field (assumed to be comma-separated) is used. If the value is
+	// "RemoteAddr", the connecting host's address is used. Any other value is disallowed.
+	IncludeIPs string `toml:"include-ip"`
 	// Endpoint to notify with a `GET /<notify-url>?<id>` whenever an audit event occurs.
 	NotifyURL *URL `toml:"notify-url"`
 }

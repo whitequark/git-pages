@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -802,10 +801,8 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 
 func ServePages(w http.ResponseWriter, r *http.Request) {
 	r = r.WithContext(WithPrincipal(r.Context()))
-	if config.Audit.IncludeIPs {
-		if ipAddress, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
-			GetPrincipal(r.Context()).IpAddress = proto.String(ipAddress)
-		}
+	if config.Audit.IncludeIPs != "" {
+		GetPrincipal(r.Context()).IpAddress = proto.String(r.RemoteAddr)
 	}
 	// We want upstream health checks to be done as closely to the normal flow as possible;
 	// any intentional deviation is an opportunity to miss an issue that will affect our
