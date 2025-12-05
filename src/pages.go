@@ -67,7 +67,7 @@ func observeSiteUpdate(via string, result *UpdateResult) {
 }
 
 func makeWebRoot(host string, projectName string) string {
-	return fmt.Sprintf("%s/%s", strings.ToLower(host), projectName)
+	return path.Join(strings.ToLower(host), projectName)
 }
 
 func getWebRoot(r *http.Request) (string, error) {
@@ -705,7 +705,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	if event.Ref != fmt.Sprintf("refs/heads/%s", auth.branch) {
+	if event.Ref != path.Join("refs", "heads", auth.branch) {
 		code := http.StatusUnauthorized
 		if strings.Contains(r.Header.Get("User-Agent"), "GitHub-Hookshot") {
 			// GitHub has no way to restrict branches for a webhook, and responding with 401

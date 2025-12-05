@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -115,7 +116,7 @@ func (record *AuditRecord) DescribePrincipal() string {
 func (record *AuditRecord) DescribeResource() string {
 	desc := "<unknown>"
 	if record.Domain != nil && record.Project != nil {
-		desc = fmt.Sprintf("%s/%s", *record.Domain, *record.Project)
+		desc = path.Join(*record.Domain, *record.Project)
 	} else if record.Domain != nil {
 		desc = *record.Domain
 	}
@@ -292,7 +293,7 @@ func (audited *auditedBackend) appendNewAuditRecord(ctx context.Context, record 
 			if record.Project == nil {
 				subject = *record.Domain
 			} else {
-				subject = fmt.Sprintf("%s/%s", *record.Domain, *record.Project)
+				subject = path.Join(*record.Domain, *record.Project)
 			}
 			logc.Printf(ctx, "audit %s ok: %s %s\n", subject, id, record.Event.String())
 
