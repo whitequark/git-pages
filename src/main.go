@@ -177,7 +177,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "(admin)  "+
 		"git-pages {-run-migration <name>|-freeze-domain <domain>|-unfreeze-domain <domain>}\n")
 	fmt.Fprintf(os.Stderr, "(audit)  "+
-		"git-pages {-audit-log|-audit-read <id>}\n")
+		"git-pages {-audit-log|-audit-read <id>|-audit-server <endpoint> <program> [args...]}\n")
 	fmt.Fprintf(os.Stderr, "(info)   "+
 		"git-pages {-print-config-env-vars|-print-config}\n")
 	fmt.Fprintf(os.Stderr, "(cli)    "+
@@ -215,6 +215,8 @@ func Main() {
 		"display audit log")
 	auditRead := flag.String("audit-read", "",
 		"extract contents of audit record `id` to files '<id>-*'")
+	auditServer := flag.String("audit-server", "",
+		"listen for notifications on `endpoint` and spawn a process for each audit event")
 	flag.Parse()
 
 	var cliOperations int
@@ -228,6 +230,7 @@ func Main() {
 		*unfreezeDomain != "",
 		*auditLog,
 		*auditRead != "",
+		*auditServer != "",
 	} {
 		if selected {
 			cliOperations++
@@ -469,18 +472,25 @@ func Main() {
 			logc.Fatalln(ctx, err)
 		}
 
-		errEvent := os.WriteFile(fmt.Sprintf("%s-event.json", id),
-			AuditRecordJSON(record, AuditRecordNoManifest), 0o400)
-		errManifest := os.WriteFile(fmt.Sprintf("%s-manifest.json", id),
-			ManifestJSON(record.Manifest), 0o400)
-		fileArchive, errArchive := os.OpenFile(fmt.Sprintf("%s-archive.tar", id),
-			os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o400)
-		if err = errors.Join(errEvent, errManifest, errArchive); err != nil {
+		if err = ExtractAuditRecord(ctx, id, record, "."); err != nil {
 			logc.Fatalln(ctx, err)
 		}
-		if err = CollectTar(ctx, fileArchive, record.Manifest, ManifestMetadata{}); err != nil {
+
+	case *auditServer != "":
+		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
 			logc.Fatalln(ctx, err)
 		}
+
+		if flag.NArg() < 1 {
+			logc.Fatalln(ctx, "handler path not provided")
+		}
+
+		processor, err := AuditEventProcessor(flag.Arg(0), flag.Args()[1:])
+		if err != nil {
+			logc.Fatalln(ctx, err)
+		}
+
+		serve(ctx, listen(ctx, "audit", *auditServer), ObserveHTTPHandler(processor))
 
 	default:
 		// Hook a signal (SIGHUP on *nix, nothing on Windows) for reloading the configuration

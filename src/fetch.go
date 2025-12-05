@@ -41,8 +41,7 @@ func FetchRepository(
 	var storer *filesystem.Storage
 	for _, filter := range []packp.Filter{packp.FilterBlobNone(), packp.Filter("")} {
 		var tempDir string
-		tempDir, err = os.MkdirTemp("", "fetchRepo")
-		if err != nil {
+		if tempDir, err = os.MkdirTemp("", "fetchRepo"); err != nil {
 			return nil, fmt.Errorf("mkdtemp: %w", err)
 		}
 		defer os.RemoveAll(tempDir)

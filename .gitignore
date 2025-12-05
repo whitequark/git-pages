@@ -4,3 +4,4 @@
 /data
 /config*.toml*
 /git-pages
+/site
