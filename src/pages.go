@@ -205,7 +205,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			w.Write(ManifestJSON(manifest))
 			return nil
 
-		case metadataPath == "archive.tar" && config.Feature("archive-site"):
+		case metadataPath == "archive.tar":
 			// same as above
 			_, err := AuthorizeMetadataRetrieval(r)
 			if err != nil {
@@ -507,11 +507,6 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 }
 
 func patchPage(w http.ResponseWriter, r *http.Request) error {
-	if !config.Feature("patch") {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return nil
-	}
-
 	for _, header := range []string{
 		"If-Modified-Since", "If-Unmodified-Since", "If-Match", "If-None-Match",
 	} {
