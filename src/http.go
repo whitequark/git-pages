@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var httpAcceptEncodingRegexp = regexp.MustCompile(`` +
+var httpAcceptRegexp = regexp.MustCompile(`` +
 	// token optionally prefixed by whitespace
 	`^[ \t]*([a-zA-Z0-9$!#$%&'*+.^_\x60|~-]+)` +
 	// quality value prefixed by a semicolon optionally surrounded by whitespace
@@ -17,22 +17,22 @@ var httpAcceptEncodingRegexp = regexp.MustCompile(`` +
 	`[ \t]*(?:,|$)`,
 )
 
-type httpEncoding struct {
+type httpAcceptOffer struct {
 	code string
 	qval float64
 }
 
-type httpEncodings struct {
-	encodings []httpEncoding
+type HTTPEncodings struct {
+	encodings []httpAcceptOffer
 }
 
-func parseHTTPEncodings(headerValue string) (result httpEncodings) {
+func ParseHTTPAcceptEncoding(headerValue string) (result HTTPEncodings) {
 	for headerValue != "" {
-		matches := httpAcceptEncodingRegexp.FindStringSubmatch(headerValue)
+		matches := httpAcceptRegexp.FindStringSubmatch(headerValue)
 		if matches == nil {
-			return httpEncodings{}
+			return HTTPEncodings{}
 		}
-		enc := httpEncoding{strings.ToLower(matches[1]), 1.0}
+		enc := httpAcceptOffer{strings.ToLower(matches[1]), 1.0}
 		if matches[2] != "" {
 			enc.qval, _ = strconv.ParseFloat(matches[2], 64)
 		}
@@ -51,9 +51,9 @@ func parseHTTPEncodings(headerValue string) (result httpEncodings) {
 
 // Negotiate returns the most preferred encoding that is acceptable by the
 // client, or an empty string if no encodings are acceptable.
-func (e *httpEncodings) Negotiate(codes ...string) string {
-	prefs := make(map[string]float64, len(codes))
-	for _, code := range codes {
+func (e *HTTPEncodings) Negotiate(offers ...string) string {
+	prefs := make(map[string]float64, len(offers))
+	for _, code := range offers {
 		prefs[code] = 0
 	}
 	implicitIdentity := true
@@ -73,11 +73,11 @@ func (e *httpEncodings) Negotiate(codes ...string) string {
 	if _, ok := prefs["identity"]; ok && implicitIdentity {
 		prefs["identity"] = -1 // sort last
 	}
-	encs := make([]httpEncoding, len(codes))
-	for idx, code := range codes {
-		encs[idx] = httpEncoding{code, prefs[code]}
+	encs := make([]httpAcceptOffer, len(offers))
+	for idx, code := range offers {
+		encs[idx] = httpAcceptOffer{code, prefs[code]}
 	}
-	slices.SortStableFunc(encs, func(a, b httpEncoding) int {
+	slices.SortStableFunc(encs, func(a, b httpAcceptOffer) int {
 		return -cmp.Compare(a.qval, b.qval)
 	})
 	for _, enc := range encs {

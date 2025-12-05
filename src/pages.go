@@ -214,7 +214,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 
 			// we only offer `/.git-pages/archive.tar` and not the `.tar.gz`/`.tar.zst` variants
 			// because HTTP can already request compression using the `Content-Encoding` mechanism
-			acceptedEncodings := parseHTTPEncodings(r.Header.Get("Accept-Encoding"))
+			acceptedEncodings := ParseHTTPAcceptEncoding(r.Header.Get("Accept-Encoding"))
 			negotiated := acceptedEncodings.Negotiate("zstd", "gzip", "identity")
 			if negotiated != "" {
 				w.Header().Set("Content-Encoding", negotiated)
@@ -322,11 +322,13 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		defer closer.Close()
 	}
 
-	acceptedEncodings := parseHTTPEncodings(r.Header.Get("Accept-Encoding"))
+	offeredEncodings := []string{}
+	acceptedEncodings := ParseHTTPAcceptEncoding(r.Header.Get("Accept-Encoding"))
 	negotiatedEncoding := true
 	switch entry.GetTransform() {
 	case Transform_Identity:
-		switch acceptedEncodings.Negotiate("identity") {
+		offeredEncodings = []string{"identity"}
+		switch acceptedEncodings.Negotiate(offeredEncodings...) {
 		case "identity":
 			serveEncodingCount.
 				With(prometheus.Labels{"transform": "identity", "negotiated": "identity"}).
@@ -338,13 +340,13 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				Inc()
 		}
 	case Transform_Zstd:
-		supported := []string{"zstd", "identity"}
+		offeredEncodings = []string{"zstd", "identity"}
 		if entry.ContentType == nil {
 			// If Content-Type is unset, `http.ServeContent` will try to sniff
 			// the file contents. That won't work if it's compressed.
-			supported = []string{"identity"}
+			offeredEncodings = []string{"identity"}
 		}
-		switch acceptedEncodings.Negotiate(supported...) {
+		switch acceptedEncodings.Negotiate(offeredEncodings...) {
 		case "zstd":
 			// Set Content-Length ourselves since `http.ServeContent` only sets
 			// it if Content-Encoding is unset or if it's a range request.
