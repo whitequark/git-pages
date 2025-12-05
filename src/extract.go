@@ -19,8 +19,6 @@ import (
 
 var ErrArchiveTooLarge = errors.New("archive too large")
 
-const BlobReferencePrefix = "/git/blobs/"
-
 func boundArchiveStream(reader io.Reader) io.Reader {
 	return ReadAtMost(reader, int64(config.Limits.MaxSiteSize.Bytes()),
 		fmt.Errorf("%w: %s limit exceeded", ErrArchiveTooLarge, config.Limits.MaxSiteSize.HR()))
@@ -52,6 +50,16 @@ func ExtractZstd(
 	return next(ctx, boundArchiveStream(stream))
 }
 
+const BlobReferencePrefix = "/git/blobs/"
+
+type UnresolvedRefError struct {
+	missing []string
+}
+
+func (err UnresolvedRefError) Error() string {
+	return fmt.Sprintf("%d unresolved blob references", len(err.missing))
+}
+
 // Returns a map of git hash to entry. If `manifest` is nil, returns an empty map.
 func indexManifestByGitHash(manifest *Manifest) map[string]*Entry {
 	index := map[string]*Entry{}
@@ -68,14 +76,15 @@ func indexManifestByGitHash(manifest *Manifest) map[string]*Entry {
 }
 
 func addSymlinkOrBlobReference(
-	manifest *Manifest, fileName string, target string, index map[string]*Entry,
+	manifest *Manifest, fileName string, target string,
+	index map[string]*Entry, missing *[]string,
 ) *Entry {
 	if hash, found := strings.CutPrefix(target, BlobReferencePrefix); found {
 		if entry, found := index[hash]; found {
 			manifest.Contents[fileName] = entry
 			return entry
 		} else {
-			AddProblem(manifest, fileName, "unresolved reference: %s", target)
+			*missing = append(*missing, hash)
 			return nil
 		}
 	} else {
@@ -90,6 +99,7 @@ func ExtractTar(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 	var dataBytesTransferred int64
 
 	index := indexManifestByGitHash(oldManifest)
+	missing := []string{}
 	manifest := NewManifest()
 	for {
 		header, err := archive.Next()
@@ -119,7 +129,8 @@ func ExtractTar(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 			AddFile(manifest, fileName, fileData)
 			dataBytesTransferred += int64(len(fileData))
 		case tar.TypeSymlink:
-			entry := addSymlinkOrBlobReference(manifest, fileName, header.Linkname, index)
+			entry := addSymlinkOrBlobReference(
+				manifest, fileName, header.Linkname, index, &missing)
 			dataBytesRecycled += entry.GetOriginalSize()
 		case tar.TypeDir:
 			AddDirectory(manifest, fileName)
@@ -127,6 +138,10 @@ func ExtractTar(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 			AddProblem(manifest, fileName, "tar: unsupported type '%c'", header.Typeflag)
 			continue
 		}
+	}
+
+	if len(missing) > 0 {
+		return nil, UnresolvedRefError{missing}
 	}
 
 	logc.Printf(ctx,
@@ -166,6 +181,7 @@ func ExtractZip(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 	var dataBytesTransferred int64
 
 	index := indexManifestByGitHash(oldManifest)
+	missing := []string{}
 	manifest := NewManifest()
 	for _, file := range archive.File {
 		if strings.HasSuffix(file.Name, "/") {
@@ -183,13 +199,18 @@ func ExtractZip(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 			}
 
 			if file.Mode()&os.ModeSymlink != 0 {
-				entry := addSymlinkOrBlobReference(manifest, file.Name, string(fileData), index)
+				entry := addSymlinkOrBlobReference(
+					manifest, file.Name, string(fileData), index, &missing)
 				dataBytesRecycled += entry.GetOriginalSize()
 			} else {
 				AddFile(manifest, file.Name, fileData)
 				dataBytesTransferred += int64(len(fileData))
 			}
 		}
+	}
+
+	if len(missing) > 0 {
+		return nil, UnresolvedRefError{missing}
 	}
 
 	logc.Printf(ctx,

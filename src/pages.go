@@ -572,6 +572,7 @@ func patchPage(w http.ResponseWriter, r *http.Request) error {
 func reportUpdateResult(w http.ResponseWriter, result UpdateResult) error {
 	switch result.outcome {
 	case UpdateError:
+		var unresolvedRefErr UnresolvedRefError
 		if errors.Is(result.err, ErrManifestTooLarge) {
 			w.WriteHeader(http.StatusRequestEntityTooLarge)
 		} else if errors.Is(result.err, errArchiveFormat) {
@@ -586,6 +587,8 @@ func reportUpdateResult(w http.ResponseWriter, result UpdateResult) error {
 			w.WriteHeader(http.StatusConflict)
 		} else if errors.Is(result.err, ErrDomainFrozen) {
 			w.WriteHeader(http.StatusForbidden)
+		} else if errors.As(result.err, &unresolvedRefErr) {
+			w.WriteHeader(http.StatusUnprocessableEntity)
 		} else {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
