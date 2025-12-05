@@ -214,7 +214,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 
 			// we only offer `/.git-pages/archive.tar` and not the `.tar.gz`/`.tar.zst` variants
 			// because HTTP can already request compression using the `Content-Encoding` mechanism
-			acceptedEncodings := ParseHTTPAcceptEncoding(r.Header.Get("Accept-Encoding"))
+			acceptedEncodings := ParseAcceptEncodingHeader(r.Header.Get("Accept-Encoding"))
 			negotiated := acceptedEncodings.Negotiate("zstd", "gzip", "identity")
 			if negotiated != "" {
 				w.Header().Set("Content-Encoding", negotiated)
@@ -322,8 +322,8 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		defer closer.Close()
 	}
 
-	offeredEncodings := []string{}
-	acceptedEncodings := ParseHTTPAcceptEncoding(r.Header.Get("Accept-Encoding"))
+	var offeredEncodings []string
+	acceptedEncodings := ParseAcceptEncodingHeader(r.Header.Get("Accept-Encoding"))
 	negotiatedEncoding := true
 	switch entry.GetTransform() {
 	case Transform_Identity:
@@ -379,7 +379,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	if !negotiatedEncoding {
 		w.Header().Set("Accept-Encoding", strings.Join(offeredEncodings, ", "))
 		w.WriteHeader(http.StatusNotAcceptable)
-		return fmt.Errorf("no supported content encodings (Accept-Encoding: %q)",
+		return fmt.Errorf("no supported content encodings (Accept-Encoding: %s)",
 			r.Header.Get("Accept-Encoding"))
 	}
 
@@ -506,7 +506,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		result = UpdateFromArchive(ctx, webRoot, contentType, reader)
 	}
 
-	return reportUpdateResult(w, result)
+	return reportUpdateResult(w, r, result)
 }
 
 func patchPage(w http.ResponseWriter, r *http.Request) error {
@@ -569,13 +569,32 @@ func patchPage(w http.ResponseWriter, r *http.Request) error {
 	contentType := getMediaType(r.Header.Get("Content-Type"))
 	reader := http.MaxBytesReader(w, r.Body, int64(config.Limits.MaxSiteSize.Bytes()))
 	result := PartialUpdateFromArchive(ctx, webRoot, contentType, reader, parents)
-	return reportUpdateResult(w, result)
+	return reportUpdateResult(w, r, result)
 }
 
-func reportUpdateResult(w http.ResponseWriter, result UpdateResult) error {
+func reportUpdateResult(w http.ResponseWriter, r *http.Request, result UpdateResult) error {
+	var unresolvedRefErr UnresolvedRefError
+	if result.outcome == UpdateError && errors.As(result.err, &unresolvedRefErr) {
+		offeredContentTypes := []string{"application/vnd.git-pages.unresolved", "text/plain"}
+		acceptedContentTypes := ParseAcceptHeader(r.Header.Get("Accept"))
+		switch acceptedContentTypes.Negotiate(offeredContentTypes...) {
+		default:
+			w.Header().Set("Accept", strings.Join(offeredContentTypes, ", "))
+			w.WriteHeader(http.StatusNotAcceptable)
+			return fmt.Errorf("no supported content types (Accept: %s)", r.Header.Get("Accept"))
+		case "application/vnd.git-pages.unresolved":
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			for _, missingRef := range unresolvedRefErr.missing {
+				fmt.Fprintln(w, missingRef)
+			}
+			return nil
+		case "text/plain":
+			// handled below
+		}
+	}
+
 	switch result.outcome {
 	case UpdateError:
-		var unresolvedRefErr UnresolvedRefError
 		if errors.Is(result.err, ErrManifestTooLarge) {
 			w.WriteHeader(http.StatusRequestEntityTooLarge)
 		} else if errors.Is(result.err, errArchiveFormat) {
