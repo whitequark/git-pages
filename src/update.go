@@ -226,7 +226,12 @@ func PartialUpdateFromArchive(
 }
 
 func observeUpdateResult(result UpdateResult) {
-	if result.err != nil {
+	var unresolvedRefErr UnresolvedRefError
+	if errors.As(result.err, &unresolvedRefErr) {
+		// This error is an expected outcome of an incremental update's probe phase.
+	} else if errors.Is(result.err, ErrWriteConflict) {
+		// This error is an expected outcome of an incremental update losing a race.
+	} else if result.err != nil {
 		ObserveError(result.err)
 	}
 }
