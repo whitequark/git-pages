@@ -452,9 +452,16 @@ func (backend *observedBackend) CreateDomain(ctx context.Context, domain string)
 	return
 }
 
-func (backend *observedBackend) FreezeDomain(ctx context.Context, domain string, freeze bool) (err error) {
-	span, ctx := ObserveFunction(ctx, "FreezeDomain", "domain.name", domain, "domain.frozen", freeze)
-	err = backend.inner.FreezeDomain(ctx, domain, freeze)
+func (backend *observedBackend) FreezeDomain(ctx context.Context, domain string) (err error) {
+	span, ctx := ObserveFunction(ctx, "FreezeDomain", "domain.name", domain)
+	err = backend.inner.FreezeDomain(ctx, domain)
+	span.Finish()
+	return
+}
+
+func (backend *observedBackend) UnfreezeDomain(ctx context.Context, domain string) (err error) {
+	span, ctx := ObserveFunction(ctx, "UnfreezeDomain", "domain.name", domain)
+	err = backend.inner.UnfreezeDomain(ctx, domain)
 	span.Finish()
 	return
 }

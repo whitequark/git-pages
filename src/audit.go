@@ -378,17 +378,20 @@ func (audited *auditedBackend) DeleteManifest(
 	return audited.Backend.DeleteManifest(ctx, name, opts)
 }
 
-func (audited *auditedBackend) FreezeDomain(ctx context.Context, domain string, freeze bool) (err error) {
-	var event AuditEvent
-	if freeze {
-		event = AuditEvent_FreezeDomain
-	} else {
-		event = AuditEvent_UnfreezeDomain
-	}
+func (audited *auditedBackend) FreezeDomain(ctx context.Context, domain string) (err error) {
 	audited.appendNewAuditRecord(ctx, &AuditRecord{
-		Event:  event.Enum(),
+		Event:  AuditEvent_FreezeDomain.Enum(),
 		Domain: proto.String(domain),
 	})
 
-	return audited.Backend.FreezeDomain(ctx, domain, freeze)
+	return audited.Backend.FreezeDomain(ctx, domain)
+}
+
+func (audited *auditedBackend) UnfreezeDomain(ctx context.Context, domain string) (err error) {
+	audited.appendNewAuditRecord(ctx, &AuditRecord{
+		Event:  AuditEvent_UnfreezeDomain.Enum(),
+		Domain: proto.String(domain),
+	})
+
+	return audited.Backend.UnfreezeDomain(ctx, domain)
 }

@@ -718,23 +718,24 @@ func (s3 *S3Backend) CreateDomain(ctx context.Context, domain string) error {
 	return err
 }
 
-func (s3 *S3Backend) FreezeDomain(ctx context.Context, domain string, freeze bool) error {
-	if freeze {
-		logc.Printf(ctx, "s3: freeze domain %s\n", domain)
+func (s3 *S3Backend) FreezeDomain(ctx context.Context, domain string) error {
+	logc.Printf(ctx, "s3: freeze domain %s\n", domain)
 
-		_, err := s3.client.PutObject(ctx, s3.bucket, domainFrozenObjectName(domain),
-			&bytes.Reader{}, 0, minio.PutObjectOptions{})
-		return err
+	_, err := s3.client.PutObject(ctx, s3.bucket, domainFrozenObjectName(domain),
+		&bytes.Reader{}, 0, minio.PutObjectOptions{})
+	return err
+
+}
+
+func (s3 *S3Backend) UnfreezeDomain(ctx context.Context, domain string) error {
+	logc.Printf(ctx, "s3: unfreeze domain %s\n", domain)
+
+	err := s3.client.RemoveObject(ctx, s3.bucket, domainFrozenObjectName(domain),
+		minio.RemoveObjectOptions{})
+	if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
+		return nil
 	} else {
-		logc.Printf(ctx, "s3: thaw domain %s\n", domain)
-
-		err := s3.client.RemoveObject(ctx, s3.bucket, domainFrozenObjectName(domain),
-			minio.RemoveObjectOptions{})
-		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
-			return nil
-		} else {
-			return err
-		}
+		return err
 	}
 }
 

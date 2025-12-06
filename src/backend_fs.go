@@ -442,16 +442,16 @@ func (fs *FSBackend) CreateDomain(ctx context.Context, domain string) error {
 	return nil // no-op
 }
 
-func (fs *FSBackend) FreezeDomain(ctx context.Context, domain string, freeze bool) error {
-	if freeze {
-		return fs.siteRoot.WriteFile(domainFrozenMarkerName(domain), []byte{}, 0o644)
+func (fs *FSBackend) FreezeDomain(ctx context.Context, domain string) error {
+	return fs.siteRoot.WriteFile(domainFrozenMarkerName(domain), []byte{}, 0o644)
+}
+
+func (fs *FSBackend) UnfreezeDomain(ctx context.Context, domain string) error {
+	err := fs.siteRoot.Remove(domainFrozenMarkerName(domain))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
 	} else {
-		err := fs.siteRoot.Remove(domainFrozenMarkerName(domain))
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		} else {
-			return err
-		}
+		return err
 	}
 }
 

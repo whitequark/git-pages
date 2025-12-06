@@ -422,12 +422,15 @@ func Main() {
 			freeze = false
 		}
 
-		if err = backend.FreezeDomain(ctx, domain, freeze); err != nil {
-			logc.Fatalln(ctx, err)
-		}
 		if freeze {
+			if err = backend.FreezeDomain(ctx, domain); err != nil {
+				logc.Fatalln(ctx, err)
+			}
 			logc.Println(ctx, "frozen")
 		} else {
+			if err = backend.UnfreezeDomain(ctx, domain); err != nil {
+				logc.Fatalln(ctx, err)
+			}
 			logc.Println(ctx, "thawed")
 		}
 
