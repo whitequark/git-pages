@@ -171,7 +171,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "(server) "+
 		"git-pages [-config <file>|-no-config]\n")
 	fmt.Fprintf(os.Stderr, "(debug)  "+
-		"git-pages {-list-blobs}\n")
+		"git-pages {-list-blobs|-list-manifests}\n")
 	fmt.Fprintf(os.Stderr, "(debug)  "+
 		"git-pages {-get-blob|-get-manifest|-get-archive|-update-site} <ref> [file]\n")
 	fmt.Fprintf(os.Stderr, "(admin)  "+
@@ -203,6 +203,8 @@ func Main() {
 		"enumerate every blob with its metadata")
 	getManifest := flag.String("get-manifest", "",
 		"write manifest for `site` (either 'domain.tld' or 'domain.tld/dir') as ProtoJSON")
+	listManifests := flag.Bool("list-manifests", false,
+		"enumerate every manifest with its metadata")
 	getArchive := flag.String("get-archive", "",
 		"write archive for `site` (either 'domain.tld' or 'domain.tld/dir') in tar format")
 	updateSite := flag.String("update-site", "",
@@ -225,6 +227,7 @@ func Main() {
 		*getBlob != "",
 		*listBlobs,
 		*getManifest != "",
+		*listManifests,
 		*getArchive != "",
 		*updateSite != "",
 		*freezeDomain != "",
@@ -316,6 +319,18 @@ func Main() {
 			logc.Fatalln(ctx, err)
 		}
 		fmt.Fprintln(fileOutputArg(), string(ManifestJSON(manifest)))
+
+	case *listManifests:
+		for metadata, err := range backend.EnumerateManifests(ctx) {
+			if err != nil {
+				logc.Fatalln(ctx, err)
+			}
+			fmt.Fprintf(color.Output, "%s %s %s\n",
+				metadata.Name,
+				color.HiWhiteString(metadata.LastModified.UTC().Format(time.RFC3339)),
+				color.HiGreenString(fmt.Sprint(metadata.Size)),
+			)
+		}
 
 	case *getArchive != "":
 		webRoot := webRootArg(*getArchive)

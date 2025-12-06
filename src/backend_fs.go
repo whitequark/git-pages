@@ -207,22 +207,6 @@ func (fs *FSBackend) EnumerateBlobs(ctx context.Context) iter.Seq2[BlobMetadata,
 	}
 }
 
-func (fs *FSBackend) ListManifests(ctx context.Context) (manifests []string, err error) {
-	err = iofs.WalkDir(fs.siteRoot.FS(), ".",
-		func(path string, entry iofs.DirEntry, err error) error {
-			if strings.Count(path, "/") > 1 {
-				return iofs.SkipDir
-			}
-			_, project, _ := strings.Cut(path, "/")
-			if project == "" || strings.HasPrefix(project, ".") && project != ".index" {
-				return nil
-			}
-			manifests = append(manifests, path)
-			return nil
-		})
-	return
-}
-
 func (fs *FSBackend) GetManifest(
 	ctx context.Context, name string, opts GetManifestOptions,
 ) (
@@ -409,6 +393,37 @@ func (fs *FSBackend) DeleteManifest(
 		return nil
 	} else {
 		return err
+	}
+}
+
+func (fs *FSBackend) EnumerateManifests(ctx context.Context) iter.Seq2[ManifestMetadata, error] {
+	return func(yield func(ManifestMetadata, error) bool) {
+		iofs.WalkDir(fs.siteRoot.FS(), ".",
+			func(path string, entry iofs.DirEntry, err error) error {
+				_, project, _ := strings.Cut(path, "/")
+				var metadata ManifestMetadata
+				if err != nil {
+					// report error
+				} else if entry.IsDir() {
+					// skip directory
+					return nil
+				} else if project == "" || strings.HasPrefix(project, ".") && project != ".index" {
+					// skip internal
+					return nil
+				} else if info, err := entry.Info(); err != nil {
+					// report error
+				} else {
+					// report blob
+					metadata.Name = path
+					metadata.Size = info.Size()
+					metadata.LastModified = info.ModTime()
+					// not setting metadata.ETag since it is too costly
+				}
+				if !yield(metadata, err) {
+					return iofs.SkipAll
+				}
+				return nil
+			})
 	}
 }
 

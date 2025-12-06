@@ -22,12 +22,15 @@ func createDomainMarkers(ctx context.Context) error {
 		return nil
 	}
 
-	var manifests, domains []string
-	manifests, err := backend.ListManifests(ctx)
-	if err != nil {
-		return fmt.Errorf("list manifests: %w", err)
+	var manifests []string
+	for metadata, err := range backend.EnumerateManifests(ctx) {
+		if err != nil {
+			return fmt.Errorf("enum manifests: %w", err)
+		}
+		manifests = append(manifests, metadata.Name)
 	}
 	slices.Sort(manifests)
+	var domains []string
 	for _, manifest := range manifests {
 		domain, _, _ := strings.Cut(manifest, "/")
 		if len(domains) == 0 || domains[len(domains)-1] != domain {

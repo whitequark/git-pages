@@ -46,6 +46,8 @@ type GetManifestOptions struct {
 }
 
 type ManifestMetadata struct {
+	Name         string
+	Size         int64
 	LastModified time.Time
 	ETag         string
 }
@@ -122,8 +124,9 @@ type Backend interface {
 	// Delete a manifest.
 	DeleteManifest(ctx context.Context, name string, opts ModifyManifestOptions) error
 
-	// List all manifests.
-	ListManifests(ctx context.Context) (manifests []string, err error)
+	// Iterate through all manifests. Whether manifests that are newly added during iteration
+	// will appear in the results is unspecified.
+	EnumerateManifests(ctx context.Context) iter.Seq2[ManifestMetadata, error]
 
 	// Check whether a domain has any deployments.
 	CheckDomain(ctx context.Context, domain string) (found bool, err error)

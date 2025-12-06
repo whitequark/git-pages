@@ -385,13 +385,6 @@ func (backend *observedBackend) EnumerateBlobs(ctx context.Context) iter.Seq2[Bl
 	}
 }
 
-func (backend *observedBackend) ListManifests(ctx context.Context) (manifests []string, err error) {
-	span, ctx := ObserveFunction(ctx, "ListManifests")
-	manifests, err = backend.inner.ListManifests(ctx)
-	span.Finish()
-	return
-}
-
 func (backend *observedBackend) GetManifest(
 	ctx context.Context, name string, opts GetManifestOptions,
 ) (
@@ -431,6 +424,18 @@ func (backend *observedBackend) DeleteManifest(ctx context.Context, name string,
 	err = backend.inner.DeleteManifest(ctx, name, opts)
 	span.Finish()
 	return
+}
+
+func (backend *observedBackend) EnumerateManifests(ctx context.Context) iter.Seq2[ManifestMetadata, error] {
+	return func(yield func(ManifestMetadata, error) bool) {
+		span, ctx := ObserveFunction(ctx, "EnumerateManifests")
+		for metadata, err := range backend.inner.EnumerateManifests(ctx) {
+			if !yield(metadata, err) {
+				break
+			}
+		}
+		span.Finish()
+	}
 }
 
 func (backend *observedBackend) CheckDomain(ctx context.Context, domain string) (found bool, err error) {

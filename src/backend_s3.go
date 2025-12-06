@@ -397,34 +397,6 @@ func stagedManifestObjectName(manifestData []byte) string {
 	return fmt.Sprintf("dirty/%x", sha256.Sum256(manifestData))
 }
 
-func (s3 *S3Backend) ListManifests(ctx context.Context) (manifests []string, err error) {
-	logc.Print(ctx, "s3: list manifests")
-
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	prefix := manifestObjectName("")
-	for object := range s3.client.ListObjectsIter(ctx, s3.bucket, minio.ListObjectsOptions{
-		Prefix:    prefix,
-		Recursive: true,
-	}) {
-		if object.Err != nil {
-			return nil, object.Err
-		}
-		key := strings.TrimRight(strings.TrimPrefix(object.Key, prefix), "/")
-		if strings.Count(key, "/") > 1 {
-			continue
-		}
-		_, project, _ := strings.Cut(key, "/")
-		if project == "" || strings.HasPrefix(project, ".") && project != ".index" {
-			continue
-		}
-		manifests = append(manifests, key)
-	}
-
-	return
-}
-
 type s3ManifestLoader struct {
 	s3 *S3Backend
 }
@@ -666,6 +638,41 @@ func (s3 *S3Backend) DeleteManifest(
 		minio.RemoveObjectOptions{})
 	s3.siteCache.Cache.Invalidate(name)
 	return err
+}
+
+func (s3 *S3Backend) EnumerateManifests(ctx context.Context) iter.Seq2[ManifestMetadata, error] {
+	return func(yield func(ManifestMetadata, error) bool) {
+		logc.Print(ctx, "s3: enumerate manifests")
+
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		prefix := "site/"
+		for object := range s3.client.ListObjectsIter(ctx, s3.bucket, minio.ListObjectsOptions{
+			Prefix:    prefix,
+			Recursive: true,
+		}) {
+			var metadata ManifestMetadata
+			var err error
+			if err = object.Err; err == nil {
+				key := strings.TrimPrefix(object.Key, prefix)
+				_, project, _ := strings.Cut(key, "/")
+				if strings.HasSuffix(key, "/") {
+					continue // directory; skip
+				} else if project == "" || strings.HasPrefix(project, ".") && project != ".index" {
+					continue // internal; skip
+				} else {
+					metadata.Name = key
+					metadata.Size = object.Size
+					metadata.LastModified = object.LastModified
+					metadata.ETag = object.ETag
+				}
+			}
+			if !yield(metadata, err) {
+				break
+			}
+		}
+	}
 }
 
 func domainCheckObjectName(domain string) string {
