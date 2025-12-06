@@ -780,7 +780,7 @@ func (s3 *S3Backend) SearchAuditLog(
 	ctx context.Context, opts SearchAuditLogOptions,
 ) iter.Seq2[AuditID, error] {
 	return func(yield func(AuditID, error) bool) {
-		logc.Printf(ctx, "s3: query audit\n")
+		logc.Printf(ctx, "s3: search audit\n")
 
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()

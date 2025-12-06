@@ -170,16 +170,18 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "Usage:\n")
 	fmt.Fprintf(os.Stderr, "(server) "+
 		"git-pages [-config <file>|-no-config]\n")
+	fmt.Fprintf(os.Stderr, "(info)   "+
+		"git-pages {-print-config-env-vars|-print-config}\n")
 	fmt.Fprintf(os.Stderr, "(debug)  "+
 		"git-pages {-list-blobs|-list-manifests}\n")
 	fmt.Fprintf(os.Stderr, "(debug)  "+
 		"git-pages {-get-blob|-get-manifest|-get-archive|-update-site} <ref> [file]\n")
 	fmt.Fprintf(os.Stderr, "(admin)  "+
-		"git-pages {-run-migration <name>|-freeze-domain <domain>|-unfreeze-domain <domain>}\n")
+		"git-pages {-freeze-domain <domain>|-unfreeze-domain <domain>}\n")
 	fmt.Fprintf(os.Stderr, "(audit)  "+
 		"git-pages {-audit-log|-audit-read <id>|-audit-server <endpoint> <program> [args...]}\n")
-	fmt.Fprintf(os.Stderr, "(info)   "+
-		"git-pages {-print-config-env-vars|-print-config}\n")
+	fmt.Fprintf(os.Stderr, "(maint)  "+
+		"git-pages {-run-migration <name>|-trace-garbage}\n")
 	flag.PrintDefaults()
 }
 
@@ -187,24 +189,22 @@ func Main() {
 	ctx := context.Background()
 
 	flag.Usage = usage
-	printConfigEnvVars := flag.Bool("print-config-env-vars", false,
-		"print every recognized configuration environment variable and exit")
-	printConfig := flag.Bool("print-config", false,
-		"print configuration as JSON and exit")
 	configTomlPath := flag.String("config", "",
 		"load configuration from `filename` (default: 'config.toml')")
 	noConfig := flag.Bool("no-config", false,
 		"run without configuration file (configure via environment variables)")
-	runMigration := flag.String("run-migration", "",
-		"run a store `migration` (one of: create-domain-markers)")
-	getBlob := flag.String("get-blob", "",
-		"write contents of `blob` ('sha256-xxxxxxx...xxx')")
+	printConfigEnvVars := flag.Bool("print-config-env-vars", false,
+		"print every recognized configuration environment variable and exit")
+	printConfig := flag.Bool("print-config", false,
+		"print configuration as JSON and exit")
 	listBlobs := flag.Bool("list-blobs", false,
 		"enumerate every blob with its metadata")
-	getManifest := flag.String("get-manifest", "",
-		"write manifest for `site` (either 'domain.tld' or 'domain.tld/dir') as ProtoJSON")
 	listManifests := flag.Bool("list-manifests", false,
 		"enumerate every manifest with its metadata")
+	getBlob := flag.String("get-blob", "",
+		"write contents of `blob` ('sha256-xxxxxxx...xxx')")
+	getManifest := flag.String("get-manifest", "",
+		"write manifest for `site` (either 'domain.tld' or 'domain.tld/dir') as ProtoJSON")
 	getArchive := flag.String("get-archive", "",
 		"write archive for `site` (either 'domain.tld' or 'domain.tld/dir') in tar format")
 	updateSite := flag.String("update-site", "",
@@ -219,15 +219,18 @@ func Main() {
 		"extract contents of audit record `id` to files '<id>-*'")
 	auditServer := flag.String("audit-server", "",
 		"listen for notifications on `endpoint` and spawn a process for each audit event")
+	runMigration := flag.String("run-migration", "",
+		"run a store `migration` (one of: create-domain-markers)")
+	traceGarbage := flag.Bool("trace-garbage", false,
+		"estimate total size of unreachable blobs")
 	flag.Parse()
 
 	var cliOperations int
 	for _, selected := range []bool{
-		*runMigration != "",
-		*getBlob != "",
 		*listBlobs,
-		*getManifest != "",
 		*listManifests,
+		*getBlob != "",
+		*getManifest != "",
 		*getArchive != "",
 		*updateSite != "",
 		*freezeDomain != "",
@@ -235,14 +238,17 @@ func Main() {
 		*auditLog,
 		*auditRead != "",
 		*auditServer != "",
+		*runMigration != "",
+		*traceGarbage,
 	} {
 		if selected {
 			cliOperations++
 		}
 	}
 	if cliOperations > 1 {
-		logc.Fatalln(ctx, "-get-blob, -get-manifest, -get-archive, -update-site, "+
-			"-freeze, -unfreeze, -audit-log, and -audit-read are mutually exclusive")
+		logc.Fatalln(ctx, "-list-blobs, -list-manifests, -get-blob, -get-manifest, -get-archive, "+
+			"-update-site, -freeze-domain, -unfreeze-domain, -audit-log, -audit-read, "+
+			"-audit-server, -run-migration, and -trace-garbage are mutually exclusive")
 	}
 
 	if *configTomlPath != "" && *noConfig {
@@ -288,18 +294,6 @@ func Main() {
 	}
 
 	switch {
-	case *runMigration != "":
-		if err := RunMigration(ctx, *runMigration); err != nil {
-			logc.Fatalln(ctx, err)
-		}
-
-	case *getBlob != "":
-		reader, _, err := backend.GetBlob(ctx, *getBlob)
-		if err != nil {
-			logc.Fatalln(ctx, err)
-		}
-		io.Copy(fileOutputArg(), reader)
-
 	case *listBlobs:
 		for metadata, err := range backend.EnumerateBlobs(ctx) {
 			if err != nil {
@@ -312,14 +306,6 @@ func Main() {
 			)
 		}
 
-	case *getManifest != "":
-		webRoot := webRootArg(*getManifest)
-		manifest, _, err := backend.GetManifest(ctx, webRoot, GetManifestOptions{})
-		if err != nil {
-			logc.Fatalln(ctx, err)
-		}
-		fmt.Fprintln(fileOutputArg(), string(ManifestJSON(manifest)))
-
 	case *listManifests:
 		for metadata, err := range backend.EnumerateManifests(ctx) {
 			if err != nil {
@@ -331,6 +317,21 @@ func Main() {
 				color.HiGreenString(fmt.Sprint(metadata.Size)),
 			)
 		}
+
+	case *getBlob != "":
+		reader, _, err := backend.GetBlob(ctx, *getBlob)
+		if err != nil {
+			logc.Fatalln(ctx, err)
+		}
+		io.Copy(fileOutputArg(), reader)
+
+	case *getManifest != "":
+		webRoot := webRootArg(*getManifest)
+		manifest, _, err := backend.GetManifest(ctx, webRoot, GetManifestOptions{})
+		if err != nil {
+			logc.Fatalln(ctx, err)
+		}
+		fmt.Fprintln(fileOutputArg(), string(ManifestJSON(manifest)))
 
 	case *getArchive != "":
 		webRoot := webRootArg(*getArchive)
@@ -490,6 +491,16 @@ func Main() {
 		}
 
 		serve(ctx, listen(ctx, "audit", *auditServer), ObserveHTTPHandler(processor))
+
+	case *runMigration != "":
+		if err = RunMigration(ctx, *runMigration); err != nil {
+			logc.Fatalln(ctx, err)
+		}
+
+	case *traceGarbage:
+		if err = TraceGarbage(ctx); err != nil {
+			logc.Fatalln(ctx, err)
+		}
 
 	default:
 		// Hook a signal (SIGHUP on *nix, nothing on Windows) for reloading the configuration
