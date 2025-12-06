@@ -76,12 +76,13 @@ func TraceGarbage(ctx context.Context) error {
 	}
 
 	allBlobsCount, allBlobsSize := trieReduce(allBlobs)
+	liveBlobsCount, liveBlobsSize := trieReduce(liveBlobs)
 	logc.Printf(ctx, "trace all: %d blobs, %s",
 		allBlobsCount, datasize.ByteSize(allBlobsSize).HR())
-
-	liveBlobsCount, liveBlobsSize := trieReduce(liveBlobs)
 	logc.Printf(ctx, "trace live: %d blobs, %s",
 		liveBlobsCount, datasize.ByteSize(liveBlobsSize).HR())
+	logc.Printf(ctx, "trace dead: %d blobs, %s",
+		allBlobsCount-liveBlobsCount, datasize.ByteSize(allBlobsSize-liveBlobsSize).HR())
 
 	return nil
 }
