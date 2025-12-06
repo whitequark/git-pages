@@ -11,11 +11,11 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/getsentry/sentry-go v0.40.0
 	github.com/getsentry/sentry-go/slog v0.40.0
-	github.com/go-git/go-billy/v6 v6.0.0-20251126203821-7f9c95185ee0
-	github.com/go-git/go-git/v6 v6.0.0-20251128074608-48f817f57805
+	github.com/go-git/go-billy/v6 v6.0.0-20251204095141-7469ffe06db2
+	github.com/go-git/go-git/v6 v6.0.0-20251205125627-4aac0c537802
 	github.com/jpillora/backoff v1.0.0
 	github.com/kankanreno/go-snowflake v1.2.0
-	github.com/klauspost/compress v1.18.1
+	github.com/klauspost/compress v1.18.2
 	github.com/maypok86/otter/v2 v2.2.1
 	github.com/minio/minio-go/v7 v7.0.97
 	github.com/pelletier/go-toml/v2 v2.2.4
