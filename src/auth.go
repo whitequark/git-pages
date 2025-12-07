@@ -436,7 +436,7 @@ func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 }
 
 func checkAllowedURLPrefix(repoURL string) error {
-	if config.Limits.AllowedRepositoryURLPrefixes != nil {
+	if len(config.Limits.AllowedRepositoryURLPrefixes) > 0 {
 		allowedPrefix := false
 		repoURL = strings.ToLower(repoURL)
 		for _, allowedRepoURLPrefix := range config.Limits.AllowedRepositoryURLPrefixes {
@@ -658,7 +658,7 @@ func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
 		return auth, nil
 	}
 
-	if config.Limits.AllowedRepositoryURLPrefixes != nil {
+	if len(config.Limits.AllowedRepositoryURLPrefixes) > 0 {
 		causes = append(causes, AuthError{http.StatusUnauthorized, "DNS challenge not allowed"})
 	} else {
 		// DNS challenge gives absolute authority.

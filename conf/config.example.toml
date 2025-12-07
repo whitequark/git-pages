@@ -51,7 +51,7 @@ max-symlink-depth = 16
 update-timeout = "60s"
 max-heap-size-ratio = 0.5 # * RAM_size
 forbidden-domains = []
-# allowed-repository-url-prefixes = <nil>
+allowed-repository-url-prefixes = []
 allowed-custom-headers = ["X-Clacks-Overhead"]
 
 [audit]
