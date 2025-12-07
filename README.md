@@ -137,10 +137,11 @@ _git-pages_ has robust observability features built in:
     * If `SENTRY_DSN` environment variable is set, panics are reported to Sentry.
     * If `SENTRY_DSN` and `SENTRY_LOGS=1` environment variables are set, logs are uploaded to Sentry.
     * If `SENTRY_DSN` and `SENTRY_TRACING=1` environment variables are set, traces are uploaded to Sentry.
-* Optional syslog integration allows transmitting application logs to a syslog daemon. When present, the `SYSLOG_ADDR` environment variable enables the integration, and the variable's value is used to configure the absolute path to a Unix socket (usually located at `/dev/log` on Unix systems) or a network address of one of the following formats:
-    * for TLS over TCP: `tcp+tls://host:port`;
-    * for plain TCP: `tcp://host:post`;
-    * for UDP: `udp://host:port`.
+* Optional syslog integration allows transmitting application logs to a syslog daemon. When present, the `SYSLOG_ADDR` environment variable enables the integration, and the value is used to configure the syslog destination. The value must follow the format `family/address` and is usually one of the following:
+    * a Unix datagram socket: `unixgram//dev/log`;
+    * TLS over TCP: `tcp+tls/host:port`;
+    * plain TCP: `tcp/host:post`;
+    * UDP: `udp/host:port`.
 
 
 Architecture (v2)
