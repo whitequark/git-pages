@@ -12,8 +12,8 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/getsentry/sentry-go v0.40.0
 	github.com/getsentry/sentry-go/slog v0.40.0
-	github.com/go-git/go-billy/v6 v6.0.0-20251204095141-7469ffe06db2
-	github.com/go-git/go-git/v6 v6.0.0-20251205125627-4aac0c537802
+	github.com/go-git/go-billy/v6 v6.0.0-20251206100608-d4862421331a
+	github.com/go-git/go-git/v6 v6.0.0-20251206100705-e633db5b9a34
 	github.com/jpillora/backoff v1.0.0
 	github.com/kankanreno/go-snowflake v1.2.0
 	github.com/klauspost/compress v1.18.2
