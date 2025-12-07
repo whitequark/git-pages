@@ -93,6 +93,7 @@ func InitObservability() {
 		var err error
 		syslogHandler, err = syslog.NewHandler(&syslog.HandlerOptions{
 			Address:          syslogAddr,
+			Level:            logLevel,
 			AppName:          "git-pages",
 			StructuredDataID: "git-pages",
 		})
