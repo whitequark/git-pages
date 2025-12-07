@@ -244,7 +244,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	entryPath := sitePath
 	entry := (*Entry)(nil)
 	appliedRedirect := false
-	status := 200
+	status := http.StatusOK
 	reader := io.ReadSeeker(nil)
 	mtime := time.Time{}
 	for {
@@ -276,7 +276,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			}
 		}
 		if entry == nil || entry.GetType() == Type_InvalidEntry {
-			status = 404
+			status = http.StatusNotFound
 			if entryPath != notFoundPage {
 				entryPath = notFoundPage
 				continue
@@ -832,18 +832,18 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 	err := error(nil)
 	switch r.Method {
 	// REST API
-	case http.MethodOptions:
+	case "OPTIONS":
 		// no preflight options
-	case http.MethodHead, http.MethodGet:
+	case "HEAD", "GET":
 		err = getPage(w, r)
-	case http.MethodPut:
+	case "PUT":
 		err = putPage(w, r)
-	case http.MethodPatch:
+	case "PATCH":
 		err = patchPage(w, r)
-	case http.MethodDelete:
+	case "DELETE":
 		err = deletePage(w, r)
 	// webhook API
-	case http.MethodPost:
+	case "POST":
 		err = postPage(w, r)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
