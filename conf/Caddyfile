@@ -25,11 +25,5 @@ https://, http:// {
 		on_demand
 	}
 
-	# initial PUT/POST for a new domain has to happen over HTTP
-	@upgrade `method('GET') && protocol('http')`
-	redir @upgrade https://{host}{uri} 301
-
 	reverse_proxy http://localhost:3000
-	header Alt-Svc `h3=":443"; persist=1, h2=":443"; persist=1`
-	encode
 }

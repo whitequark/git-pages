@@ -6,9 +6,9 @@ log-level = "info"
 
 [server]
 # Use "-" to disable the handler.
-pages = "tcp/:3000"
-caddy = "tcp/:3001"
-metrics = "tcp/:3002"
+pages = "tcp/localhost:3000"
+caddy = "tcp/localhost:3001"
+metrics = "tcp/localhost:3002"
 
 [[wildcard]] # non-default section
 domain = "codeberg.page"
