@@ -65,10 +65,14 @@ func GetHost(r *http.Request) (string, error) {
 	return host, nil
 }
 
+func IsValidProjectName(name string) bool {
+	return !strings.HasPrefix(name, ".") && !strings.Contains(name, "%")
+}
+
 func GetProjectName(r *http.Request) (string, error) {
 	// path must be either `/` or `/foo/` (`/foo` is accepted as an alias)
 	path := strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, "/"), "/")
-	if path == ".index" || strings.HasPrefix(path, ".index/") {
+	if !IsValidProjectName(path) {
 		return "", AuthError{http.StatusBadRequest,
 			fmt.Sprintf("directory name %q is reserved", ".index")}
 	} else if strings.Contains(path, "/") {

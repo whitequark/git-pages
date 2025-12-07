@@ -132,18 +132,20 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	err = nil
 	sitePath = strings.TrimPrefix(r.URL.Path, "/")
 	if projectName, projectPath, hasProjectSlash := strings.Cut(sitePath, "/"); projectName != "" {
-		var projectManifest *Manifest
-		var projectMetadata ManifestMetadata
-		projectManifest, projectMetadata, err = backend.GetManifest(
-			r.Context(), makeWebRoot(host, projectName),
-			GetManifestOptions{BypassCache: bypassCache},
-		)
-		if err == nil {
-			if !hasProjectSlash {
-				writeRedirect(w, http.StatusFound, r.URL.Path+"/")
-				return nil
+		if IsValidProjectName(projectName) {
+			var projectManifest *Manifest
+			var projectMetadata ManifestMetadata
+			projectManifest, projectMetadata, err = backend.GetManifest(
+				r.Context(), makeWebRoot(host, projectName),
+				GetManifestOptions{BypassCache: bypassCache},
+			)
+			if err == nil {
+				if !hasProjectSlash {
+					writeRedirect(w, http.StatusFound, r.URL.Path+"/")
+					return nil
+				}
+				sitePath, manifest, metadata = projectPath, projectManifest, projectMetadata
 			}
-			sitePath, manifest, metadata = projectPath, projectManifest, projectMetadata
 		}
 	}
 	if manifest == nil && (err == nil || errors.Is(err, ErrObjectNotFound)) {
