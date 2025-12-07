@@ -13,7 +13,6 @@ import (
 	"os"
 	"runtime/debug"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -62,29 +61,15 @@ func InitObservability() {
 
 	logHandlers := []slog.Handler{}
 
-	logLevel := slog.LevelInfo
-	switch strings.ToLower(config.LogLevel) {
-	case "debug":
-		logLevel = slog.LevelDebug
-	case "info":
-		logLevel = slog.LevelInfo
-	case "warn":
-		logLevel = slog.LevelWarn
-	case "error":
-		logLevel = slog.LevelError
-	default:
-		log.Println("unknown log level", config.LogLevel)
-	}
-
 	switch config.LogFormat {
 	case "none":
 		// nothing to do
 	case "text":
 		logHandlers = append(logHandlers,
-			slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel}))
+			slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{}))
 	case "json":
 		logHandlers = append(logHandlers,
-			slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel}))
+			slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{}))
 	default:
 		log.Println("unknown log format", config.LogFormat)
 	}
@@ -93,7 +78,6 @@ func InitObservability() {
 		var err error
 		syslogHandler, err = syslog.NewHandler(&syslog.HandlerOptions{
 			Address:          syslogAddr,
-			Level:            logLevel,
 			AppName:          "git-pages",
 			StructuredDataID: "git-pages",
 		})
@@ -154,24 +138,11 @@ func InitObservability() {
 		if enableLogs {
 			logHandlers = append(logHandlers, sentryslog.Option{
 				AddSource: true,
-				LogLevel:  levelsFromMinimum(logLevel),
 			}.NewSentryHandler(context.Background()))
 		}
 	}
 
 	slog.SetDefault(slog.New(slogmulti.Fanout(logHandlers...)))
-}
-
-// From sentryslog, because for some reason they don't make it public.
-func levelsFromMinimum(minLevel slog.Level) []slog.Level {
-	allLevels := []slog.Level{slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError, sentryslog.LevelFatal}
-	var result []slog.Level
-	for _, level := range allLevels {
-		if level >= minLevel {
-			result = append(result, level)
-		}
-	}
-	return result
 }
 
 func FiniObservability() {

@@ -2,7 +2,6 @@
 # as the intrinsic default value.
 
 log-format = "text"
-log-level = "info"
 
 [server]
 # Use "-" to disable the handler.
