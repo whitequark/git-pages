@@ -257,24 +257,27 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 // At the moment, there isn't a good way to report errors except to log them on the terminal.
 // (Perhaps in the future they could be exposed at `.git-pages/status.txt`?)
 func PrepareManifest(ctx context.Context, manifest *Manifest) error {
-	// Parse Netlify-style `_redirects`
+	// Parse Netlify-style `_redirects`.
 	if err := ProcessRedirectsFile(manifest); err != nil {
 		logc.Printf(ctx, "redirects err: %s\n", err)
 	} else if len(manifest.Redirects) > 0 {
 		logc.Printf(ctx, "redirects ok: %d rules\n", len(manifest.Redirects))
 	}
 
-	// Parse Netlify-style `_headers`
+	// Check if any redirects are unreachable.
+	LintRedirects(manifest)
+
+	// Parse Netlify-style `_headers`.
 	if err := ProcessHeadersFile(manifest); err != nil {
 		logc.Printf(ctx, "headers err: %s\n", err)
 	} else if len(manifest.Headers) > 0 {
 		logc.Printf(ctx, "headers ok: %d rules\n", len(manifest.Headers))
 	}
 
-	// Sniff content type like `http.ServeContent`
+	// Sniff content type like `http.ServeContent`.
 	DetectContentType(manifest)
 
-	// Opportunistically compress blobs (must be done last)
+	// Opportunistically compress blobs (must be done last).
 	CompressFiles(ctx, manifest)
 
 	return nil

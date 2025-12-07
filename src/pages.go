@@ -262,7 +262,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				redirectKind = RedirectForce
 			}
 			originalURL := (&url.URL{Host: r.Host}).ResolveReference(r.URL)
-			redirectURL, redirectStatus := ApplyRedirectRules(manifest, originalURL, redirectKind)
+			_, redirectURL, redirectStatus := ApplyRedirectRules(manifest, originalURL, redirectKind)
 			if Is3xxHTTPStatus(redirectStatus) {
 				writeRedirect(w, redirectStatus, redirectURL.String())
 				return nil

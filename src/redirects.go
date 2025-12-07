@@ -13,7 +13,17 @@ import (
 
 const RedirectsFileName string = "_redirects"
 
-func unparseRule(rule redirects.Rule) string {
+// Converts our Protobuf representation to tj/go-redirects.
+func exportRedirectRule(rule *RedirectRule) *redirects.Rule {
+	return &redirects.Rule{
+		From:   rule.GetFrom(),
+		To:     rule.GetTo(),
+		Status: int(rule.GetStatus()),
+		Force:  rule.GetForce(),
+	}
+}
+
+func unparseRedirectRule(rule *redirects.Rule) string {
 	var statusPart string
 	if rule.Force {
 		statusPart = fmt.Sprintf("%d!", rule.Status)
@@ -49,7 +59,7 @@ func Is3xxHTTPStatus(status int) bool {
 	return status >= 300 && status <= 399
 }
 
-func validateRedirectRule(rule redirects.Rule) error {
+func validateRedirectRule(rule *redirects.Rule) error {
 	if len(rule.Params) > 0 {
 		return fmt.Errorf("rules with parameters are not supported")
 	}
@@ -103,9 +113,9 @@ func ProcessRedirectsFile(manifest *Manifest) error {
 	}
 
 	for index, rule := range rules {
-		if err := validateRedirectRule(rule); err != nil {
+		if err := validateRedirectRule(&rule); err != nil {
 			AddProblem(manifest, RedirectsFileName,
-				"rule #%d %q: %s", index+1, unparseRule(rule), err)
+				"rule #%d %q: %s", index+1, unparseRedirectRule(&rule), err)
 			continue
 		}
 		manifest.Redirects = append(manifest.Redirects, &RedirectRule{
@@ -121,12 +131,7 @@ func ProcessRedirectsFile(manifest *Manifest) error {
 func CollectRedirectsFile(manifest *Manifest) string {
 	var rules []string
 	for _, rule := range manifest.GetRedirects() {
-		rules = append(rules, unparseRule(redirects.Rule{
-			From:   rule.GetFrom(),
-			To:     rule.GetTo(),
-			Status: int(rule.GetStatus()),
-			Force:  rule.GetForce(),
-		})+"\n")
+		rules = append(rules, unparseRedirectRule(exportRedirectRule(rule))+"\n")
 	}
 	return strings.Join(rules, "")
 }
@@ -147,18 +152,22 @@ type RedirectKind int
 
 const (
 	RedirectAny RedirectKind = iota
+	RedirectNormal
 	RedirectForce
 )
 
 func ApplyRedirectRules(
 	manifest *Manifest, fromURL *url.URL, kind RedirectKind,
 ) (
-	toURL *url.URL, status int,
+	rule *RedirectRule, toURL *url.URL, status int,
 ) {
 	fromSegments := pathSegments(fromURL.Path)
 next:
-	for _, rule := range manifest.Redirects {
-		if kind == RedirectForce && !*rule.Force {
+	for _, rule = range manifest.Redirects {
+		switch {
+		case kind == RedirectNormal && *rule.Force:
+			continue
+		case kind == RedirectForce && !*rule.Force:
 			continue
 		}
 		// check if the rule matches fromURL
@@ -205,8 +214,43 @@ next:
 			RawQuery: fromURL.RawQuery,
 		}
 		status = int(*rule.Status)
-		break
+		return
 	}
 	// no redirect found
+	rule = nil
 	return
+}
+
+func redirectHasSplat(rule *RedirectRule) bool {
+	ruleFromURL, _ := url.Parse(*rule.From) // pre-validated in `validateRedirectRule`
+	ruleFromSegments := pathSegments(ruleFromURL.Path)
+	return slices.Contains(ruleFromSegments, "*")
+}
+
+func LintRedirects(manifest *Manifest) {
+	for name, entry := range manifest.GetContents() {
+		nameURL, err := url.Parse("/" + name)
+		if err != nil {
+			continue
+		}
+
+		// Check if the entry URL would trigger a non-forced redirect if the entry didn't exist.
+		// If the redirect matches exactly one URL (i.e. has no splat) then it will never be
+		// triggered and an issue is reported; if the rule has a splat, it will always be possible
+		// to trigger it, as it matches an infinite number of URLs.
+		rule, _, _ := ApplyRedirectRules(manifest, nameURL, RedirectNormal)
+		if rule != nil && !redirectHasSplat(rule) {
+			entryDesc := "file"
+			if entry.GetType() == Type_Directory {
+				entryDesc = "directory"
+			}
+			AddProblem(manifest, name,
+				"%s shadows redirect %q; remove the %s or use a %d! forced redirect instead",
+				entryDesc,
+				unparseRedirectRule(exportRedirectRule(rule)),
+				entryDesc,
+				rule.GetStatus(),
+			)
+		}
+	}
 }
