@@ -265,11 +265,7 @@ type auditedBackend struct {
 var _ Backend = (*auditedBackend)(nil)
 
 func NewAuditedBackend(backend Backend) Backend {
-	if config.Feature("audit") {
-		return &auditedBackend{backend}
-	} else {
-		return backend
-	}
+	return &auditedBackend{backend}
 }
 
 // This function does not retry appending audit records; as such, if it returns an error,
