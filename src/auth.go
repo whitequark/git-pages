@@ -12,6 +12,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"golang.org/x/net/idna"
 )
 
 type AuthError struct {
@@ -42,12 +44,18 @@ func authorizeInsecure(r *http.Request) *Authorization {
 	return nil
 }
 
+var idnaProfile = idna.New(idna.MapForLookup(), idna.BidiRule())
+
 func GetHost(r *http.Request) (string, error) {
-	// FIXME: handle IDNA
 	host, _, err := net.SplitHostPort(r.Host)
 	if err != nil {
-		// dirty but the go stdlib doesn't have a "split port if present" function
 		host = r.Host
+	}
+	// this also rejects invalid characters and labels
+	host, err = idnaProfile.ToASCII(host)
+	if err != nil {
+		return "", AuthError{http.StatusBadRequest,
+			fmt.Sprintf("malformed host name %q", host)}
 	}
 	if strings.HasPrefix(host, ".") {
 		return "", AuthError{http.StatusBadRequest,
