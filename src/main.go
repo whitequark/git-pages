@@ -269,7 +269,7 @@ func Main() {
 	}
 
 	if *printConfig {
-		fmt.Println(config.DebugJSON())
+		fmt.Println(config.TOML())
 		return
 	}
 

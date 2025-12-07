@@ -166,8 +166,8 @@ type ObservabilityConfig struct {
 	SlowResponseThreshold Duration `toml:"slow-response-threshold" default:"500ms"`
 }
 
-func (config *Config) DebugJSON() string {
-	result, err := json.MarshalIndent(config, "", "  ")
+func (config *Config) TOML() string {
+	result, err := toml.Marshal(config)
 	if err != nil {
 		panic(err)
 	}
