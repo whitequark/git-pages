@@ -153,6 +153,9 @@ func ExtractTar(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 	return manifest, nil
 }
 
+// Used for zstd decompression inside zip files, it is recommended to share this.
+var zstdDecomp = zstd.ZipDecompressor()
+
 func ExtractZip(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*Manifest, error) {
 	data, err := io.ReadAll(reader)
 	if err != nil {
@@ -163,6 +166,10 @@ func ExtractZip(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 	if err != nil {
 		return nil, err
 	}
+
+	// Support zstd compression inside zip files.
+	archive.RegisterDecompressor(zstd.ZipMethodWinZip, zstdDecomp)
+	archive.RegisterDecompressor(zstd.ZipMethodPKWare, zstdDecomp)
 
 	// Detect and defuse zipbombs.
 	var totalSize uint64
