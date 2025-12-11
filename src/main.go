@@ -14,6 +14,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"path"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -217,6 +218,8 @@ func Main() {
 		"display audit log")
 	auditRead := flag.String("audit-read", "",
 		"extract contents of audit record `id` to files '<id>-*'")
+	auditRollback := flag.String("audit-rollback", "",
+		"restore site from contents of audit record `id`")
 	auditServer := flag.String("audit-server", "",
 		"listen for notifications on `endpoint` and spawn a process for each audit event")
 	runMigration := flag.String("run-migration", "",
@@ -237,6 +240,7 @@ func Main() {
 		*unfreezeDomain != "",
 		*auditLog,
 		*auditRead != "",
+		*auditRollback != "",
 		*auditServer != "",
 		*runMigration != "",
 		*traceGarbage,
@@ -248,7 +252,8 @@ func Main() {
 	if cliOperations > 1 {
 		logc.Fatalln(ctx, "-list-blobs, -list-manifests, -get-blob, -get-manifest, -get-archive, "+
 			"-update-site, -freeze-domain, -unfreeze-domain, -audit-log, -audit-read, "+
-			"-audit-server, -run-migration, and -trace-garbage are mutually exclusive")
+			"-audit-rollback, -audit-server, -run-migration, and -trace-garbage are "+
+			"mutually exclusive")
 	}
 
 	if *configTomlPath != "" && *noConfig {
@@ -480,6 +485,34 @@ func Main() {
 		}
 
 		if err = ExtractAuditRecord(ctx, id, record, "."); err != nil {
+			logc.Fatalln(ctx, err)
+		}
+
+	case *auditRollback != "":
+		ctx = WithPrincipal(ctx)
+		GetPrincipal(ctx).CliAdmin = proto.Bool(true)
+
+		id, err := ParseAuditID(*auditRollback)
+		if err != nil {
+			logc.Fatalln(ctx, err)
+		}
+
+		record, err := backend.QueryAuditLog(ctx, id)
+		if err != nil {
+			logc.Fatalln(ctx, err)
+		}
+
+		if record.GetManifest() == nil || record.GetDomain() == "" || record.GetProject() == "" {
+			logc.Fatalln(ctx, "no manifest in audit record")
+		}
+
+		webRoot := path.Join(record.GetDomain(), record.GetProject())
+		err = backend.StageManifest(ctx, record.GetManifest())
+		if err != nil {
+			logc.Fatalln(ctx, err)
+		}
+		err = backend.CommitManifest(ctx, webRoot, record.GetManifest(), ModifyManifestOptions{})
+		if err != nil {
 			logc.Fatalln(ctx, err)
 		}
 
