@@ -57,7 +57,7 @@ func FetchRepository(
 		repo, err = git.CloneContext(ctx, storer, nil, &git.CloneOptions{
 			Bare:          true,
 			URL:           repoURL,
-			ReferenceName: plumbing.ReferenceName(branch),
+			ReferenceName: plumbing.NewBranchReferenceName(branch),
 			SingleBranch:  true,
 			Depth:         1,
 			Tags:          git.NoTags,
