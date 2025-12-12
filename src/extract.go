@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strings"
 
@@ -174,6 +175,11 @@ func ExtractZip(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 	// Detect and defuse zipbombs.
 	var totalSize uint64
 	for _, file := range archive.File {
+		if totalSize+file.UncompressedSize64 < totalSize {
+			// Would overflow
+			totalSize = math.MaxUint64
+			break
+		}
 		totalSize += file.UncompressedSize64
 	}
 	if totalSize > config.Limits.MaxSiteSize.Bytes() {
