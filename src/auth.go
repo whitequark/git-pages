@@ -54,12 +54,25 @@ func GetHost(r *http.Request) (string, error) {
 	// this also rejects invalid characters and labels
 	host, err = idnaProfile.ToASCII(host)
 	if err != nil {
-		return "", AuthError{http.StatusBadRequest,
-			fmt.Sprintf("malformed host name %q", host)}
+		if config.Feature("relaxed-idna") {
+			// unfortunately, the go IDNA library has some significant issues around its
+			// Unicode TR46 implementation: https://github.com/golang/go/issues/76804
+			// we would like to allow *just* the _ here, but adding `idna.StrictDomainName(false)`
+			// would also accept domains like `*.foo.bar` which should clearly be disallowed.
+			// as a workaround, accept a domain name if it is valid with all `_` characters
+			// replaced with an alphanumeric character (we use `a`); this allows e.g. `foo_bar.xxx`
+			// and `foo__bar.xxx`, as well as `_foo.xxx` and `foo_.xxx`. labels starting with
+			// an underscore are explicitly rejected below.
+			_, err = idnaProfile.ToASCII(strings.ReplaceAll(host, "_", "a"))
+		}
+		if err != nil {
+			return "", AuthError{http.StatusBadRequest,
+				fmt.Sprintf("malformed host name %q", host)}
+		}
 	}
-	if strings.HasPrefix(host, ".") {
+	if strings.HasPrefix(host, ".") || strings.HasPrefix(host, "_") {
 		return "", AuthError{http.StatusBadRequest,
-			fmt.Sprintf("host name %q is reserved", host)}
+			fmt.Sprintf("reserved host name %q", host)}
 	}
 	host = strings.TrimSuffix(host, ".")
 	return host, nil

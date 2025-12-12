@@ -28,6 +28,9 @@ jobs:
       - name: Build service
         run: |
           go build
+      - name: Run tests
+        run: |
+          go test ./src
       - name: Run static analysis
         run: |
           go vet
