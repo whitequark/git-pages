@@ -11,7 +11,7 @@ RUN git clone https://github.com/ochinchina/supervisord . && \
 RUN GOBIN=/usr/bin go install -ldflags "-s -w"
 
 # Build Caddy with S3 storage backend.
-FROM docker.io/library/caddy:2.10.2-builder@sha256:fe404674d209455fdef351db5437758ee0e70a6b59abe770663c09cfa05dbddf AS caddy-builder
+FROM docker.io/library/caddy:2.10.2-builder@sha256:6644af24bde2b4dbb07eb57637051abd2aa713e9787fa1eb544c3f31a0620898 AS caddy-builder
 RUN xcaddy build ${CADDY_VERSION} \
     --with=github.com/ss098/certmagic-s3@v0.0.0-20250922022452-8af482af5f39
 
@@ -26,7 +26,7 @@ COPY src/ ./src/
 RUN go build -ldflags "-s -w" -o git-pages .
 
 # Compose git-pages and Caddy.
-FROM docker.io/library/busybox:1.37.0-musl@sha256:ef13e7482851632be3faf5bd1d28d4727c0810901d564b35416f309975a12a30
+FROM docker.io/library/busybox:1.37.0-musl@sha256:b259afe60d4b88dbdb31908ca9524ef5308afd01aea17f4ce44ddb3c6a882929
 COPY --from=ca-certificates-builder /etc/ssl/cert.pem /etc/ssl/cert.pem
 COPY --from=supervisor-builder /usr/bin/supervisord /bin/supervisord
 COPY --from=caddy-builder /usr/bin/caddy /bin/caddy
