@@ -12,7 +12,7 @@ jobs:
   check:
     runs-on: codeberg-small-lazy
     container:
-      image: docker.io/library/node:24-trixie-slim@sha256:fcdfd7bcd8f641c8c76a8950343c73912d68ba341e8dd1074e663b784d3e76f4
+      image: docker.io/library/node:24-trixie-slim@sha256:9ad7e7db423b2ca7ddcc01568da872701ef6171505bd823978736247885c7eb4
     steps:
       - name: Check out source code
         uses: https://code.forgejo.org/actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -42,7 +42,7 @@ jobs:
     needs: [check]
     runs-on: codeberg-medium-lazy
     container:
-      image: docker.io/library/node:24-trixie-slim@sha256:fcdfd7bcd8f641c8c76a8950343c73912d68ba341e8dd1074e663b784d3e76f4
+      image: docker.io/library/node:24-trixie-slim@sha256:9ad7e7db423b2ca7ddcc01568da872701ef6171505bd823978736247885c7eb4
     steps:
       - name: Check out source code
         uses: https://code.forgejo.org/actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -77,7 +77,7 @@ jobs:
     needs: [check]
     runs-on: codeberg-medium-lazy
     container:
-      image: docker.io/library/node:24-trixie-slim@sha256:fcdfd7bcd8f641c8c76a8950343c73912d68ba341e8dd1074e663b784d3e76f4
+      image: docker.io/library/node:24-trixie-slim@sha256:9ad7e7db423b2ca7ddcc01568da872701ef6171505bd823978736247885c7eb4
     steps:
       - name: Install dependencies
         run: |
