@@ -607,6 +607,8 @@ func reportUpdateResult(w http.ResponseWriter, r *http.Request, result UpdateRes
 			w.WriteHeader(http.StatusUnsupportedMediaType)
 		} else if errors.Is(result.err, ErrArchiveTooLarge) {
 			w.WriteHeader(http.StatusRequestEntityTooLarge)
+		} else if errors.Is(result.err, ErrRepositoryTooLarge) {
+			w.WriteHeader(http.StatusUnprocessableEntity)
 		} else if errors.Is(result.err, ErrMalformedPatch) {
 			w.WriteHeader(http.StatusUnprocessableEntity)
 		} else if errors.Is(result.err, ErrPreconditionFailed) {

@@ -23,6 +23,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+var ErrRepositoryTooLarge = errors.New("repository too large")
+
 func FetchRepository(
 	ctx context.Context, repoURL string, branch string, oldManifest *Manifest,
 ) (
@@ -152,9 +154,10 @@ func FetchRepository(
 	// This will only succeed if a `blob:none` filter isn't supported and we got a full
 	// clone despite asking for a partial clone.
 	for hash, manifestEntry := range blobsNeeded {
-		if err := readGitBlob(repo, hash, manifestEntry); err == nil {
-			dataBytesTransferred += manifestEntry.GetOriginalSize()
+		if err := readGitBlob(repo, hash, manifestEntry, &dataBytesTransferred); err == nil {
 			delete(blobsNeeded, hash)
+		} else if errors.Is(err, ErrRepositoryTooLarge) {
+			return nil, err
 		}
 	}
 
@@ -193,10 +196,9 @@ func FetchRepository(
 
 		// All remaining blobs should now be available.
 		for hash, manifestEntry := range blobsNeeded {
-			if err := readGitBlob(repo, hash, manifestEntry); err != nil {
+			if err := readGitBlob(repo, hash, manifestEntry, &dataBytesTransferred); err != nil {
 				return nil, err
 			}
-			dataBytesTransferred += manifestEntry.GetOriginalSize()
 			delete(blobsNeeded, hash)
 		}
 	}
@@ -210,7 +212,9 @@ func FetchRepository(
 	return manifest, nil
 }
 
-func readGitBlob(repo *git.Repository, hash plumbing.Hash, entry *Entry) error {
+func readGitBlob(
+	repo *git.Repository, hash plumbing.Hash, entry *Entry, bytesTransferred *int64,
+) error {
 	blob, err := repo.BlobObject(hash)
 	if err != nil {
 		return fmt.Errorf("git blob %s: %w", hash, err)
@@ -239,5 +243,14 @@ func readGitBlob(repo *git.Repository, hash plumbing.Hash, entry *Entry) error {
 	entry.Transform = Transform_Identity.Enum()
 	entry.OriginalSize = proto.Int64(blob.Size)
 	entry.CompressedSize = proto.Int64(blob.Size)
+
+	*bytesTransferred += blob.Size
+	if uint64(*bytesTransferred) > config.Limits.MaxSiteSize.Bytes() {
+		return fmt.Errorf("%w: fetch exceeds %s limit",
+			ErrRepositoryTooLarge,
+			config.Limits.MaxSiteSize.HR(),
+		)
+	}
+
 	return nil
 }
