@@ -148,7 +148,7 @@ func GetProblemReport(manifest *Manifest) []string {
 	var report []string
 	for _, problem := range manifest.Problems {
 		report = append(report,
-			fmt.Sprintf("%s: %s", problem.GetPath(), problem.GetCause()))
+			fmt.Sprintf("/%s: %s", problem.GetPath(), problem.GetCause()))
 	}
 	return report
 }
