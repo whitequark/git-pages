@@ -599,8 +599,10 @@ func reportUpdateResult(w http.ResponseWriter, r *http.Request, result UpdateRes
 
 	switch result.outcome {
 	case UpdateError:
-		if errors.Is(result.err, ErrManifestTooLarge) {
-			w.WriteHeader(http.StatusRequestEntityTooLarge)
+		if errors.Is(result.err, ErrSiteTooLarge) {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+		} else if errors.Is(result.err, ErrManifestTooLarge) {
+			w.WriteHeader(http.StatusUnprocessableEntity)
 		} else if errors.Is(result.err, errArchiveFormat) {
 			w.WriteHeader(http.StatusUnsupportedMediaType)
 		} else if errors.Is(result.err, ErrArchiveTooLarge) {

@@ -283,6 +283,7 @@ func PrepareManifest(ctx context.Context, manifest *Manifest) error {
 	return nil
 }
 
+var ErrSiteTooLarge = errors.New("site too large")
 var ErrManifestTooLarge = errors.New("manifest too large")
 
 // Uploads inline file data over certain size to the storage backend. Returns a copy of
@@ -325,12 +326,21 @@ func StoreManifest(
 		}
 	}
 
-	// Compute the deduplicated storage size.
-	var blobSizes = make(map[string]int64)
+	// Compute the total and deduplicated storage size.
+	totalSize := int64(0)
+	blobSizes := map[string]int64{}
 	for _, entry := range manifest.Contents {
+		totalSize += entry.GetOriginalSize()
 		if entry.GetType() == Type_ExternalFile {
 			blobSizes[string(entry.Data)] = entry.GetCompressedSize()
 		}
+	}
+	if uint64(totalSize) > config.Limits.MaxSiteSize.Bytes() {
+		return nil, fmt.Errorf("%w: contents size %s exceeds %s limit",
+			ErrSiteTooLarge,
+			datasize.ByteSize(totalSize).HR(),
+			config.Limits.MaxSiteSize.HR(),
+		)
 	}
 	for _, blobSize := range blobSizes {
 		*extManifest.StoredSize += blobSize
