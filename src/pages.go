@@ -417,13 +417,15 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			io.Copy(w, reader)
 		}
 	} else {
-		// consider content fresh for 60 seconds (the same as the freshness interval of
-		// manifests in the S3 backend), and use stale content anyway as long as it's not
-		// older than a hour; while it is cheap to handle If-Modified-Since queries
-		// server-side, on the client `max-age=0, must-revalidate` causes every resource
-		// to block the page load every time
-		w.Header().Set("Cache-Control", "max-age=60, stale-while-revalidate=3600")
-		// see https://web.dev/articles/stale-while-revalidate for details
+		if _, hasCacheControl := w.Header()["Cache-Control"]; !hasCacheControl {
+			// consider content fresh for 60 seconds (the same as the freshness interval of
+			// manifests in the S3 backend), and use stale content anyway as long as it's not
+			// older than a hour; while it is cheap to handle If-Modified-Since queries
+			// server-side, on the client `max-age=0, must-revalidate` causes every resource
+			// to block the page load every time
+			w.Header().Set("Cache-Control", "max-age=60, stale-while-revalidate=3600")
+			// see https://web.dev/articles/stale-while-revalidate for details
+		}
 
 		// http.ServeContent handles conditional requests and range requests
 		http.ServeContent(w, r, entryPath, mtime, reader)
