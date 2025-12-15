@@ -145,6 +145,9 @@ func ExtractTar(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 		return nil, UnresolvedRefError{missing}
 	}
 
+	// Ensure parent directories exist for all entries.
+	EnsureLeadingDirectories(manifest)
+
 	logc.Printf(ctx,
 		"reuse: %s recycled, %s transferred\n",
 		datasize.ByteSize(dataBytesRecycled).HR(),
@@ -226,6 +229,9 @@ func ExtractZip(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 		return nil, UnresolvedRefError{missing}
 	}
 
+	// Ensure parent directories exist for all entries.
+	EnsureLeadingDirectories(manifest)
+
 	logc.Printf(ctx,
 		"reuse: %s recycled, %s transferred\n",
 		datasize.ByteSize(dataBytesRecycled).HR(),
@@ -234,3 +240,4 @@ func ExtractZip(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 
 	return manifest, nil
 }
+

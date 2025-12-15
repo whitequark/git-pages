@@ -144,6 +144,20 @@ func AddProblem(manifest *Manifest, pathName, format string, args ...any) error 
 	return fmt.Errorf("%s: %s", pathName, cause)
 }
 
+// EnsureLeadingDirectories adds directory entries for any parent directories
+// that are implicitly referenced by files in the manifest but don't have
+// explicit directory entries. (This can be the case if an archive is created
+// via globs rather than including a whole directory.)
+func EnsureLeadingDirectories(manifest *Manifest) {
+	for name := range manifest.Contents {
+		for dir := path.Dir(name); dir != "." && dir != ""; dir = path.Dir(dir) {
+			if _, exists := manifest.Contents[dir]; !exists {
+				AddDirectory(manifest, dir)
+			}
+		}
+	}
+}
+
 func GetProblemReport(manifest *Manifest) []string {
 	var report []string
 	for _, problem := range manifest.Problems {
