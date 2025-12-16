@@ -329,7 +329,7 @@ func StoreManifest(
 	// Compute the total and deduplicated storage size.
 	totalSize := int64(0)
 	blobSizes := map[string]int64{}
-	for _, entry := range manifest.Contents {
+	for _, entry := range extManifest.Contents {
 		totalSize += entry.GetOriginalSize()
 		if entry.GetType() == Type_ExternalFile {
 			blobSizes[string(entry.Data)] = entry.GetCompressedSize()
