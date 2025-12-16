@@ -770,7 +770,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		result := UpdateFromRepository(ctx, webRoot, repoURL, auth.branch)
 		resultChan <- result
 		observeSiteUpdate("webhook", &result)
-	}(r.Context())
+	}(context.WithoutCancel(r.Context()))
 
 	var result UpdateResult
 	select {
