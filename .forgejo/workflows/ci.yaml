@@ -30,11 +30,11 @@ jobs:
           go build
       - name: Run tests
         run: |
-          go test ./src
+          go test ./...
       - name: Run static analysis
         run: |
-          go vet
-          staticcheck
+          go vet ./...
+          staticcheck ./...
 
   release:
     # IMPORTANT: This workflow step will not work without the Releases unit enabled!
