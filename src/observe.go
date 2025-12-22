@@ -51,6 +51,59 @@ func hasSentry() bool {
 	return os.Getenv("SENTRY_DSN") != ""
 }
 
+func chainSentryMiddleware(
+	middleware ...func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event,
+) func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+	return func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+		for idx := 0; idx < len(middleware) && event != nil; idx++ {
+			event = middleware[idx](event, hint)
+		}
+		return event
+	}
+}
+
+// sensitiveHTTPHeaders extends the list of sensitive headers defined in the Sentry Go SDK with our
+// own application-specific header field names.
+var sensitiveHTTPHeaders = map[string]struct{}{
+	"Forge-Authorization": {},
+}
+
+// scrubSentryEvent removes sensitive HTTP header fields from the Sentry event.
+func scrubSentryEvent(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+	if event.Request != nil && event.Request.Headers != nil {
+		for key := range event.Request.Headers {
+			if _, ok := sensitiveHTTPHeaders[key]; ok {
+				delete(event.Request.Headers, key)
+			}
+		}
+	}
+	return event
+}
+
+// sampleSentryEvent returns a function that discards a Sentry event according to the sample rate,
+// unless the associated HTTP request triggers a mutation or it took too long to produce a response,
+// in which case the event is never discarded.
+func sampleSentryEvent(sampleRate float64) func(*sentry.Event, *sentry.EventHint) *sentry.Event {
+	return func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+		newSampleRate := sampleRate
+		if event.Request != nil {
+			switch event.Request.Method {
+			case "PUT", "POST", "DELETE":
+				newSampleRate = 1
+			}
+		}
+		duration := event.Timestamp.Sub(event.StartTime)
+		threshold := time.Duration(config.Observability.SlowResponseThreshold)
+		if duration >= threshold {
+			newSampleRate = 1
+		}
+		if rand.Float64() < newSampleRate {
+			return event
+		}
+		return nil
+	}
+}
+
 func InitObservability() {
 	debug.SetPanicOnFault(true)
 
@@ -98,39 +151,24 @@ func InitObservability() {
 			enableTracing = value
 		}
 
+		tracesSampleRate := 1.00
+		switch environment {
+		case "development", "staging":
+		default:
+			tracesSampleRate = 0.05
+		}
+
 		options := sentry.ClientOptions{}
 		options.DisableTelemetryBuffer = !config.Feature("sentry-telemetry-buffer")
 		options.Environment = environment
 		options.EnableLogs = enableLogs
 		options.EnableTracing = enableTracing
-		options.TracesSampleRate = 1
-		switch environment {
-		case "development", "staging":
-		default:
-			options.BeforeSendTransaction = func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-				sampleRate := 0.05
-				if trace, ok := event.Contexts["trace"]; ok {
-					if data, ok := trace["data"].(map[string]any); ok {
-						if method, ok := data["http.request.method"].(string); ok {
-							switch method {
-							case "PUT", "DELETE", "POST":
-								sampleRate = 1
-							default:
-								duration := event.Timestamp.Sub(event.StartTime)
-								threshold := time.Duration(config.Observability.SlowResponseThreshold)
-								if duration >= threshold {
-									sampleRate = 1
-								}
-							}
-						}
-					}
-				}
-				if rand.Float64() < sampleRate {
-					return event
-				}
-				return nil
-			}
-		}
+		options.TracesSampleRate = 1 // use our own custom sampling logic
+		options.BeforeSend = scrubSentryEvent
+		options.BeforeSendTransaction = chainSentryMiddleware(
+			sampleSentryEvent(tracesSampleRate),
+			scrubSentryEvent,
+		)
 		if err := sentry.Init(options); err != nil {
 			log.Fatalf("sentry: %s\n", err)
 		}
