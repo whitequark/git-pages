@@ -85,26 +85,25 @@ jobs:
           apt-get -y install ca-certificates buildah qemu-user-binfmt
       - name: Check out source code
         uses: https://code.forgejo.org/actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-      - name: Authenticate with Docker
-        run: |
-          buildah login --authfile=/tmp/authfile-${FORGE}.json \
-            -u ${{ vars.PACKAGES_USER }} -p ${{ secrets.PACKAGES_TOKEN }} ${FORGE}
+      - name: Cache container build
+        uses: actions/cache@v5
+        with:
+          path: /var/lib/containers/storage
+          key: buildah-${{ hashFiles('Dockerfile') }}
       - name: Build container
         run: |
           printf '[storage]\ndriver="vfs"\nrunroot="/run/containers/storage"\ngraphroot="/var/lib/containers/storage"\n' | tee /etc/containers/storage.conf
-          buildah build ${CACHE} --arch=amd64 --tag=container:${VER}-amd64
-          buildah build ${CACHE} --arch=arm64 --tag=container:${VER}-arm64
-          buildah manifest create container:${VER} \
-            container:${VER}-amd64 \
-            container:${VER}-arm64
+          buildah build --arch=amd64 --tag=container:amd64
+          buildah build --arch=arm64 --tag=container:arm64
+          buildah manifest create container container:amd64 container:arm64
         env:
           BUILDAH_ISOLATION: chroot
-          VER: ${{ startsWith(forge.event.ref, 'refs/tags/v') && forge.ref_name || 'latest' }}
-          CACHE: ${{ format('--authfile=/tmp/authfile-{0}.json --layers --cache-from {0}/{1}/cache --cache-to {0}/{1}/cache', env.FORGE, forge.repository) }}
       - if: ${{ forge.repository == 'git-pages/git-pages' }}
         name: Push container to Codeberg
         run: |
-          buildah manifest push --authfile=/tmp/authfile-${FORGE}.json \
-            --all container:${VER} "docker://${FORGE}/${{ forge.repository }}:${VER/v/}"
+          buildah login --authfile=/tmp/authfile.json \
+            -u ${{ vars.PACKAGES_USER }} -p ${{ secrets.PACKAGES_TOKEN }} ${FORGE}
+          buildah manifest push --authfile=/tmp/authfile.json \
+            --all container "docker://${FORGE}/${{ forge.repository }}:${VER/v/}"
         env:
           VER: ${{ startsWith(forge.event.ref, 'refs/tags/v') && forge.ref_name || 'latest' }}
