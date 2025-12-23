@@ -83,7 +83,7 @@ jobs:
       - name: Install dependencies
         run: |
           apt-get -y update
-          apt-get -y install ca-certificates buildah qemu-user-binfmt
+          apt-get -y install ca-certificates zstd buildah qemu-user-binfmt
       - name: Check out source code
         uses: https://code.forgejo.org/actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - name: Cache container build
