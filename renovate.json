@@ -14,5 +14,7 @@
   "lockFileMaintenance": {
     "enabled": true,
     "automerge": false
-  }
+  },
+  "semanticCommits": "disabled",
+  "commitMessagePrefix": "Renovate"
 }
