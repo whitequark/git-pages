@@ -96,6 +96,7 @@ jobs:
           printf '[storage]\ndriver="vfs"\nrunroot="/run/containers/storage"\ngraphroot="/var/lib/containers/storage"\n' | tee /etc/containers/storage.conf
           buildah build --arch=amd64 --tag=container:amd64
           buildah build --arch=arm64 --tag=container:arm64
+          buildah manifest exists container && buildah manifest remove container
           buildah manifest create container container:amd64 container:arm64
         env:
           BUILDAH_ISOLATION: chroot
