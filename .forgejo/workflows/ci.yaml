@@ -99,6 +99,7 @@ jobs:
           buildah manifest create container container:amd64 container:arm64
         env:
           BUILDAH_ISOLATION: chroot
+          BUILDAH_LAYERS: true
       - if: ${{ forge.repository == 'git-pages/git-pages' }}
         name: Push container to Codeberg
         run: |
