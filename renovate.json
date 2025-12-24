@@ -16,5 +16,5 @@
     "automerge": false
   },
   "semanticCommits": "disabled",
-  "commitMessagePrefix": "Renovate"
+  "commitMessagePrefix": "[Renovate]"
 }
