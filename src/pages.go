@@ -216,6 +216,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			// we only offer `/.git-pages/archive.tar` and not the `.tar.gz`/`.tar.zst` variants
 			// because HTTP can already request compression using the `Content-Encoding` mechanism
 			acceptedEncodings := ParseAcceptEncodingHeader(r.Header.Get("Accept-Encoding"))
+			w.Header().Add("Vary", "Accept-Encoding")
 			negotiated := acceptedEncodings.Negotiate("zstd", "gzip", "identity")
 			if negotiated != "" {
 				w.Header().Set("Content-Encoding", negotiated)
@@ -327,6 +328,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 
 	var offeredEncodings []string
 	acceptedEncodings := ParseAcceptEncodingHeader(r.Header.Get("Accept-Encoding"))
+	w.Header().Add("Vary", "Accept-Encoding")
 	negotiatedEncoding := true
 	switch entry.GetTransform() {
 	case Transform_Identity:
