@@ -820,7 +820,14 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 	// any intentional deviation is an opportunity to miss an issue that will affect our
 	// visitors but not our health checks.
 	if r.Header.Get("Health-Check") == "" {
-		logc.Println(r.Context(), "pages:", r.Method, r.Host, r.URL, r.Header.Get("Content-Type"))
+		var mediaType string
+		switch r.Method {
+		case "HEAD", "GET":
+			mediaType = r.Header.Get("Accept")
+		default:
+			mediaType = r.Header.Get("Content-Type")
+		}
+		logc.Println(r.Context(), "pages:", r.Method, r.Host, r.URL, mediaType)
 		if region := os.Getenv("FLY_REGION"); region != "" {
 			machine_id := os.Getenv("FLY_MACHINE_ID")
 			w.Header().Add("Server", fmt.Sprintf("git-pages (fly.io; %s; %s)", region, machine_id))
