@@ -182,6 +182,9 @@ func PartialUpdateFromArchive(
 		// `*Manifest` objects, which should never be mutated.
 		newManifest := &Manifest{}
 		proto.Merge(newManifest, oldManifest)
+		newManifest.RepoUrl = nil
+		newManifest.Branch = nil
+		newManifest.Commit = nil
 		if err := ApplyTarPatch(newManifest, reader, parents); err != nil {
 			return nil, err
 		} else {
