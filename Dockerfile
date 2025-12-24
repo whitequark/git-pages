@@ -1,5 +1,5 @@
 # Install CA certificates.
-FROM docker.io/library/alpine:latest@sha256:865b95f46d98cf867a156fe4a135ad3fe50d2056aa3f25ed31662dff6da4eb62 AS ca-certificates-builder
+FROM docker.io/library/alpine:3 AS ca-certificates-builder
 RUN apk --no-cache add ca-certificates
 
 # Build supervisor.
@@ -36,7 +36,7 @@ WORKDIR /app
 RUN mkdir /app/data
 COPY conf/supervisord.conf /app/supervisord.conf
 COPY conf/Caddyfile /app/Caddyfile
-COPY conf/config.example.toml /app/config.toml
+COPY conf/config.docker.toml /app/config.toml
 
 # Caddy ports:
 EXPOSE 80/tcp 443/tcp 443/udp
@@ -46,8 +46,8 @@ EXPOSE 3000/tcp 3001/tcp 3002/tcp
 # While the default command is to run git-pages standalone, the intended configuration
 # is to use it with Caddy and store both site data and credentials to an S3-compatible
 # object store.
-#  * In a standalone configuration, the default, git-caddy listens on port 3000 (http).
-#  * In a combined configuration, supervisord launches both git-caddy and Caddy, and
+#  * In a standalone configuration, the default, git-pages listens on port 3000 (http).
+#  * In a combined configuration, supervisord launches both git-pages and Caddy, and
 #    Caddy listens on ports 80 (http) and 443 (https).
 CMD ["git-pages"]
 # CMD ["supervisord"]
