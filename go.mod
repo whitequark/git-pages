@@ -3,7 +3,7 @@ module codeberg.org/git-pages/git-pages
 go 1.25.0
 
 require (
-	codeberg.org/git-pages/go-headers v1.1.0
+	codeberg.org/git-pages/go-headers v1.1.1
 	codeberg.org/git-pages/go-slog-syslog v0.0.0-20251207093707-892f654e80b7
 	github.com/KimMachineGun/automemlimit v0.7.5
 	github.com/c2h5oh/datasize v0.0.0-20231215233829-aa82cc1e6500

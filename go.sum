@@ -1,5 +1,5 @@
-codeberg.org/git-pages/go-headers v1.1.0 h1:rk7/SOSsn+XuL7PUQZFYUaWKHEaj6K8mXmUV9rF2VxE=
-codeberg.org/git-pages/go-headers v1.1.0/go.mod h1:N4gwH0U3YPwmuyxqH7xBA8j44fTPX+vOEP7ejJVBPts=
+codeberg.org/git-pages/go-headers v1.1.1 h1:fpIBELKo66Z2k+gCeYl5mCEXVQ99Lmx1iup1nbo2shE=
+codeberg.org/git-pages/go-headers v1.1.1/go.mod h1:N4gwH0U3YPwmuyxqH7xBA8j44fTPX+vOEP7ejJVBPts=
 codeberg.org/git-pages/go-slog-syslog v0.0.0-20251207093707-892f654e80b7 h1:+rkrAxhNZo/eKEcKOqVOsF6ohAPv5amz0JLburOeRjs=
 codeberg.org/git-pages/go-slog-syslog v0.0.0-20251207093707-892f654e80b7/go.mod h1:8NPSXbYcVb71qqNM5cIgn1/uQgMisLbu2dVD1BNxsUw=
 github.com/KimMachineGun/automemlimit v0.7.5 h1:RkbaC0MwhjL1ZuBKunGDjE/ggwAX43DwZrJqVwyveTk=
