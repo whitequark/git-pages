@@ -3,6 +3,12 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     nix-filter.url = "github:numtide/nix-filter";
+
+    gomod2nix = {
+      url = "github:nix-community/gomod2nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
+    };
   };
 
   outputs =
@@ -11,13 +17,20 @@
       nixpkgs,
       flake-utils,
       nix-filter,
-    }:
+      ...
+    }@inputs:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
+        pkgs = import nixpkgs {
+          inherit system;
 
-        git-pages = pkgs.buildGo125Module {
+          overlays = [
+            inputs.gomod2nix.overlays.default
+          ];
+        };
+
+        git-pages = pkgs.buildGoApplication {
           pname = "git-pages";
           version = "0";
 
@@ -43,7 +56,8 @@
             "-s -w"
           ];
 
-          vendorHash = "sha256-xG2hFc5ugJOPNCBz+GEoC7Wa5ATh86q8MrZRqs+HFUg=";
+          go = pkgs.go_1_25;
+          modules = ./gomod2nix.toml;
         };
       in
       {
@@ -56,6 +70,7 @@
 
           packages = with pkgs; [
             caddy
+            gomod2nix
           ];
         };
 
