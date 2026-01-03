@@ -13,7 +13,7 @@ require (
 	github.com/getsentry/sentry-go v0.40.0
 	github.com/getsentry/sentry-go/slog v0.40.0
 	github.com/go-git/go-billy/v6 v6.0.0-20251217170237-e9738f50a3cd
-	github.com/go-git/go-git/v6 v6.0.0-20251224103503-78aff6aa5ea9
+	github.com/go-git/go-git/v6 v6.0.0-20251231065035-29ae690a9f19
 	github.com/jpillora/backoff v1.0.0
 	github.com/kankanreno/go-snowflake v1.2.0
 	github.com/klauspost/compress v1.18.2
