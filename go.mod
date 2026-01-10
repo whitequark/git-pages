@@ -22,7 +22,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/prometheus/client_golang v1.23.2
-	github.com/samber/slog-multi v1.6.0
+	github.com/samber/slog-multi v1.7.0
 	github.com/tj/go-redirects v0.0.0-20200911105812-fd1ba1020b37
 	github.com/valyala/fasttemplate v1.2.2
 	golang.org/x/net v0.48.0

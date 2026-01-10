@@ -26,7 +26,7 @@ COPY src/ ./src/
 RUN go build -ldflags "-s -w" -o git-pages .
 
 # Compose git-pages and Caddy.
-FROM docker.io/library/busybox:1.37.0-musl@sha256:b259afe60d4b88dbdb31908ca9524ef5308afd01aea17f4ce44ddb3c6a882929
+FROM docker.io/library/busybox:1.37.0-musl@sha256:03db190ed4c1ceb1c55d179a0940e2d71d42130636a780272629735893292223
 COPY --from=ca-certificates-builder /etc/ssl/cert.pem /etc/ssl/cert.pem
 COPY --from=supervisor-builder /usr/bin/supervisord /bin/supervisord
 COPY --from=caddy-builder /usr/bin/caddy /bin/caddy
