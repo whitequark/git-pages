@@ -10,22 +10,22 @@ require (
 	github.com/creasty/defaults v1.8.0
 	github.com/dghubble/trie v0.1.0
 	github.com/fatih/color v1.18.0
-	github.com/getsentry/sentry-go v0.40.0
-	github.com/getsentry/sentry-go/slog v0.40.0
-	github.com/go-git/go-billy/v6 v6.0.0-20251217170237-e9738f50a3cd
-	github.com/go-git/go-git/v6 v6.0.0-20251231065035-29ae690a9f19
+	github.com/getsentry/sentry-go v0.41.0
+	github.com/getsentry/sentry-go/slog v0.41.0
+	github.com/go-git/go-billy/v6 v6.0.0-20260114122816-19306b749ecc
+	github.com/go-git/go-git/v6 v6.0.0-20260114124804-a8db3a6585a6
 	github.com/jpillora/backoff v1.0.0
 	github.com/kankanreno/go-snowflake v1.2.0
-	github.com/klauspost/compress v1.18.2
+	github.com/klauspost/compress v1.18.3
 	github.com/maypok86/otter/v2 v2.3.0
-	github.com/minio/minio-go/v7 v7.0.97
+	github.com/minio/minio-go/v7 v7.0.98
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/samber/slog-multi v1.7.0
 	github.com/tj/go-redirects v0.0.0-20200911105812-fd1ba1020b37
 	github.com/valyala/fasttemplate v1.2.2
-	golang.org/x/net v0.48.0
+	golang.org/x/net v0.49.0
 	google.golang.org/protobuf v1.36.11
 )
 
@@ -49,7 +49,7 @@ require (
 	github.com/leodido/go-syslog/v4 v4.3.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/minio/crc64nvme v1.1.0 // indirect
+	github.com/minio/crc64nvme v1.1.1 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
@@ -65,12 +65,13 @@ require (
 	github.com/samber/slog-common v0.19.0 // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
-	github.com/tinylib/msgp v1.3.0 // indirect
+	github.com/tinylib/msgp v1.6.1 // indirect
 	github.com/tj/assert v0.0.3 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
-	golang.org/x/crypto v0.46.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/crypto v0.47.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
