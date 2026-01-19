@@ -159,7 +159,6 @@ func InitObservability() {
 		}
 
 		options := sentry.ClientOptions{}
-		options.DisableTelemetryBuffer = !config.Feature("sentry-telemetry-buffer")
 		options.Environment = environment
 		options.EnableLogs = enableLogs
 		options.EnableTracing = enableTracing
