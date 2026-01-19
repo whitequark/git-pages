@@ -265,8 +265,8 @@ func authorizeWildcardMatchSite(r *http.Request, pattern *WildcardPattern) (*Aut
 	}
 
 	if userName, found := pattern.Matches(host); found {
-		repoURLs, branch := pattern.ApplyTemplate(userName, projectName)
-		return &Authorization{repoURLs, branch}, nil
+		repoURL, branch := pattern.ApplyTemplate(userName, projectName)
+		return &Authorization{[]string{repoURL}, branch}, nil
 	} else {
 		return nil, AuthError{
 			http.StatusUnauthorized,
@@ -632,25 +632,20 @@ func authorizeForgeWithToken(r *http.Request) (*Authorization, error) {
 		}
 
 		if userName, found := pattern.Matches(host); found {
-			repoURLs, branch := pattern.ApplyTemplate(userName, projectName)
-			for _, repoURL := range repoURLs {
-				parsedRepoURL, err := url.Parse(repoURL)
-				if err != nil {
-					panic(err) // misconfiguration
-				}
-
-				if err = checkGogsRepositoryPushPermission(parsedRepoURL, authorization); err != nil {
-					errs = append(errs, err)
-					continue
-				}
-
-				// This will actually be ignored by the caller of AuthorizeUpdateFromArchive,
-				// but we return this information as it makes sense to do contextually here.
-				return &Authorization{
-					[]string{repoURL},
-					branch,
-				}, nil
+			repoURL, branch := pattern.ApplyTemplate(userName, projectName)
+			parsedRepoURL, err := url.Parse(repoURL)
+			if err != nil {
+				panic(err) // misconfiguration
 			}
+
+			if err = checkGogsRepositoryPushPermission(parsedRepoURL, authorization); err != nil {
+				errs = append(errs, err)
+				continue
+			}
+
+			// This will actually be ignored by the caller of AuthorizeUpdateFromArchive,
+			// but we return this information as it makes sense to do contextually here.
+			return &Authorization{[]string{repoURL}, branch}, nil
 		}
 	}
 

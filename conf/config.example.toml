@@ -12,7 +12,7 @@ metrics = "tcp/localhost:3002"
 [[wildcard]] # non-default section
 domain = "codeberg.page"
 clone-url = "https://codeberg.org/<user>/<project>.git"
-index-repos = ["<user>.codeberg.page", "pages"]
+index-repo = "pages"
 index-repo-branch = "main"
 authorization = "forgejo"
 

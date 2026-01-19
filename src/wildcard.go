@@ -11,7 +11,7 @@ import (
 type WildcardPattern struct {
 	Domain        []string
 	CloneURL      *fasttemplate.Template
-	IndexRepos    []*fasttemplate.Template
+	IndexRepo     *fasttemplate.Template
 	IndexBranch   string
 	Authorization bool
 }
@@ -49,27 +49,24 @@ func (pattern *WildcardPattern) Matches(host string) (string, bool) {
 	return subdomain, true
 }
 
-func (pattern *WildcardPattern) ApplyTemplate(userName string, projectName string) ([]string, string) {
-	var repoURLs []string
+func (pattern *WildcardPattern) ApplyTemplate(userName string, projectName string) (string, string) {
+	var repoURL string
 	var branch string
 	repoURLTemplate := pattern.CloneURL
 	if projectName == ".index" {
-		for _, indexRepoTemplate := range pattern.IndexRepos {
-			indexRepo := indexRepoTemplate.ExecuteString(map[string]any{"user": userName})
-			repoURLs = append(repoURLs, repoURLTemplate.ExecuteString(map[string]any{
-				"user":    userName,
-				"project": indexRepo,
-			}))
-		}
+		repoURL = repoURLTemplate.ExecuteString(map[string]any{
+			"user":    userName,
+			"project": pattern.IndexRepo.ExecuteString(map[string]any{"user": userName}),
+		})
 		branch = pattern.IndexBranch
 	} else {
-		repoURLs = append(repoURLs, repoURLTemplate.ExecuteString(map[string]any{
+		repoURL = repoURLTemplate.ExecuteString(map[string]any{
 			"user":    userName,
 			"project": projectName,
-		}))
+		})
 		branch = "pages"
 	}
-	return repoURLs, branch
+	return repoURL, branch
 }
 
 func TranslateWildcards(configs []WildcardConfig) ([]*WildcardPattern, error) {
@@ -80,14 +77,10 @@ func TranslateWildcards(configs []WildcardConfig) ([]*WildcardPattern, error) {
 			return nil, fmt.Errorf("wildcard pattern: clone URL: %w", err)
 		}
 
-		var indexRepoTemplates []*fasttemplate.Template
 		var indexRepoBranch string = config.IndexRepoBranch
-		for _, indexRepo := range config.IndexRepos {
-			indexRepoTemplate, err := fasttemplate.NewTemplate(indexRepo, "<", ">")
-			if err != nil {
-				return nil, fmt.Errorf("wildcard pattern: index repo: %w", err)
-			}
-			indexRepoTemplates = append(indexRepoTemplates, indexRepoTemplate)
+		indexRepoTemplate, err := fasttemplate.NewTemplate(config.IndexRepo, "<", ">")
+		if err != nil {
+			return nil, fmt.Errorf("wildcard pattern: index repo: %w", err)
 		}
 
 		authorization := false
@@ -107,7 +100,7 @@ func TranslateWildcards(configs []WildcardConfig) ([]*WildcardPattern, error) {
 		wildcardPatterns = append(wildcardPatterns, &WildcardPattern{
 			Domain:        strings.Split(config.Domain, "."),
 			CloneURL:      cloneURLTemplate,
-			IndexRepos:    indexRepoTemplates,
+			IndexRepo:     indexRepoTemplate,
 			IndexBranch:   indexRepoBranch,
 			Authorization: authorization,
 		})

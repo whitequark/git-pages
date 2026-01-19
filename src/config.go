@@ -79,11 +79,11 @@ type ServerConfig struct {
 }
 
 type WildcardConfig struct {
-	Domain          string   `toml:"domain"`
-	CloneURL        string   `toml:"clone-url"` // URL template, not an exact URL
-	IndexRepos      []string `toml:"index-repos" default:"[]"`
-	IndexRepoBranch string   `toml:"index-repo-branch" default:"pages"`
-	Authorization   string   `toml:"authorization"`
+	Domain          string `toml:"domain"`
+	CloneURL        string `toml:"clone-url"` // URL template, not an exact URL
+	IndexRepo       string `toml:"index-repo" default:"pages"`
+	IndexRepoBranch string `toml:"index-repo-branch" default:"pages"`
+	Authorization   string `toml:"authorization"`
 }
 
 type FallbackConfig struct {
