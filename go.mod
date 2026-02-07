@@ -10,10 +10,10 @@ require (
 	github.com/creasty/defaults v1.8.0
 	github.com/dghubble/trie v0.1.0
 	github.com/fatih/color v1.18.0
-	github.com/getsentry/sentry-go v0.41.0
-	github.com/getsentry/sentry-go/slog v0.41.0
+	github.com/getsentry/sentry-go v0.42.0
+	github.com/getsentry/sentry-go/slog v0.42.0
 	github.com/go-git/go-billy/v6 v6.0.0-20260114122816-19306b749ecc
-	github.com/go-git/go-git/v6 v6.0.0-20260123133532-f99a98e81ce9
+	github.com/go-git/go-git/v6 v6.0.0-20260206150416-f623c7555599
 	github.com/jpillora/backoff v1.0.0
 	github.com/kankanreno/go-snowflake v1.2.0
 	github.com/klauspost/compress v1.18.3
@@ -22,7 +22,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/prometheus/client_golang v1.23.2
-	github.com/samber/slog-multi v1.7.0
+	github.com/samber/slog-multi v1.7.1
 	github.com/tj/go-redirects v0.0.0-20200911105812-fd1ba1020b37
 	github.com/valyala/fasttemplate v1.2.2
 	golang.org/x/net v0.49.0
@@ -62,7 +62,7 @@ require (
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/samber/lo v1.52.0 // indirect
-	github.com/samber/slog-common v0.19.0 // indirect
+	github.com/samber/slog-common v0.20.0 // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/tinylib/msgp v1.6.1 // indirect
