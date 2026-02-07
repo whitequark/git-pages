@@ -151,6 +151,9 @@ func AddProblem(manifest *Manifest, pathName, format string, args ...any) error 
 func EnsureLeadingDirectories(manifest *Manifest) {
 	for name := range manifest.Contents {
 		for dir := path.Dir(name); dir != "." && dir != ""; dir = path.Dir(dir) {
+			if dir == "/" {
+				panic("malformed manifest (paths must not be rooted in /)")
+			}
 			if _, exists := manifest.Contents[dir]; !exists {
 				AddDirectory(manifest, dir)
 			}

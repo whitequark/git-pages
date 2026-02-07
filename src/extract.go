@@ -11,6 +11,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/c2h5oh/datasize"
@@ -59,6 +60,16 @@ type UnresolvedRefError struct {
 
 func (err UnresolvedRefError) Error() string {
 	return fmt.Sprintf("%d unresolved blob references", len(err.missing))
+}
+
+func normalizeArchiveMemberName(fileName string) string {
+	// Strip the leading slash and any extraneous path segments.
+	fileName = path.Clean(fileName)
+	fileName = strings.TrimPrefix(fileName, "/")
+	if fileName == "." {
+		fileName = ""
+	}
+	return fileName
 }
 
 // Returns a map of git hash to entry. If `manifest` is nil, returns an empty map.
@@ -110,15 +121,10 @@ func ExtractTar(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 			return nil, err
 		}
 
-		// For some reason, GNU tar includes any leading `.` path segments in archive filenames,
-		// unless there is a `..` path segment anywhere in the input filenames.
-		fileName := header.Name
-		for {
-			if strippedName, found := strings.CutPrefix(fileName, "./"); found {
-				fileName = strippedName
-			} else {
-				break
-			}
+		fileName := normalizeArchiveMemberName(header.Name)
+		if fileName == "" {
+			// This must be the root directory. It will be filled in by EnsureLeadingDirectories.
+			continue
 		}
 
 		switch header.Typeflag {
@@ -200,8 +206,9 @@ func ExtractZip(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 	missing := []string{}
 	manifest := NewManifest()
 	for _, file := range archive.File {
+		normalizedName := normalizeArchiveMemberName(file.Name)
 		if strings.HasSuffix(file.Name, "/") {
-			AddDirectory(manifest, file.Name)
+			AddDirectory(manifest, normalizedName)
 		} else {
 			fileReader, err := file.Open()
 			if err != nil {
@@ -216,10 +223,10 @@ func ExtractZip(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 
 			if file.Mode()&os.ModeSymlink != 0 {
 				entry := addSymlinkOrBlobReference(
-					manifest, file.Name, string(fileData), index, &missing)
+					manifest, normalizedName, string(fileData), index, &missing)
 				dataBytesRecycled += entry.GetOriginalSize()
 			} else {
-				AddFile(manifest, file.Name, fileData)
+				AddFile(manifest, normalizedName, fileData)
 				dataBytesTransferred += int64(len(fileData))
 			}
 		}
@@ -240,4 +247,3 @@ func ExtractZip(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 
 	return manifest, nil
 }
-

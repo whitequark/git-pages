@@ -70,7 +70,7 @@ func ApplyTarPatch(manifest *Manifest, reader io.Reader, parents CreateParentsMo
 			return err
 		}
 
-		segments := strings.Split(strings.TrimRight(header.Name, "/"), "/")
+		segments := strings.Split(normalizeArchiveMemberName(header.Name), "/")
 		fileName := segments[len(segments)-1]
 		node := root
 		for index, segment := range segments[:len(segments)-1] {
