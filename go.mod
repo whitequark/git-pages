@@ -12,11 +12,11 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/getsentry/sentry-go v0.42.0
 	github.com/getsentry/sentry-go/slog v0.42.0
-	github.com/go-git/go-billy/v6 v6.0.0-20260207062542-7cf3dc9049c3
-	github.com/go-git/go-git/v6 v6.0.0-20260206150416-f623c7555599
+	github.com/go-git/go-billy/v6 v6.0.0-20260209124918-37866f83c2d3
+	github.com/go-git/go-git/v6 v6.0.0-20260210102253-e4d10f0e569a
 	github.com/jpillora/backoff v1.0.0
 	github.com/kankanreno/go-snowflake v1.2.0
-	github.com/klauspost/compress v1.18.3
+	github.com/klauspost/compress v1.18.4
 	github.com/maypok86/otter/v2 v2.3.0
 	github.com/minio/minio-go/v7 v7.0.98
 	github.com/pelletier/go-toml/v2 v2.2.4
@@ -25,7 +25,7 @@ require (
 	github.com/samber/slog-multi v1.7.1
 	github.com/tj/go-redirects v0.0.0-20200911105812-fd1ba1020b37
 	github.com/valyala/fasttemplate v1.2.2
-	golang.org/x/net v0.49.0
+	golang.org/x/net v0.50.0
 	google.golang.org/protobuf v1.36.11
 )
 
@@ -70,8 +70,8 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.47.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
-	golang.org/x/text v0.33.0 // indirect
+	golang.org/x/crypto v0.48.0 // indirect
+	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
