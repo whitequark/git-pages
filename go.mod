@@ -13,7 +13,7 @@ require (
 	github.com/getsentry/sentry-go v0.42.0
 	github.com/getsentry/sentry-go/slog v0.42.0
 	github.com/go-git/go-billy/v6 v6.0.0-20260209124918-37866f83c2d3
-	github.com/go-git/go-git/v6 v6.0.0-20260210102253-e4d10f0e569a
+	github.com/go-git/go-git/v6 v6.0.0-20260220113129-c02711164eb8
 	github.com/jpillora/backoff v1.0.0
 	github.com/kankanreno/go-snowflake v1.2.0
 	github.com/klauspost/compress v1.18.4
@@ -43,7 +43,7 @@ require (
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/kevinburke/ssh_config v1.4.0 // indirect
+	github.com/kevinburke/ssh_config v1.5.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/leodido/go-syslog/v4 v4.3.0 // indirect
