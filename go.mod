@@ -10,10 +10,10 @@ require (
 	github.com/creasty/defaults v1.8.0
 	github.com/dghubble/trie v0.1.0
 	github.com/fatih/color v1.18.0
-	github.com/getsentry/sentry-go v0.42.0
-	github.com/getsentry/sentry-go/slog v0.42.0
-	github.com/go-git/go-billy/v6 v6.0.0-20260209124918-37866f83c2d3
-	github.com/go-git/go-git/v6 v6.0.0-20260220113129-c02711164eb8
+	github.com/getsentry/sentry-go v0.43.0
+	github.com/getsentry/sentry-go/slog v0.43.0
+	github.com/go-git/go-billy/v6 v6.0.0-20260226131633-45bd0956d66f
+	github.com/go-git/go-git/v6 v6.0.0-20260227233803-efde8c49a5e2
 	github.com/jpillora/backoff v1.0.0
 	github.com/kankanreno/go-snowflake v1.2.0
 	github.com/klauspost/compress v1.18.4
@@ -34,7 +34,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cloudflare/circl v1.6.1 // indirect
+	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect

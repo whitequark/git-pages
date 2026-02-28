@@ -26,8 +26,8 @@ schema = 3
     version = "v2.3.0"
     hash = "sha256-7hRlwSR+fos1kx4VZmJ/7snR7zHh8ZFKX+qqqqGcQpY="
   [mod."github.com/cloudflare/circl"]
-    version = "v1.6.1"
-    hash = "sha256-Dc69V12eIFnJoUNmwg6VKXHfAMijbAeEVSDe8AiOaLo="
+    version = "v1.6.3"
+    hash = "sha256-XZm4EastgX67Dgm5BpOEW/PY4aLcHM/O8+Xbz26PuTY="
   [mod."github.com/creasty/defaults"]
     version = "v1.8.0"
     hash = "sha256-I1LE1cfOhMS5JxB7+fWTKieefw2Gge1UhIZh+A6pa6s="
@@ -50,20 +50,20 @@ schema = 3
     version = "v1.18.0"
     hash = "sha256-pP5y72FSbi4j/BjyVq/XbAOFjzNjMxZt2R/lFFxGWvY="
   [mod."github.com/getsentry/sentry-go"]
-    version = "v0.42.0"
-    hash = "sha256-vBrPAsJ7P0tTwff5T3CDrhPAHRKk6mCBqFcLYysoI9g="
+    version = "v0.43.0"
+    hash = "sha256-Wu1inIhjuAw6wKburwqIlNxC0I4akunHGh/8DOqo3xg="
   [mod."github.com/getsentry/sentry-go/slog"]
-    version = "v0.42.0"
-    hash = "sha256-tIisRFEInrBoi+CTFZdjy+S7CrXCMCXJ+RjcLEH/qY0="
+    version = "v0.43.0"
+    hash = "sha256-FJMx2E8anKtHknn867gCkYPjitZb9Okqp2uZ+dV7JqA="
   [mod."github.com/go-git/gcfg/v2"]
     version = "v2.0.2"
     hash = "sha256-icqMDeC/tEg/3979EuEN67Ml5KjdDA0R3QvR6iLLrSI="
   [mod."github.com/go-git/go-billy/v6"]
-    version = "v6.0.0-20260209124918-37866f83c2d3"
-    hash = "sha256-GtqvZvoaAIg03gCR7KtbLamFjFMnTt7cY++ZNo3i/4g="
+    version = "v6.0.0-20260226131633-45bd0956d66f"
+    hash = "sha256-s+dthtn+JewJ58R5VbvWaEoYLozDt5YpkHyXcN0xMvQ="
   [mod."github.com/go-git/go-git/v6"]
-    version = "v6.0.0-20260220113129-c02711164eb8"
-    hash = "sha256-b31kUM8/Dy6KdM3pi9W5U9uRx3ni0qXSqBGfdBUu84I="
+    version = "v6.0.0-20260227233803-efde8c49a5e2"
+    hash = "sha256-ur98cCGvoYOXz2+EIEarQrPGDXVqsiU1YP2pnCqcRVA="
   [mod."github.com/go-ini/ini"]
     version = "v1.67.0"
     hash = "sha256-V10ahGNGT+NLRdKUyRg1dos5RxLBXBk1xutcnquc/+4="
