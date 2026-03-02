@@ -681,7 +681,9 @@ func deletePage(w http.ResponseWriter, r *http.Request) error {
 }
 
 func postPage(w http.ResponseWriter, r *http.Request) error {
-	// Start a timer for the request timeout immediately.
+	// The HTTP requests for webhook delivery usually have a short timeout. We start the timer
+	// before doing any time-consuming work so that it's closely aligned to the client's timeout and
+	// we can respond before the webhook delivery is considered failed.
 	requestTimeout := 3 * time.Second
 	requestTimer := time.NewTimer(requestTimeout)
 
