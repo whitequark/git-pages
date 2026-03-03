@@ -661,7 +661,7 @@ func deletePage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	_, err = AuthorizeUpdateFromRepository(r)
+	_, err = AuthorizeDeletion(r)
 	if err != nil {
 		return err
 	}

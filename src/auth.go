@@ -390,9 +390,6 @@ func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
 	return nil, joinErrors(causes...)
 }
 
-// Returns `repoURLs, err` where if `err == nil` then the request is authorized to clone from
-// any repository URL included in `repoURLs` (by case-insensitive comparison), or any URL at all
-// if `repoURLs == nil`.
 func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
@@ -643,8 +640,9 @@ func authorizeForgeWithToken(r *http.Request) (*Authorization, error) {
 				continue
 			}
 
-			// This will actually be ignored by the caller of AuthorizeUpdateFromArchive,
-			// but we return this information as it makes sense to do contextually here.
+			// This will actually be ignored by the callers of AuthorizeUpdateFromArchive and
+			// AuthorizeDeletion, but we return this information as it makes sense to do
+			// contextually here.
 			return &Authorization{[]string{repoURL}, branch}, nil
 		}
 	}
@@ -691,6 +689,41 @@ func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
 			logc.Println(r.Context(), "auth: DNS challenge")
 			return auth, nil
 		}
+	}
+
+	return nil, joinErrors(causes...)
+}
+
+func AuthorizeDeletion(r *http.Request) (*Authorization, error) {
+	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
+
+	if err := CheckForbiddenDomain(r); err != nil {
+		return nil, err
+	}
+
+	auth := authorizeInsecure(r)
+	if auth != nil {
+		return auth, nil
+	}
+
+	auth, err := authorizeDNSChallenge(r)
+	if err != nil && IsUnauthorized(err) {
+		causes = append(causes, err)
+	} else if err != nil { // bad request
+		return nil, err
+	} else {
+		logc.Printf(r.Context(), "auth: DNS challenge: allow *\n")
+		return auth, nil
+	}
+
+	auth, err = authorizeForgeWithToken(r)
+	if err != nil && IsUnauthorized(err) {
+		causes = append(causes, err)
+	} else if err != nil { // bad request
+		return nil, err
+	} else {
+		logc.Printf(r.Context(), "auth: forge token: allow\n")
+		return auth, nil
 	}
 
 	return nil, joinErrors(causes...)
