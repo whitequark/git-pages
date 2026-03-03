@@ -132,4 +132,11 @@ message AuditRecord {
 message Principal {
 	string ip_address = 1;
 	bool cli_admin = 2;
+	ForgeUser forge_user = 3;
+}
+
+message ForgeUser {
+	string origin = 1;
+	int64 id = 2;
+	string handle = 3;
 }

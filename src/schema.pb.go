@@ -750,6 +750,7 @@ type Principal struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	IpAddress     *string                `protobuf:"bytes,1,opt,name=ip_address,json=ipAddress" json:"ip_address,omitempty"`
 	CliAdmin      *bool                  `protobuf:"varint,2,opt,name=cli_admin,json=cliAdmin" json:"cli_admin,omitempty"`
+	ForgeUser     *ForgeUser             `protobuf:"bytes,3,opt,name=forge_user,json=forgeUser" json:"forge_user,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -796,6 +797,73 @@ func (x *Principal) GetCliAdmin() bool {
 		return *x.CliAdmin
 	}
 	return false
+}
+
+func (x *Principal) GetForgeUser() *ForgeUser {
+	if x != nil {
+		return x.ForgeUser
+	}
+	return nil
+}
+
+type ForgeUser struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Origin        *string                `protobuf:"bytes,1,opt,name=origin" json:"origin,omitempty"`
+	Id            *int64                 `protobuf:"varint,2,opt,name=id" json:"id,omitempty"`
+	Handle        *string                `protobuf:"bytes,3,opt,name=handle" json:"handle,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ForgeUser) Reset() {
+	*x = ForgeUser{}
+	mi := &file_schema_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ForgeUser) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ForgeUser) ProtoMessage() {}
+
+func (x *ForgeUser) ProtoReflect() protoreflect.Message {
+	mi := &file_schema_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ForgeUser.ProtoReflect.Descriptor instead.
+func (*ForgeUser) Descriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ForgeUser) GetOrigin() string {
+	if x != nil && x.Origin != nil {
+		return *x.Origin
+	}
+	return ""
+}
+
+func (x *ForgeUser) GetId() int64 {
+	if x != nil && x.Id != nil {
+		return *x.Id
+	}
+	return 0
+}
+
+func (x *ForgeUser) GetHandle() string {
+	if x != nil && x.Handle != nil {
+		return *x.Handle
+	}
+	return ""
 }
 
 var File_schema_proto protoreflect.FileDescriptor
@@ -853,11 +921,18 @@ const file_schema_proto_rawDesc = "" +
 	"\x06domain\x18\n" +
 	" \x01(\tR\x06domain\x12\x18\n" +
 	"\aproject\x18\v \x01(\tR\aproject\x12%\n" +
-	"\bmanifest\x18\f \x01(\v2\t.ManifestR\bmanifest\"G\n" +
+	"\bmanifest\x18\f \x01(\v2\t.ManifestR\bmanifest\"r\n" +
 	"\tPrincipal\x12\x1d\n" +
 	"\n" +
 	"ip_address\x18\x01 \x01(\tR\tipAddress\x12\x1b\n" +
-	"\tcli_admin\x18\x02 \x01(\bR\bcliAdmin*V\n" +
+	"\tcli_admin\x18\x02 \x01(\bR\bcliAdmin\x12)\n" +
+	"\n" +
+	"forge_user\x18\x03 \x01(\v2\n" +
+	".ForgeUserR\tforgeUser\"K\n" +
+	"\tForgeUser\x12\x16\n" +
+	"\x06origin\x18\x01 \x01(\tR\x06origin\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\x03R\x02id\x12\x16\n" +
+	"\x06handle\x18\x03 \x01(\tR\x06handle*V\n" +
 	"\x04Type\x12\x10\n" +
 	"\fInvalidEntry\x10\x00\x12\r\n" +
 	"\tDirectory\x10\x01\x12\x0e\n" +
@@ -889,7 +964,7 @@ func file_schema_proto_rawDescGZIP() []byte {
 }
 
 var file_schema_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_schema_proto_goTypes = []any{
 	(Type)(0),                     // 0: Type
 	(Transform)(0),                // 1: Transform
@@ -902,27 +977,29 @@ var file_schema_proto_goTypes = []any{
 	(*Manifest)(nil),              // 8: Manifest
 	(*AuditRecord)(nil),           // 9: AuditRecord
 	(*Principal)(nil),             // 10: Principal
-	nil,                           // 11: Manifest.ContentsEntry
-	(*timestamppb.Timestamp)(nil), // 12: google.protobuf.Timestamp
+	(*ForgeUser)(nil),             // 11: ForgeUser
+	nil,                           // 12: Manifest.ContentsEntry
+	(*timestamppb.Timestamp)(nil), // 13: google.protobuf.Timestamp
 }
 var file_schema_proto_depIdxs = []int32{
 	0,  // 0: Entry.type:type_name -> Type
 	1,  // 1: Entry.transform:type_name -> Transform
 	5,  // 2: HeaderRule.header_map:type_name -> Header
-	11, // 3: Manifest.contents:type_name -> Manifest.ContentsEntry
+	12, // 3: Manifest.contents:type_name -> Manifest.ContentsEntry
 	4,  // 4: Manifest.redirects:type_name -> RedirectRule
 	6,  // 5: Manifest.headers:type_name -> HeaderRule
 	7,  // 6: Manifest.problems:type_name -> Problem
-	12, // 7: AuditRecord.timestamp:type_name -> google.protobuf.Timestamp
+	13, // 7: AuditRecord.timestamp:type_name -> google.protobuf.Timestamp
 	2,  // 8: AuditRecord.event:type_name -> AuditEvent
 	10, // 9: AuditRecord.principal:type_name -> Principal
 	8,  // 10: AuditRecord.manifest:type_name -> Manifest
-	3,  // 11: Manifest.ContentsEntry.value:type_name -> Entry
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	11, // 11: Principal.forge_user:type_name -> ForgeUser
+	3,  // 12: Manifest.ContentsEntry.value:type_name -> Entry
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_schema_proto_init() }
@@ -936,7 +1013,7 @@ func file_schema_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_schema_proto_rawDesc), len(file_schema_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

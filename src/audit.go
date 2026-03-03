@@ -102,6 +102,12 @@ func (record *AuditRecord) DescribePrincipal() string {
 		if record.Principal.GetIpAddress() != "" {
 			items = append(items, record.Principal.GetIpAddress())
 		}
+		if record.Principal.GetForgeUser() != nil {
+			items = append(items, fmt.Sprintf("%s/%s(%d)",
+				record.Principal.GetForgeUser().GetOrigin(),
+				record.Principal.GetForgeUser().GetHandle(),
+				record.Principal.GetForgeUser().GetId()))
+		}
 		if record.Principal.GetCliAdmin() {
 			items = append(items, "<cli-admin>")
 		}

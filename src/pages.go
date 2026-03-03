@@ -499,9 +499,10 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		result = UpdateFromRepository(ctx, webRoot, repoURL, branch)
 
 	default:
-		_, err := AuthorizeUpdateFromArchive(r)
-		if err != nil {
+		if auth, err := AuthorizeUpdateFromArchive(r); err != nil {
 			return err
+		} else if auth.forgeUser != nil {
+			GetPrincipal(r.Context()).ForgeUser = auth.forgeUser
 		}
 
 		if checkDryRun(w, r) {
@@ -531,8 +532,10 @@ func patchPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	if _, err = AuthorizeUpdateFromArchive(r); err != nil {
+	if auth, err := AuthorizeUpdateFromArchive(r); err != nil {
 		return err
+	} else if auth.forgeUser != nil {
+		GetPrincipal(r.Context()).ForgeUser = auth.forgeUser
 	}
 
 	if checkDryRun(w, r) {
@@ -661,9 +664,10 @@ func deletePage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	_, err = AuthorizeDeletion(r)
-	if err != nil {
+	if auth, err := AuthorizeDeletion(r); err != nil {
 		return err
+	} else if auth.forgeUser != nil {
+		GetPrincipal(r.Context()).ForgeUser = auth.forgeUser
 	}
 
 	if checkDryRun(w, r) {

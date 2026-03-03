@@ -106,6 +106,8 @@ type Authorization struct {
 	repoURLs []string
 	// Only the exact branch is allowed.
 	branch string
+	// The authorized forge user.
+	forgeUser *ForgeUser
 }
 
 func authorizeDNSChallenge(r *http.Request) (*Authorization, error) {
@@ -266,7 +268,7 @@ func authorizeWildcardMatchSite(r *http.Request, pattern *WildcardPattern) (*Aut
 
 	if userName, found := pattern.Matches(host); found {
 		repoURL, branch := pattern.ApplyTemplate(userName, projectName)
-		return &Authorization{[]string{repoURL}, branch}, nil
+		return &Authorization{repoURLs: []string{repoURL}, branch: branch}, nil
 	} else {
 		return nil, AuthError{
 			http.StatusUnauthorized,
@@ -606,6 +608,59 @@ func checkGogsRepositoryPushPermission(baseURL *url.URL, authorization string) e
 	return nil
 }
 
+// Gogs, Gitea, and Forgejo all support the same API here.
+func fetchGogsAuthorizedUser(baseURL *url.URL, authorization string) (*ForgeUser, error) {
+	request, err := http.NewRequest("GET", baseURL.JoinPath("/api/v1/user").String(), nil)
+	if err != nil {
+		panic(err) // misconfiguration
+	}
+	request.Header.Set("Accept", "application/json")
+	request.Header.Set("Authorization", authorization)
+
+	httpClient := http.Client{Timeout: 5 * time.Second}
+	response, err := httpClient.Do(request)
+	if err != nil {
+		return nil, AuthError{
+			http.StatusServiceUnavailable,
+			fmt.Sprintf("cannot fetch authorized forge user: %s", err),
+		}
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return nil, AuthError{
+			http.StatusServiceUnavailable,
+			fmt.Sprintf(
+				"cannot fetch authorized forge user: GET %s returned %s",
+				request.URL,
+				response.Status,
+			),
+		}
+	}
+	decoder := json.NewDecoder(response.Body)
+
+	var userInfo struct {
+		ID    int64
+		Login string
+	}
+	if err = decoder.Decode(&userInfo); err != nil {
+		return nil, errors.Join(AuthError{
+			http.StatusServiceUnavailable,
+			fmt.Sprintf(
+				"cannot fetch authorized forge user: GET %s returned malformed JSON",
+				request.URL,
+			),
+		}, err)
+	}
+
+	origin := request.URL.Hostname()
+	return &ForgeUser{
+		Origin: &origin,
+		Id:     &userInfo.ID,
+		Handle: &userInfo.Login,
+	}, nil
+}
+
 func authorizeForgeWithToken(r *http.Request) (*Authorization, error) {
 	authorization := r.Header.Get("Forge-Authorization")
 	if authorization == "" {
@@ -640,10 +695,21 @@ func authorizeForgeWithToken(r *http.Request) (*Authorization, error) {
 				continue
 			}
 
-			// This will actually be ignored by the callers of AuthorizeUpdateFromArchive and
-			// AuthorizeDeletion, but we return this information as it makes sense to do
-			// contextually here.
-			return &Authorization{[]string{repoURL}, branch}, nil
+			authorizedUser, err := fetchGogsAuthorizedUser(parsedRepoURL, authorization)
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+
+			return &Authorization{
+				// This will actually be ignored by the callers of AuthorizeUpdateFromArchive and
+				// AuthorizeDeletion, but we return this information as it makes sense to do
+				// contextually here.
+				repoURLs: []string{repoURL},
+				branch:   branch,
+
+				forgeUser: authorizedUser,
+			}, nil
 		}
 	}
 
