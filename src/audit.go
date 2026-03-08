@@ -113,7 +113,7 @@ func (record *AuditRecord) DescribePrincipal() string {
 		}
 	}
 	if len(items) > 0 {
-		return strings.Join(items, ";")
+		return strings.Join(items, ",")
 	} else {
 		return "<unknown>"
 	}
