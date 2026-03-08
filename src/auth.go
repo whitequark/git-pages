@@ -610,7 +610,9 @@ func checkGogsRepositoryPushPermission(baseURL *url.URL, authorization string) e
 
 // Gogs, Gitea, and Forgejo all support the same API here.
 func fetchGogsAuthorizedUser(baseURL *url.URL, authorization string) (*ForgeUser, error) {
-	request, err := http.NewRequest("GET", baseURL.JoinPath("/api/v1/user").String(), nil)
+	request, err := http.NewRequest("GET", baseURL.ResolveReference(&url.URL{
+		Path: "/api/v1/user",
+	}).String(), nil)
 	if err != nil {
 		panic(err) // misconfiguration
 	}
