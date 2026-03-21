@@ -94,6 +94,7 @@ Features
     - Any archive entry that is a symlink to `/git/pages/<git-sha256>` is replaced with an existing manifest entry for the same site whose git blob hash matches `<git-sha256>`. If there is no existing manifest entry with the specified git hash, the update fails with a `422 Unprocessable Entity`.
     - For this error response only, if the negotiated content type is `application/vnd.git-pages.unresolved`, the response will contain the `<git-sha256>` of each unresolved reference, one per line.
 * Support for SHA-256 Git hashes is [limited by go-git][go-git-sha256]; once go-git implements the required features, _git-pages_ will automatically gain support for SHA-256 Git hashes. Note that shallow clones (used by _git-pages_ to conserve bandwidth if available) aren't supported yet in the Git protocol as of 2025.
+* Git LFS is not supported: it is a single-vendor specification/implementation with no stable Go API and a risk of misuse for reflected HTTP DoS attacks. A diagnostic is emitted for any files uploaded have the `filter=lfs` attribute set via `.gitattributes`.
 
 [_redirects]: https://docs.netlify.com/manage/routing/redirects/overview/
 [_headers]: https://docs.netlify.com/manage/routing/headers/
