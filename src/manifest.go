@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
 	"mime"
 	"net/http"
 	"path"
@@ -144,6 +145,44 @@ func AddProblem(manifest *Manifest, pathName, format string, args ...any) error 
 	return fmt.Errorf("%s: %s", pathName, cause)
 }
 
+func IsEntryRegularFile(entry *Entry) bool {
+	return entry.GetType() == Type_InlineFile ||
+		entry.GetType() == Type_ExternalFile
+}
+
+var ErrNotRegularFile = errors.New("not a regular file")
+
+func GetEntryContents(ctx context.Context, entry *Entry) (data []byte, err error) {
+	switch entry.GetType() {
+	case Type_InlineFile:
+		data = entry.GetData()
+	case Type_ExternalFile:
+		reader, _, err := backend.GetBlob(ctx, string(entry.GetData()))
+		if err != nil {
+			return nil, err
+		}
+		data, err = io.ReadAll(reader)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, ErrNotRegularFile
+	}
+
+	switch entry.GetTransform() {
+	case Transform_Identity:
+	case Transform_Zstd:
+		data, err = zstdDecoder.DecodeAll(data, []byte{})
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unexpected transform")
+	}
+
+	return
+}
+
 // EnsureLeadingDirectories adds directory entries for any parent directories
 // that are implicitly referenced by files in the manifest but don't have
 // explicit directory entries. (This can be the case if an archive is created
@@ -275,7 +314,7 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 // (Perhaps in the future they could be exposed at `.git-pages/status.txt`?)
 func PrepareManifest(ctx context.Context, manifest *Manifest) error {
 	// Parse Netlify-style `_redirects`.
-	if err := ProcessRedirectsFile(manifest); err != nil {
+	if err := ProcessRedirectsFile(ctx, manifest); err != nil {
 		logc.Printf(ctx, "redirects err: %s\n", err)
 	} else if len(manifest.Redirects) > 0 {
 		logc.Printf(ctx, "redirects ok: %d rules\n", len(manifest.Redirects))
@@ -285,7 +324,7 @@ func PrepareManifest(ctx context.Context, manifest *Manifest) error {
 	LintRedirects(manifest)
 
 	// Parse Netlify-style `_headers`.
-	if err := ProcessHeadersFile(manifest); err != nil {
+	if err := ProcessHeadersFile(ctx, manifest); err != nil {
 		logc.Printf(ctx, "headers err: %s\n", err)
 	} else if len(manifest.Headers) > 0 {
 		logc.Printf(ctx, "headers ok: %d rules\n", len(manifest.Headers))

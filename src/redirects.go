@@ -1,6 +1,8 @@
 package git_pages
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -96,17 +98,22 @@ func validateRedirectRule(rule *redirects.Rule) error {
 }
 
 // Parses redirects file and injects rules into the manifest.
-func ProcessRedirectsFile(manifest *Manifest) error {
+func ProcessRedirectsFile(ctx context.Context, manifest *Manifest) error {
 	redirectsEntry := manifest.Contents[RedirectsFileName]
 	delete(manifest.Contents, RedirectsFileName)
 	if redirectsEntry == nil {
 		return nil
-	} else if redirectsEntry.GetType() != Type_InlineFile {
-		return AddProblem(manifest, RedirectsFileName,
-			"not a regular file")
 	}
 
-	rules, err := redirects.ParseString(string(redirectsEntry.GetData()))
+	data, err := GetEntryContents(ctx, redirectsEntry)
+	if errors.Is(err, ErrNotRegularFile) {
+		return AddProblem(manifest, RedirectsFileName,
+			"not a regular file")
+	} else if err != nil {
+		return err
+	}
+
+	rules, err := redirects.ParseString(string(data))
 	if err != nil {
 		return AddProblem(manifest, RedirectsFileName,
 			"syntax error: %s", err)

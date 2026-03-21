@@ -1,6 +1,7 @@
 package git_pages
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -85,17 +86,22 @@ func validateHeaderRule(rule headers.Rule) error {
 }
 
 // Parses redirects file and injects rules into the manifest.
-func ProcessHeadersFile(manifest *Manifest) error {
+func ProcessHeadersFile(ctx context.Context, manifest *Manifest) error {
 	headersEntry := manifest.Contents[HeadersFileName]
 	delete(manifest.Contents, HeadersFileName)
 	if headersEntry == nil {
 		return nil
-	} else if headersEntry.GetType() != Type_InlineFile {
-		return AddProblem(manifest, HeadersFileName,
-			"not a regular file")
 	}
 
-	rules, err := headers.ParseString(string(headersEntry.GetData()))
+	data, err := GetEntryContents(ctx, headersEntry)
+	if errors.Is(err, ErrNotRegularFile) {
+		return AddProblem(manifest, HeadersFileName,
+			"not a regular file")
+	} else if err != nil {
+		return err
+	}
+
+	rules, err := headers.ParseString(string(data))
 	if err != nil {
 		return AddProblem(manifest, HeadersFileName,
 			"syntax error: %s", err)

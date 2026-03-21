@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/c2h5oh/datasize"
 	"github.com/go-git/go-billy/v6/osfs"
@@ -209,6 +210,8 @@ func FetchRepository(
 		datasize.ByteSize(dataBytesTransferred).HR(),
 	)
 
+	warnAboutGitLFS(ctx, manifest)
+
 	return manifest, nil
 }
 
@@ -253,4 +256,19 @@ func readGitBlob(
 	}
 
 	return nil
+}
+
+func warnAboutGitLFS(ctx context.Context, manifest *Manifest) {
+	gitattributes := ReadGitAttributes(ctx, manifest)
+	for _, name := range slices.Sorted(maps.Keys(manifest.GetContents())) {
+		entry := manifest.GetContents()[name]
+		if !IsEntryRegularFile(entry) {
+			continue
+		}
+		parts := strings.Split(name, "/")
+		attrs, _ := gitattributes.Match(parts, nil)
+		if attr, ok := attrs["filter"]; ok && attr.Value() == "lfs" {
+			AddProblem(manifest, name, "git-pages does not support Git LFS; move this file into Git or use incremental uploads")
+		}
+	}
 }
