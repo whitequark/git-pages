@@ -9,14 +9,14 @@ require (
 	github.com/c2h5oh/datasize v0.0.0-20231215233829-aa82cc1e6500
 	github.com/creasty/defaults v1.8.0
 	github.com/dghubble/trie v0.1.0
-	github.com/fatih/color v1.18.0
+	github.com/fatih/color v1.19.0
 	github.com/getsentry/sentry-go v0.43.0
 	github.com/getsentry/sentry-go/slog v0.43.0
 	github.com/go-git/go-billy/v6 v6.0.0-20260226131633-45bd0956d66f
-	github.com/go-git/go-git/v6 v6.0.0-20260313081548-799bb393a8ed
+	github.com/go-git/go-git/v6 v6.0.0-20260320111621-ea91339c5263
 	github.com/jpillora/backoff v1.0.0
 	github.com/kankanreno/go-snowflake v1.2.0
-	github.com/klauspost/compress v1.18.4
+	github.com/klauspost/compress v1.18.5
 	github.com/maypok86/otter/v2 v2.3.0
 	github.com/minio/minio-go/v7 v7.0.99
 	github.com/pelletier/go-toml/v2 v2.2.4
@@ -47,7 +47,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/leodido/go-syslog/v4 v4.3.0 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/minio/crc64nvme v1.1.1 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
