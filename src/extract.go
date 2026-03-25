@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/c2h5oh/datasize"
-	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/klauspost/compress/zstd"
 )
 
@@ -52,16 +51,6 @@ func ExtractZstd(
 	return next(ctx, boundArchiveStream(stream))
 }
 
-const BlobReferencePrefix = "/git/blobs/"
-
-type UnresolvedRefError struct {
-	missing []string
-}
-
-func (err UnresolvedRefError) Error() string {
-	return fmt.Sprintf("%d unresolved blob references", len(err.missing))
-}
-
 func normalizeArchiveMemberName(fileName string) string {
 	// Strip the leading slash and any extraneous path segments.
 	fileName = path.Clean(fileName)
@@ -70,21 +59,6 @@ func normalizeArchiveMemberName(fileName string) string {
 		fileName = ""
 	}
 	return fileName
-}
-
-// Returns a map of git hash to entry. If `manifest` is nil, returns an empty map.
-func indexManifestByGitHash(manifest *Manifest) map[string]*Entry {
-	index := map[string]*Entry{}
-	for _, entry := range manifest.GetContents() {
-		if hash := entry.GetGitHash(); hash != "" {
-			if _, ok := plumbing.FromHex(hash); ok {
-				index[hash] = entry
-			} else {
-				panic(fmt.Errorf("index: malformed hash: %s", hash))
-			}
-		}
-	}
-	return index
 }
 
 func addSymlinkOrBlobReference(
@@ -110,7 +84,7 @@ func ExtractTar(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 	var dataBytesRecycled int64
 	var dataBytesTransferred int64
 
-	index := indexManifestByGitHash(oldManifest)
+	index := IndexManifestByGitHash(oldManifest)
 	missing := []string{}
 	manifest := NewManifest()
 	for {
@@ -202,7 +176,7 @@ func ExtractZip(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 	var dataBytesRecycled int64
 	var dataBytesTransferred int64
 
-	index := indexManifestByGitHash(oldManifest)
+	index := IndexManifestByGitHash(oldManifest)
 	missing := []string{}
 	manifest := NewManifest()
 	for _, file := range archive.File {

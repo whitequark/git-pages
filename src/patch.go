@@ -30,8 +30,12 @@ func ApplyTarPatch(manifest *Manifest, reader io.Reader, parents CreateParentsMo
 		children map[string]*Node
 	}
 
+	// Index the manifest for incremental update operations.
+	index := IndexManifestByGitHash(manifest)
+	missing := []string{}
+
 	// Extract the manifest contents (which is using a flat hash map) into a directory tree
-	// so that recursive delete operations have O(1) complexity. s
+	// so that recursive delete operations have O(1) complexity.
 	var root *Node
 	sortedNames := slices.Sorted(maps.Keys(manifest.GetContents()))
 	for _, name := range sortedNames {
@@ -107,8 +111,16 @@ func ApplyTarPatch(manifest *Manifest, reader io.Reader, parents CreateParentsMo
 				entry: NewManifestEntry(Type_InlineFile, fileData),
 			}
 		case tar.TypeSymlink:
-			node.children[fileName] = &Node{
-				entry: NewManifestEntry(Type_Symlink, []byte(header.Linkname)),
+			if hash, found := strings.CutPrefix(header.Linkname, BlobReferencePrefix); found {
+				if entry, found := index[hash]; found {
+					node.children[fileName] = &Node{entry: entry}
+				} else {
+					missing = append(missing, hash)
+				}
+			} else {
+				node.children[fileName] = &Node{
+					entry: NewManifestEntry(Type_Symlink, []byte(header.Linkname)),
+				}
 			}
 		case tar.TypeDir:
 			node.children[fileName] = &Node{
@@ -127,6 +139,10 @@ func ApplyTarPatch(manifest *Manifest, reader io.Reader, parents CreateParentsMo
 				"tar: unsupported type '%c'", header.Typeflag)
 			continue
 		}
+	}
+
+	if len(missing) > 0 {
+		return UnresolvedRefError{missing}
 	}
 
 	// Repopulate manifest contents with the updated directory tree.

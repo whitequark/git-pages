@@ -10,6 +10,16 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const BlobReferencePrefix = "/git/blobs/"
+
+type UnresolvedRefError struct {
+	missing []string
+}
+
+func (err UnresolvedRefError) Error() string {
+	return fmt.Sprintf("%d unresolved blob references", len(err.missing))
+}
+
 type UpdateOutcome int
 
 const (

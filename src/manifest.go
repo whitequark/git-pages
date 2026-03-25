@@ -145,6 +145,21 @@ func AddProblem(manifest *Manifest, pathName, format string, args ...any) error 
 	return fmt.Errorf("%s: %s", pathName, cause)
 }
 
+// Returns a map of git hash to entry. If `manifest` is nil, returns an empty map.
+func IndexManifestByGitHash(manifest *Manifest) map[string]*Entry {
+	index := map[string]*Entry{}
+	for _, entry := range manifest.GetContents() {
+		if hash := entry.GetGitHash(); hash != "" {
+			if _, ok := plumbing.FromHex(hash); ok {
+				index[hash] = entry
+			} else {
+				panic(fmt.Errorf("index: malformed hash: %s", hash))
+			}
+		}
+	}
+	return index
+}
+
 func IsEntryRegularFile(entry *Entry) bool {
 	return entry.GetType() == Type_InlineFile ||
 		entry.GetType() == Type_ExternalFile
