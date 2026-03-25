@@ -84,7 +84,11 @@ func CollectTar(
 			header.Typeflag = tar.TypeSymlink
 			header.Mode = 0644
 			header.ModTime = metadata.LastModified
-			err = appendFile(&header, entry.GetData(), Transform_Identity)
+			header.Linkname = string(entry.GetData())
+			err = archive.WriteHeader(&header)
+			if err != nil {
+				return fmt.Errorf("tar: %w", err)
+			}
 
 		default:
 			panic(fmt.Errorf("CollectTar encountered invalid entry: %v, %v",
