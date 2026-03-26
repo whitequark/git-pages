@@ -20,6 +20,7 @@ max-inline-file-size = '256B'
 git-large-object-threshold = '1MB'
 max-symlink-depth = 16
 update-timeout = '1m0s'
+concurrent-uploads = 1024
 max-heap-size-ratio = 0.5
 forbidden-domains = []
 allowed-repository-url-prefixes = []

@@ -134,6 +134,8 @@ type LimitsConfig struct {
 	// Maximum time that an update operation (PUT or POST request) could take before being
 	// interrupted.
 	UpdateTimeout Duration `toml:"update-timeout" default:"60s"`
+	// Maximum number of concurrent blob uploads, globally across every update request.
+	ConcurrentUploads uint `toml:"concurrent-uploads" default:"1024"`
 	// Soft limit on Go heap size, expressed as a fraction of total available RAM.
 	MaxHeapSizeRatio float64 `toml:"max-heap-size-ratio" default:"0.5"`
 	// List of domains unconditionally forbidden for uploads.

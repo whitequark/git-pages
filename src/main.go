@@ -61,6 +61,12 @@ func configureMemLimit(ctx context.Context) (err error) {
 	return
 }
 
+// Can only be safely called during initial configuration.
+func configureConcurrency(_ context.Context) (err error) {
+	blobUploadSemaphore = make(chan struct{}, config.Limits.ConcurrentUploads)
+	return
+}
+
 func configureWildcards(_ context.Context) (err error) {
 	newWildcards, err := TranslateWildcards(config.Wildcard)
 	if err != nil {
@@ -284,6 +290,7 @@ func Main() {
 	if err = errors.Join(
 		configureFeatures(ctx),
 		configureMemLimit(ctx),
+		configureConcurrency(ctx),
 		configureWildcards(ctx),
 		configureFallback(ctx),
 		configureAudit(ctx),
