@@ -178,7 +178,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "(server) "+
 		"git-pages [-config <file>|-no-config]\n")
 	fmt.Fprintf(os.Stderr, "(info)   "+
-		"git-pages {-print-config-env-vars|-print-config}\n")
+		"git-pages {-version|-print-config-env-vars|-print-config}\n")
 	fmt.Fprintf(os.Stderr, "(debug)  "+
 		"git-pages {-list-blobs|-list-manifests}\n")
 	fmt.Fprintf(os.Stderr, "(debug)  "+
@@ -192,7 +192,7 @@ func usage() {
 	flag.PrintDefaults()
 }
 
-func Main() {
+func Main(versionInfo string) {
 	ctx := context.Background()
 
 	flag.Usage = usage
@@ -232,7 +232,14 @@ func Main() {
 		"run a store `migration` (one of: create-domain-markers)")
 	traceGarbage := flag.Bool("trace-garbage", false,
 		"estimate total size of unreachable blobs")
+	version := flag.Bool("version", false,
+		"display version")
 	flag.Parse()
+
+	if *version {
+		fmt.Printf("git-pages %s\n", versionInfo)
+		os.Exit(0)
+	}
 
 	var cliOperations int
 	for _, selected := range []bool{

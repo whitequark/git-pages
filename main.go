@@ -2,6 +2,27 @@
 
 package main
 
-import gitpages "codeberg.org/git-pages/git-pages/src"
+import (
+	"runtime/debug"
 
-func main() { gitpages.Main() }
+	git_pages "codeberg.org/git-pages/git-pages/src"
+)
+
+// By default the version information is retrieved from VCS. If not available during build,
+// override this variable using linker flags to change the displayed version.
+// Example: `-ldflags "-X main.versionOverride=v1.2.3"`
+var versionOverride = ""
+
+func extractVersion() string {
+	if versionOverride != "" {
+		return versionOverride
+	} else if buildInfo, ok := debug.ReadBuildInfo(); ok {
+		return buildInfo.Main.Version
+	} else {
+		panic("version information not available")
+	}
+}
+
+func main() {
+	git_pages.Main(extractVersion())
+}
