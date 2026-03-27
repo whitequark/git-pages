@@ -52,6 +52,7 @@
 
           ldflags = [
             "-linkmode external"
+            "-X main.versionOverride=${self.shortRev or self.dirtyShortRev}"
             "-extldflags -static"
             "-s -w"
           ];
