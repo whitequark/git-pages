@@ -112,7 +112,14 @@ func ExtractTar(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 		case tar.TypeSymlink:
 			entry := addSymlinkOrBlobReference(
 				manifest, fileName, header.Linkname, index, &missing)
-			dataBytesRecycled += entry.GetOriginalSize()
+			switch {
+			case entry == nil:
+				// unresolved blob reference
+			case entry.GetType() != Type_Symlink:
+				dataBytesRecycled += entry.GetOriginalSize() // resolved blob reference
+			default:
+				dataBytesTransferred += int64(len(header.Linkname)) // actual symlink
+			}
 		case tar.TypeDir:
 			AddDirectory(manifest, fileName)
 		default:
@@ -198,7 +205,14 @@ func ExtractZip(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 			if file.Mode()&os.ModeSymlink != 0 {
 				entry := addSymlinkOrBlobReference(
 					manifest, normalizedName, string(fileData), index, &missing)
-				dataBytesRecycled += entry.GetOriginalSize()
+				switch {
+				case entry == nil:
+					// unresolved blob reference
+				case entry.GetType() != Type_Symlink:
+					dataBytesRecycled += entry.GetOriginalSize() // resolved blob reference
+				default:
+					dataBytesTransferred += int64(len(fileData)) // actual symlink
+				}
 			} else {
 				AddFile(manifest, normalizedName, fileData)
 				dataBytesTransferred += int64(len(fileData))
