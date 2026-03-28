@@ -41,12 +41,6 @@ var (
 
 var syslogHandler syslog.Handler
 
-// sensitiveHTTPHeaders extends the list of sensitive headers defined in the Sentry Go SDK with our
-// own application-specific header field names.
-var sensitiveHTTPHeaders = map[string]struct{}{
-	"Forge-Authorization": {},
-}
-
 func InitObservability() {
 	debug.SetPanicOnFault(true)
 
