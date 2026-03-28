@@ -134,10 +134,6 @@ Observability
 
 _git-pages_ has robust observability features built in:
 * The metrics endpoint (bound to `:3002` by default) returns Go, pages server, and storage backend metrics in the [Prometheus](https://prometheus.io/) format.
-* Optional [Sentry](https://sentry.io/) integration allows greater visibility into the application. The `ENVIRONMENT` environment variable configures the deploy environment name (`development` by default).
-    * If `SENTRY_DSN` environment variable is set, panics are reported to Sentry.
-    * If `SENTRY_DSN` and `SENTRY_LOGS=1` environment variables are set, logs are uploaded to Sentry.
-    * If `SENTRY_DSN` and `SENTRY_TRACING=1` environment variables are set, traces are uploaded to Sentry.
 * Optional syslog integration allows transmitting application logs to a syslog daemon. When present, the `SYSLOG_ADDR` environment variable enables the integration, and the value is used to configure the syslog destination. The value must follow the format `family/address` and is usually one of the following:
     * a Unix datagram socket: `unixgram//dev/log`;
     * TLS over TCP: `tcp+tls/host:port`;
