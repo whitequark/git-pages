@@ -87,6 +87,7 @@ func ExtractTar(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 	index := IndexManifestByGitHash(oldManifest)
 	missing := []string{}
 	manifest := NewManifest()
+	hardLinks := map[string]*Entry{}
 	for {
 		header, err := archive.Next()
 		if err == io.EOF {
@@ -107,11 +108,13 @@ func ExtractTar(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 			if err != nil {
 				return nil, fmt.Errorf("tar: %s: %w", fileName, err)
 			}
-			AddFile(manifest, fileName, fileData)
+			entry := AddFile(manifest, fileName, fileData)
+			hardLinks[header.Name] = entry
 			dataBytesTransferred += int64(len(fileData))
 		case tar.TypeSymlink:
 			entry := addSymlinkOrBlobReference(
 				manifest, fileName, header.Linkname, index, &missing)
+			hardLinks[header.Name] = entry
 			switch {
 			case entry == nil:
 				// unresolved blob reference
@@ -119,6 +122,12 @@ func ExtractTar(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 				dataBytesRecycled += entry.GetOriginalSize() // resolved blob reference
 			default:
 				dataBytesTransferred += int64(len(header.Linkname)) // actual symlink
+			}
+		case tar.TypeLink:
+			if entry, found := hardLinks[header.Linkname]; found {
+				manifest.Contents[fileName] = entry
+			} else {
+				AddProblem(manifest, fileName, "tar: invalid hardlink %q", header.Linkname)
 			}
 		case tar.TypeDir:
 			AddDirectory(manifest, fileName)
