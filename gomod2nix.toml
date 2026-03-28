@@ -49,12 +49,6 @@ schema = 3
   [mod."github.com/fatih/color"]
     version = "v1.19.0"
     hash = "sha256-YgMm1nid8yigNLG6aHfuMbsvMI1UYVf/Rkg44pp/NTU="
-  [mod."github.com/getsentry/sentry-go"]
-    version = "v0.43.0"
-    hash = "sha256-Wu1inIhjuAw6wKburwqIlNxC0I4akunHGh/8DOqo3xg="
-  [mod."github.com/getsentry/sentry-go/slog"]
-    version = "v0.43.0"
-    hash = "sha256-FJMx2E8anKtHknn867gCkYPjitZb9Okqp2uZ+dV7JqA="
   [mod."github.com/go-git/gcfg/v2"]
     version = "v2.0.2"
     hash = "sha256-icqMDeC/tEg/3979EuEN67Ml5KjdDA0R3QvR6iLLrSI="

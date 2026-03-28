@@ -10,8 +10,6 @@ require (
 	github.com/creasty/defaults v1.8.0
 	github.com/dghubble/trie v0.1.0
 	github.com/fatih/color v1.19.0
-	github.com/getsentry/sentry-go v0.43.0
-	github.com/getsentry/sentry-go/slog v0.43.0
 	github.com/go-git/go-billy/v6 v6.0.0-20260226131633-45bd0956d66f
 	github.com/go-git/go-git/v6 v6.0.0-20260320111621-ea91339c5263
 	github.com/jpillora/backoff v1.0.0

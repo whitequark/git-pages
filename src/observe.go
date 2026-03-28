@@ -8,11 +8,9 @@ import (
 	"iter"
 	"log"
 	"log/slog"
-	"math/rand/v2"
 	"net/http"
 	"os"
 	"runtime/debug"
-	"strconv"
 	"sync"
 	"time"
 
@@ -22,10 +20,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-
-	"github.com/getsentry/sentry-go"
-	sentryhttp "github.com/getsentry/sentry-go/http"
-	sentryslog "github.com/getsentry/sentry-go/slog"
 )
 
 var (
@@ -47,70 +41,14 @@ var (
 
 var syslogHandler syslog.Handler
 
-func hasSentry() bool {
-	return os.Getenv("SENTRY_DSN") != ""
-}
-
-func chainSentryMiddleware(
-	middleware ...func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event,
-) func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-	return func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-		for idx := 0; idx < len(middleware) && event != nil; idx++ {
-			event = middleware[idx](event, hint)
-		}
-		return event
-	}
-}
-
 // sensitiveHTTPHeaders extends the list of sensitive headers defined in the Sentry Go SDK with our
 // own application-specific header field names.
 var sensitiveHTTPHeaders = map[string]struct{}{
 	"Forge-Authorization": {},
 }
 
-// scrubSentryEvent removes sensitive HTTP header fields from the Sentry event.
-func scrubSentryEvent(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-	if event.Request != nil && event.Request.Headers != nil {
-		for key := range event.Request.Headers {
-			if _, ok := sensitiveHTTPHeaders[key]; ok {
-				delete(event.Request.Headers, key)
-			}
-		}
-	}
-	return event
-}
-
-// sampleSentryEvent returns a function that discards a Sentry event according to the sample rate,
-// unless the associated HTTP request triggers a mutation or it took too long to produce a response,
-// in which case the event is never discarded.
-func sampleSentryEvent(sampleRate float64) func(*sentry.Event, *sentry.EventHint) *sentry.Event {
-	return func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-		newSampleRate := sampleRate
-		if event.Request != nil {
-			switch event.Request.Method {
-			case "PUT", "POST", "DELETE":
-				newSampleRate = 1
-			}
-		}
-		duration := event.Timestamp.Sub(event.StartTime)
-		threshold := time.Duration(config.Observability.SlowResponseThreshold)
-		if duration >= threshold {
-			newSampleRate = 1
-		}
-		if rand.Float64() < newSampleRate {
-			return event
-		}
-		return nil
-	}
-}
-
 func InitObservability() {
 	debug.SetPanicOnFault(true)
-
-	environment := "development"
-	if value, ok := os.LookupEnv("ENVIRONMENT"); ok {
-		environment = value
-	}
 
 	logHandlers := []slog.Handler{}
 
@@ -140,45 +78,6 @@ func InitObservability() {
 		logHandlers = append(logHandlers, syslogHandler)
 	}
 
-	if hasSentry() {
-		enableLogs := false
-		if value, err := strconv.ParseBool(os.Getenv("SENTRY_LOGS")); err == nil {
-			enableLogs = value
-		}
-
-		enableTracing := false
-		if value, err := strconv.ParseBool(os.Getenv("SENTRY_TRACING")); err == nil {
-			enableTracing = value
-		}
-
-		tracesSampleRate := 1.00
-		switch environment {
-		case "development", "staging":
-		default:
-			tracesSampleRate = 0.05
-		}
-
-		options := sentry.ClientOptions{}
-		options.Environment = environment
-		options.EnableLogs = enableLogs
-		options.EnableTracing = enableTracing
-		options.TracesSampleRate = 1 // use our own custom sampling logic
-		options.BeforeSend = scrubSentryEvent
-		options.BeforeSendTransaction = chainSentryMiddleware(
-			sampleSentryEvent(tracesSampleRate),
-			scrubSentryEvent,
-		)
-		if err := sentry.Init(options); err != nil {
-			log.Fatalf("sentry: %s\n", err)
-		}
-
-		if enableLogs {
-			logHandlers = append(logHandlers, sentryslog.Option{
-				AddSource: true,
-			}.NewSentryHandler(context.Background()))
-		}
-	}
-
 	slog.SetDefault(slog.New(slogmulti.Fanout(logHandlers...)))
 }
 
@@ -188,9 +87,6 @@ func FiniObservability() {
 	if syslogHandler != nil {
 		wg.Go(func() { syslogHandler.Flush(timeout) })
 	}
-	if hasSentry() {
-		wg.Go(func() { sentry.Flush(timeout) })
-	}
 	wg.Wait()
 }
 
@@ -199,10 +95,6 @@ func ObserveError(err error) {
 		// Something has explicitly requested cancellation.
 		// Timeout results in a different error.
 		return
-	}
-
-	if hasSentry() {
-		sentry.CaptureException(err)
 	}
 }
 
@@ -236,22 +128,6 @@ func (w *observedResponseWriter) WriteHeader(statusCode int) {
 }
 
 func ObserveHTTPHandler(handler http.Handler) http.Handler {
-	if hasSentry() {
-		handler = func(next http.Handler) http.Handler {
-			next = sentryhttp.New(sentryhttp.Options{
-				Repanic: true,
-			}).Handle(handler)
-
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Prevent the Sentry SDK from continuing traces as we don't use this feature.
-				r.Header.Del(sentry.SentryTraceHeader)
-				r.Header.Del(sentry.SentryBaggageHeader)
-
-				next.ServeHTTP(w, r)
-			})
-		}(handler)
-	}
-
 	handler = func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ow := newObservedResponseWriter(w)
@@ -282,23 +158,12 @@ func ObserveFunction(
 	interface{ Finish() }, context.Context,
 ) {
 	switch {
-	case hasSentry():
-		span := sentry.StartSpan(ctx, "function")
-		span.Description = funcName
-		ObserveData(span.Context(), data...)
-		return span, span.Context()
 	default:
 		return noopSpan{}, ctx
 	}
 }
 
 func ObserveData(ctx context.Context, data ...any) {
-	if span := sentry.SpanFromContext(ctx); span != nil {
-		for i := 0; i < len(data); i += 2 {
-			name, value := data[i], data[i+1]
-			span.SetData(name.(string), value)
-		}
-	}
 }
 
 var (
