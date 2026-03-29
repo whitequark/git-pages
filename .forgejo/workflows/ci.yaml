@@ -12,7 +12,7 @@ jobs:
   check:
     runs-on: debian-trixie
     container:
-      image: docker.io/library/node:24-trixie-slim@sha256:8c8f12cedb96c3b59642cf30d713943c2b223990c9919b96a141681f62e6e292
+      image: docker.io/library/node:24-trixie-slim@sha256:c319bb4fac67c01ced508b67193a0397e02d37555d8f9b72958649efd302b7f8
     steps:
       - name: Check out source code
         uses: https://code.forgejo.org/actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -42,7 +42,7 @@ jobs:
     needs: [check]
     runs-on: debian-trixie
     container:
-      image: docker.io/library/node:24-trixie-slim@sha256:8c8f12cedb96c3b59642cf30d713943c2b223990c9919b96a141681f62e6e292
+      image: docker.io/library/node:24-trixie-slim@sha256:c319bb4fac67c01ced508b67193a0397e02d37555d8f9b72958649efd302b7f8
     steps:
       - name: Check out source code
         uses: https://code.forgejo.org/actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -77,7 +77,7 @@ jobs:
     needs: [check]
     runs-on: debian-trixie
     container:
-      image: docker.io/library/node:24-trixie-slim@sha256:8c8f12cedb96c3b59642cf30d713943c2b223990c9919b96a141681f62e6e292
+      image: docker.io/library/node:24-trixie-slim@sha256:c319bb4fac67c01ced508b67193a0397e02d37555d8f9b72958649efd302b7f8
     steps:
       - name: Install dependencies
         run: |

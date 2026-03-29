@@ -14,8 +14,8 @@ schema = 3
     version = "v0.6.2"
     hash = "sha256-tVNWDUMILZbJvarcl/E7tpSnkn7urqgSHa2Eaka5vSU="
   [mod."github.com/ProtonMail/go-crypto"]
-    version = "v1.3.0"
-    hash = "sha256-TUG+C4MyeWglOmiwiW2/NUVurFHXLgEPRd3X9uQ1NGI="
+    version = "v1.4.1"
+    hash = "sha256-6iGAFCjoNveY+ipbKqq2gt+RXpi2eQyPXAY01rxPcWc="
   [mod."github.com/beorn7/perks"]
     version = "v1.0.1"
     hash = "sha256-h75GUqfwJKngCJQVE5Ao5wnO3cfKD9lSIteoLp/3xJ4="
@@ -53,11 +53,11 @@ schema = 3
     version = "v2.0.2"
     hash = "sha256-icqMDeC/tEg/3979EuEN67Ml5KjdDA0R3QvR6iLLrSI="
   [mod."github.com/go-git/go-billy/v6"]
-    version = "v6.0.0-20260226131633-45bd0956d66f"
-    hash = "sha256-s+dthtn+JewJ58R5VbvWaEoYLozDt5YpkHyXcN0xMvQ="
+    version = "v6.0.0-20260328065524-593ae452e14d"
+    hash = "sha256-/mt8A6xZqRNL2xqy/laaRzLbWc7yHK5ThsfIhar1tww="
   [mod."github.com/go-git/go-git/v6"]
-    version = "v6.0.0-20260320111621-ea91339c5263"
-    hash = "sha256-tFpnBdbzYqeNiVelhy80Ob27xONds/5reHexCeA1IsQ="
+    version = "v6.0.0-20260328145551-a93bccd59f82"
+    hash = "sha256-fZh/Cy+8m/mIwYuJ1uTx3OG8l6PujjMxk4HTSUaIPts="
   [mod."github.com/go-ini/ini"]
     version = "v1.67.0"
     hash = "sha256-V10ahGNGT+NLRdKUyRg1dos5RxLBXBk1xutcnquc/+4="
@@ -74,8 +74,8 @@ schema = 3
     version = "v1.2.0"
     hash = "sha256-713xGEqjwaUGIu2EHII5sldWmcquFpxZmte/7R/O6LA="
   [mod."github.com/kevinburke/ssh_config"]
-    version = "v1.5.0"
-    hash = "sha256-4SijlenzNuWb5CavWrky8qoQj+6fKCJgOiQANzN5TUE="
+    version = "v1.6.0"
+    hash = "sha256-i/EYNJx0+HbAGFVoiKV4QF/zqb4fWewh+bpBKUkXDCc="
   [mod."github.com/klauspost/compress"]
     version = "v1.18.5"
     hash = "sha256-H9b5iFJf4XbEnkGQCjGQAJ3aYhVDiolKrDewTbhuzQo="
@@ -146,14 +146,14 @@ schema = 3
     version = "v1.6.0"
     hash = "sha256-rJB7h3KuH1DPp5n4dY3MiGnV1Y96A10lf5OUl+MLkzU="
   [mod."github.com/samber/lo"]
-    version = "v1.52.0"
-    hash = "sha256-xgMsPJv3rydHH10NZU8wz/DhK2VbbR8ymivOg1ChTp0="
+    version = "v1.53.0"
+    hash = "sha256-RCf4Buf357TTWQnMPSWKrfdJ4L/RqOHNBD0g3+VpMw8="
   [mod."github.com/samber/slog-common"]
-    version = "v0.20.0"
-    hash = "sha256-aWcvt9XNyKaolLhvthcXeFDl0t6uo7Vdo8WzCducf1E="
+    version = "v0.21.0"
+    hash = "sha256-i9Nl4xRbk8qYM+0n48IQ6+vGZiS7xFe+GgyV3X9/Spc="
   [mod."github.com/samber/slog-multi"]
-    version = "v1.7.1"
-    hash = "sha256-wHXt2lwFfjm1p7jnZi44SlHtjdk531BGz2O9pfiylxo="
+    version = "v1.8.0"
+    hash = "sha256-KsFwNP9QMDr8golYoevpGtcqUuCrIT7zmGwR7/E6gzo="
   [mod."github.com/sergi/go-diff"]
     version = "v1.4.0"
     hash = "sha256-rs9NKpv/qcQEMRg7CmxGdP4HGuFdBxlpWf9LbA9wS4k="

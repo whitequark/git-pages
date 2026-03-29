@@ -10,8 +10,8 @@ require (
 	github.com/creasty/defaults v1.8.0
 	github.com/dghubble/trie v0.1.0
 	github.com/fatih/color v1.19.0
-	github.com/go-git/go-billy/v6 v6.0.0-20260226131633-45bd0956d66f
-	github.com/go-git/go-git/v6 v6.0.0-20260320111621-ea91339c5263
+	github.com/go-git/go-billy/v6 v6.0.0-20260328065524-593ae452e14d
+	github.com/go-git/go-git/v6 v6.0.0-20260328145551-a93bccd59f82
 	github.com/jpillora/backoff v1.0.0
 	github.com/kankanreno/go-snowflake v1.2.0
 	github.com/klauspost/compress v1.18.5
@@ -20,7 +20,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.3.0
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/prometheus/client_golang v1.23.2
-	github.com/samber/slog-multi v1.7.1
+	github.com/samber/slog-multi v1.8.0
 	github.com/tj/go-redirects v0.0.0-20200911105812-fd1ba1020b37
 	github.com/valyala/fasttemplate v1.2.2
 	golang.org/x/net v0.52.0
@@ -29,7 +29,7 @@ require (
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/ProtonMail/go-crypto v1.3.0 // indirect
+	github.com/ProtonMail/go-crypto v1.4.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
@@ -41,7 +41,7 @@ require (
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/kevinburke/ssh_config v1.5.0 // indirect
+	github.com/kevinburke/ssh_config v1.6.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/leodido/go-syslog/v4 v4.3.0 // indirect
@@ -59,8 +59,8 @@ require (
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/rs/xid v1.6.0 // indirect
-	github.com/samber/lo v1.52.0 // indirect
-	github.com/samber/slog-common v0.20.0 // indirect
+	github.com/samber/lo v1.53.0 // indirect
+	github.com/samber/slog-common v0.21.0 // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/tinylib/msgp v1.6.1 // indirect
