@@ -347,7 +347,7 @@ func authorizeCodebergPagesV2(r *http.Request) (*Authorization, error) {
 }
 
 // Checks whether an operation that enables enumerating site contents is allowed.
-func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
+func AuthorizeMetadataRetrieval(r *http.Request, hasBasicAuth bool) (*Authorization, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
 	auth := authorizeInsecure(r)
@@ -365,27 +365,32 @@ func AuthorizeMetadataRetrieval(r *http.Request) (*Authorization, error) {
 		return auth, nil
 	}
 
-	for _, pattern := range wildcards {
-		auth, err = authorizeWildcardMatchHost(r, pattern)
-		if err != nil && IsUnauthorized(err) {
-			causes = append(causes, err)
-		} else if err != nil { // bad request
-			return nil, err
-		} else {
-			logc.Printf(r.Context(), "auth: wildcard %s\n", pattern.GetHost())
-			return auth, nil
+	// Normally, sites that correspond to a forge via a wildcard match are considered completely
+	// public and safe to retrieve without authorization. However, this is no longer the case if
+	// they have password-protected sections.
+	if !hasBasicAuth {
+		for _, pattern := range wildcards {
+			auth, err = authorizeWildcardMatchHost(r, pattern)
+			if err != nil && IsUnauthorized(err) {
+				causes = append(causes, err)
+			} else if err != nil { // bad request
+				return nil, err
+			} else {
+				logc.Printf(r.Context(), "auth: wildcard %s\n", pattern.GetHost())
+				return auth, nil
+			}
 		}
-	}
 
-	if config.Feature("codeberg-pages-compat") {
-		auth, err = authorizeCodebergPagesV2(r)
-		if err != nil && IsUnauthorized(err) {
-			causes = append(causes, err)
-		} else if err != nil { // bad request
-			return nil, err
-		} else {
-			logc.Printf(r.Context(), "auth: codeberg %s\n", r.Host)
-			return auth, nil
+		if config.Feature("codeberg-pages-compat") {
+			auth, err = authorizeCodebergPagesV2(r)
+			if err != nil && IsUnauthorized(err) {
+				causes = append(causes, err)
+			} else if err != nil { // bad request
+				return nil, err
+			} else {
+				logc.Printf(r.Context(), "auth: codeberg %s\n", r.Host)
+				return auth, nil
+			}
 		}
 	}
 

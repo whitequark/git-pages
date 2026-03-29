@@ -76,6 +76,16 @@ message HeaderRule {
 	repeated Header header_map = 2;
 }
 
+message BasicCredential {
+	string username = 1;
+	string password = 2;
+}
+
+message BasicAuthRule {
+	string path = 1;
+	repeated BasicCredential credentials = 2;
+}
+
 message Problem {
 	string path = 1;
 	string cause = 2;
@@ -96,6 +106,7 @@ message Manifest {
 	// Netlify-style `_redirects` and `_headers` rules.
 	repeated RedirectRule redirects = 6;
 	repeated HeaderRule headers = 9;
+	repeated BasicAuthRule basic_auth = 11;
 
 	// Diagnostics for non-fatal errors.
 	repeated Problem problems = 7;

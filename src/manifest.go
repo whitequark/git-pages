@@ -160,6 +160,10 @@ func IndexManifestByGitHash(manifest *Manifest) map[string]*Entry {
 	return index
 }
 
+func ManifestHasBasicAuth(manifest *Manifest) bool {
+	return len(manifest.GetBasicAuth()) > 0
+}
+
 func IsEntryRegularFile(entry *Entry) bool {
 	return entry.GetType() == Type_InlineFile ||
 		entry.GetType() == Type_ExternalFile
@@ -371,19 +375,11 @@ func StoreManifest(
 	span, ctx := ObserveFunction(ctx, "StoreManifest", "manifest.name", name)
 	defer span.Finish()
 
+	extManifest := &Manifest{}
+	proto.Merge(extManifest, manifest)
+
 	// Replace inline files over certain size with references to external data.
-	extManifest := Manifest{
-		RepoUrl:        manifest.RepoUrl,
-		Branch:         manifest.Branch,
-		Commit:         manifest.Commit,
-		Contents:       make(map[string]*Entry),
-		Redirects:      manifest.Redirects,
-		Headers:        manifest.Headers,
-		Problems:       manifest.Problems,
-		OriginalSize:   manifest.OriginalSize,
-		CompressedSize: manifest.CompressedSize,
-		StoredSize:     proto.Int64(0),
-	}
+	extManifest.Contents = make(map[string]*Entry)
 	for name, entry := range manifest.Contents {
 		cannotBeInlined := entry.GetType() == Type_InlineFile &&
 			entry.GetCompressedSize() > int64(config.Limits.MaxInlineFileSize.Bytes())
@@ -419,12 +415,13 @@ func StoreManifest(
 			config.Limits.MaxSiteSize.HR(),
 		)
 	}
+	extManifest.StoredSize = proto.Int64(0)
 	for _, blobSize := range blobSizes {
 		*extManifest.StoredSize += blobSize
 	}
 
 	// Upload the resulting manifest and the blob it references.
-	extManifestData := EncodeManifest(&extManifest)
+	extManifestData := EncodeManifest(extManifest)
 	if uint64(len(extManifestData)) > config.Limits.MaxManifestSize.Bytes() {
 		return nil, fmt.Errorf("%w: manifest size %s exceeds %s limit",
 			ErrManifestTooLarge,
@@ -433,7 +430,7 @@ func StoreManifest(
 		)
 	}
 
-	if err := backend.StageManifest(ctx, &extManifest); err != nil {
+	if err := backend.StageManifest(ctx, extManifest); err != nil {
 		return nil, fmt.Errorf("stage manifest: %w", err)
 	}
 
@@ -460,7 +457,7 @@ func StoreManifest(
 		return nil, err // currently ignores all but 1st error
 	}
 
-	if err := backend.CommitManifest(ctx, name, &extManifest, opts); err != nil {
+	if err := backend.CommitManifest(ctx, name, extManifest, opts); err != nil {
 		if errors.Is(err, ErrDomainFrozen) {
 			return nil, err
 		} else {
@@ -468,5 +465,5 @@ func StoreManifest(
 		}
 	}
 
-	return &extManifest, nil
+	return extManifest, nil
 }

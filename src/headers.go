@@ -15,6 +15,7 @@ import (
 )
 
 var ErrHeaderNotAllowed = errors.New("custom header not allowed")
+var ErrBasicAuthNotAllowed = errors.New("basic authorization not allowed")
 
 const HeadersFileName string = "_headers"
 
@@ -75,11 +76,18 @@ func validateHeaderRule(rule headers.Rule) error {
 		if slices.Contains(unsafeHeaders, header) {
 			return fmt.Errorf("rule sets header %q (fundamentally unsafe)", header)
 		}
-		if !slices.Contains(config.Limits.AllowedCustomHeaders, header) {
-			return fmt.Errorf("rule sets header %q (not allowlisted)", header)
-		}
-		if !IsAllowedCustomHeader(header) { // make sure we don't desync
-			panic(errors.New("header check inconsistency"))
+		switch header {
+		case "Basic-Auth":
+			if !config.Limits.AllowBasicAuth {
+				return fmt.Errorf("rule sets header %q (forbidden by policy)", header)
+			}
+		default:
+			if !slices.Contains(config.Limits.AllowedCustomHeaders, header) {
+				return fmt.Errorf("rule sets header %q (not allowlisted)", header)
+			}
+			if !IsAllowedCustomHeader(header) { // make sure we don't desync
+				panic(errors.New("header check inconsistency"))
+			}
 		}
 	}
 	return nil
@@ -114,16 +122,52 @@ func ProcessHeadersFile(ctx context.Context, manifest *Manifest) error {
 			continue
 		}
 		headerMap := []*Header{}
+		credentials := []*BasicCredential{}
+		hasBasicAuth := false
 		for header, values := range rule.Headers {
-			headerMap = append(headerMap, &Header{
-				Name:   proto.String(header),
-				Values: values,
-			})
+			switch header {
+			case "Basic-Auth":
+				hasBasicAuth = true
+				for _, value := range values {
+					for _, usernamePassword := range strings.Split(value, " ") {
+						if usernamePassword == "" {
+							continue
+						}
+						if username, password, found := strings.Cut(usernamePassword, ":"); !found {
+							AddProblem(manifest, HeadersFileName,
+								"rule #%d %q: malformed Basic-Auth credential", index+1, rule.Path)
+							continue
+						} else {
+							credentials = append(credentials, &BasicCredential{
+								Username: proto.String(username),
+								Password: proto.String(password),
+							})
+						}
+					}
+				}
+			default:
+				headerMap = append(headerMap, &Header{
+					Name:   proto.String(header),
+					Values: values,
+				})
+			}
 		}
+		// Note that we may add an empty `headerMap` here even if only credentials are defined.
+		// This is intentional: in `_headers` files processing terminates at the first matching
+		// clause, and Netlify mixes Basic-Auth with all the other headers.
 		manifest.Headers = append(manifest.Headers, &HeaderRule{
 			Path:      proto.String(rule.Path),
 			HeaderMap: headerMap,
 		})
+		// We're using `hasBasicAuth` instead of `len(credentials) > 0` so that if a `_headers`
+		// file defines only malformed credentials, we still add a rule (that in effect always
+		// denies access).
+		if hasBasicAuth {
+			manifest.BasicAuth = append(manifest.BasicAuth, &BasicAuthRule{
+				Path:        proto.String(rule.Path),
+				Credentials: credentials,
+			})
+		}
 	}
 	return nil
 }
@@ -143,13 +187,14 @@ func CollectHeadersFile(manifest *Manifest) string {
 	return headers.Must(headers.UnparseString(headersRules))
 }
 
-func ApplyHeaderRules(manifest *Manifest, url *url.URL) (headers http.Header, err error) {
-	headers = http.Header{}
+func matchPathRules[
+	Rule interface{ GetPath() string },
+](rules []Rule, url *url.URL) (matched Rule) {
 	fromSegments := pathSegments(url.Path)
 next:
-	for _, rule := range manifest.Headers {
+	for _, rule := range rules {
 		// check if the rule matches url
-		ruleURL, _ := url.Parse(*rule.Path) // pre-validated in `validateHeaderRule`
+		ruleURL, _ := url.Parse(rule.GetPath()) // pre-validated in `validateHeaderRule`
 		ruleSegments := pathSegments(ruleURL.Path)
 		if ruleSegments[len(ruleSegments)-1] != "*" {
 			if len(ruleSegments) < len(fromSegments) {
@@ -167,8 +212,19 @@ next:
 				continue next
 			}
 		}
+		matched = rule
+		break
+	}
+	return
+}
+
+func ApplyHeaderRules(manifest *Manifest, url *url.URL) (
+	headers http.Header, err error,
+) {
+	headers = http.Header{}
+	if rule := matchPathRules(manifest.Headers, url); rule != nil {
 		// the rule has matched url, validate headers against up-to-date policy
-		for _, header := range rule.HeaderMap {
+		for _, header := range rule.GetHeaderMap() {
 			name := header.GetName()
 			if !IsAllowedCustomHeader(name) {
 				return nil, fmt.Errorf("%w: %s", ErrHeaderNotAllowed, name)
@@ -177,7 +233,30 @@ next:
 				headers.Add(name, value)
 			}
 		}
-		break
 	}
 	return
+}
+
+func ApplyBasicAuthRules(manifest *Manifest, url *url.URL, r *http.Request) (bool, error) {
+	if rule := matchPathRules(manifest.BasicAuth, url); rule == nil {
+		// no matches, authorized by default
+		return true, nil
+	} else {
+		// the rule has matched url, check that basic auth is allowed per up-to-date policy
+		if !config.Limits.AllowBasicAuth {
+			// basic auth configured in the past but not allowed any more
+			return false, ErrBasicAuthNotAllowed
+		}
+		if username, password, ok := r.BasicAuth(); ok {
+			// request has credentials, check them
+			for _, credential := range rule.GetCredentials() {
+				if credential.GetUsername() == username && credential.GetPassword() == password {
+					// authorized!
+					return true, nil
+				}
+			}
+		}
+		// request has no credentials, unauthorized
+		return false, nil
+	}
 }

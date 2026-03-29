@@ -146,6 +146,9 @@ type LimitsConfig struct {
 	// e.g. `Foo-Bar`. Setting this option permits including this custom header in `_headers`,
 	// unless it is fundamentally unsafe.
 	AllowedCustomHeaders []string `toml:"allowed-custom-headers" default:"[\"X-Clacks-Overhead\"]"`
+	// Whether to allow Netlify-style credentials specified in a `Basic-Auth:` pseudo-header.
+	// These credentials are plaintext.
+	AllowBasicAuth bool `toml:"allow-basic-auth" default:"false"`
 }
 
 type AuditConfig struct {

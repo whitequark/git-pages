@@ -193,8 +193,8 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 
 		case metadataPath == "manifest.json":
 			// metadata requests require authorization to avoid making pushes from private
-			// repositories enumerable
-			_, err := AuthorizeMetadataRetrieval(r)
+			// repositories enumerable or exposing basic-auth protected sections
+			_, err := AuthorizeMetadataRetrieval(r, ManifestHasBasicAuth(manifest))
 			if err != nil {
 				return err
 			}
@@ -208,7 +208,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 
 		case metadataPath == "archive.tar":
 			// same as above
-			_, err := AuthorizeMetadataRetrieval(r)
+			_, err := AuthorizeMetadataRetrieval(r, ManifestHasBasicAuth(manifest))
 			if err != nil {
 				return err
 			}
@@ -242,6 +242,19 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			fmt.Fprintf(w, "not found\n")
 			return nil
 		}
+	}
+
+	// Apply basic-auth rules before checking existence of a path to avoid leaking the latter.
+	authorized, err := ApplyBasicAuthRules(manifest, &url.URL{Path: sitePath}, r)
+	if err != nil {
+		// See comment below for the error case under `ApplyHeaderRules`.
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "%s\n", err)
+		return err
+	} else if !authorized {
+		w.Header().Set("WWW-Authenticate", `Basic charset="UTF-8"`)
+		w.WriteHeader(http.StatusUnauthorized)
+		return nil
 	}
 
 	entryPath := sitePath

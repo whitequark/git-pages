@@ -1,5 +1,5 @@
-# Unless otherwise noted, every value in this file is the same
-# as the intrinsic default value.
+# This is a configuration used for demonstration purposes. The `config.default.toml` file contains
+# a configuration corresponding to default values only.
 
 log-format = "text"
 
@@ -48,10 +48,12 @@ max-inline-file-size = "256B"
 git-large-object-threshold = "1M"
 max-symlink-depth = 16
 update-timeout = "60s"
+concurrent-uploads = 1024
 max-heap-size-ratio = 0.5 # * RAM_size
 forbidden-domains = []
 allowed-repository-url-prefixes = []
 allowed-custom-headers = ["X-Clacks-Overhead"]
+allow-basic-auth = false
 
 [audit]
 node-id = 0

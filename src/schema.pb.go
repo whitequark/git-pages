@@ -479,6 +479,110 @@ func (x *HeaderRule) GetHeaderMap() []*Header {
 	return nil
 }
 
+type BasicCredential struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Username      *string                `protobuf:"bytes,1,opt,name=username" json:"username,omitempty"`
+	Password      *string                `protobuf:"bytes,2,opt,name=password" json:"password,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BasicCredential) Reset() {
+	*x = BasicCredential{}
+	mi := &file_schema_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BasicCredential) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BasicCredential) ProtoMessage() {}
+
+func (x *BasicCredential) ProtoReflect() protoreflect.Message {
+	mi := &file_schema_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BasicCredential.ProtoReflect.Descriptor instead.
+func (*BasicCredential) Descriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *BasicCredential) GetUsername() string {
+	if x != nil && x.Username != nil {
+		return *x.Username
+	}
+	return ""
+}
+
+func (x *BasicCredential) GetPassword() string {
+	if x != nil && x.Password != nil {
+		return *x.Password
+	}
+	return ""
+}
+
+type BasicAuthRule struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          *string                `protobuf:"bytes,1,opt,name=path" json:"path,omitempty"`
+	Credentials   []*BasicCredential     `protobuf:"bytes,2,rep,name=credentials" json:"credentials,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BasicAuthRule) Reset() {
+	*x = BasicAuthRule{}
+	mi := &file_schema_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BasicAuthRule) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BasicAuthRule) ProtoMessage() {}
+
+func (x *BasicAuthRule) ProtoReflect() protoreflect.Message {
+	mi := &file_schema_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BasicAuthRule.ProtoReflect.Descriptor instead.
+func (*BasicAuthRule) Descriptor() ([]byte, []int) {
+	return file_schema_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *BasicAuthRule) GetPath() string {
+	if x != nil && x.Path != nil {
+		return *x.Path
+	}
+	return ""
+}
+
+func (x *BasicAuthRule) GetCredentials() []*BasicCredential {
+	if x != nil {
+		return x.Credentials
+	}
+	return nil
+}
+
 type Problem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Path          *string                `protobuf:"bytes,1,opt,name=path" json:"path,omitempty"`
@@ -489,7 +593,7 @@ type Problem struct {
 
 func (x *Problem) Reset() {
 	*x = Problem{}
-	mi := &file_schema_proto_msgTypes[4]
+	mi := &file_schema_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -501,7 +605,7 @@ func (x *Problem) String() string {
 func (*Problem) ProtoMessage() {}
 
 func (x *Problem) ProtoReflect() protoreflect.Message {
-	mi := &file_schema_proto_msgTypes[4]
+	mi := &file_schema_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -514,7 +618,7 @@ func (x *Problem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Problem.ProtoReflect.Descriptor instead.
 func (*Problem) Descriptor() ([]byte, []int) {
-	return file_schema_proto_rawDescGZIP(), []int{4}
+	return file_schema_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Problem) GetPath() string {
@@ -543,8 +647,9 @@ type Manifest struct {
 	CompressedSize *int64            `protobuf:"varint,5,opt,name=compressed_size,json=compressedSize" json:"compressed_size,omitempty"` // sum of each `entry.compressed_size`
 	StoredSize     *int64            `protobuf:"varint,8,opt,name=stored_size,json=storedSize" json:"stored_size,omitempty"`             // sum of deduplicated `entry.compressed_size` for external files only
 	// Netlify-style `_redirects` and `_headers` rules.
-	Redirects []*RedirectRule `protobuf:"bytes,6,rep,name=redirects" json:"redirects,omitempty"`
-	Headers   []*HeaderRule   `protobuf:"bytes,9,rep,name=headers" json:"headers,omitempty"`
+	Redirects []*RedirectRule  `protobuf:"bytes,6,rep,name=redirects" json:"redirects,omitempty"`
+	Headers   []*HeaderRule    `protobuf:"bytes,9,rep,name=headers" json:"headers,omitempty"`
+	BasicAuth []*BasicAuthRule `protobuf:"bytes,11,rep,name=basic_auth,json=basicAuth" json:"basic_auth,omitempty"`
 	// Diagnostics for non-fatal errors.
 	Problems      []*Problem `protobuf:"bytes,7,rep,name=problems" json:"problems,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -553,7 +658,7 @@ type Manifest struct {
 
 func (x *Manifest) Reset() {
 	*x = Manifest{}
-	mi := &file_schema_proto_msgTypes[5]
+	mi := &file_schema_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -565,7 +670,7 @@ func (x *Manifest) String() string {
 func (*Manifest) ProtoMessage() {}
 
 func (x *Manifest) ProtoReflect() protoreflect.Message {
-	mi := &file_schema_proto_msgTypes[5]
+	mi := &file_schema_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -578,7 +683,7 @@ func (x *Manifest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Manifest.ProtoReflect.Descriptor instead.
 func (*Manifest) Descriptor() ([]byte, []int) {
-	return file_schema_proto_rawDescGZIP(), []int{5}
+	return file_schema_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Manifest) GetRepoUrl() string {
@@ -644,6 +749,13 @@ func (x *Manifest) GetHeaders() []*HeaderRule {
 	return nil
 }
 
+func (x *Manifest) GetBasicAuth() []*BasicAuthRule {
+	if x != nil {
+		return x.BasicAuth
+	}
+	return nil
+}
+
 func (x *Manifest) GetProblems() []*Problem {
 	if x != nil {
 		return x.Problems
@@ -669,7 +781,7 @@ type AuditRecord struct {
 
 func (x *AuditRecord) Reset() {
 	*x = AuditRecord{}
-	mi := &file_schema_proto_msgTypes[6]
+	mi := &file_schema_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -681,7 +793,7 @@ func (x *AuditRecord) String() string {
 func (*AuditRecord) ProtoMessage() {}
 
 func (x *AuditRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_schema_proto_msgTypes[6]
+	mi := &file_schema_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -694,7 +806,7 @@ func (x *AuditRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuditRecord.ProtoReflect.Descriptor instead.
 func (*AuditRecord) Descriptor() ([]byte, []int) {
-	return file_schema_proto_rawDescGZIP(), []int{6}
+	return file_schema_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AuditRecord) GetId() int64 {
@@ -757,7 +869,7 @@ type Principal struct {
 
 func (x *Principal) Reset() {
 	*x = Principal{}
-	mi := &file_schema_proto_msgTypes[7]
+	mi := &file_schema_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -769,7 +881,7 @@ func (x *Principal) String() string {
 func (*Principal) ProtoMessage() {}
 
 func (x *Principal) ProtoReflect() protoreflect.Message {
-	mi := &file_schema_proto_msgTypes[7]
+	mi := &file_schema_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -782,7 +894,7 @@ func (x *Principal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Principal.ProtoReflect.Descriptor instead.
 func (*Principal) Descriptor() ([]byte, []int) {
-	return file_schema_proto_rawDescGZIP(), []int{7}
+	return file_schema_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Principal) GetIpAddress() string {
@@ -817,7 +929,7 @@ type ForgeUser struct {
 
 func (x *ForgeUser) Reset() {
 	*x = ForgeUser{}
-	mi := &file_schema_proto_msgTypes[8]
+	mi := &file_schema_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -829,7 +941,7 @@ func (x *ForgeUser) String() string {
 func (*ForgeUser) ProtoMessage() {}
 
 func (x *ForgeUser) ProtoReflect() protoreflect.Message {
-	mi := &file_schema_proto_msgTypes[8]
+	mi := &file_schema_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -842,7 +954,7 @@ func (x *ForgeUser) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForgeUser.ProtoReflect.Descriptor instead.
 func (*ForgeUser) Descriptor() ([]byte, []int) {
-	return file_schema_proto_rawDescGZIP(), []int{8}
+	return file_schema_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ForgeUser) GetOrigin() string {
@@ -892,10 +1004,16 @@ const file_schema_proto_rawDesc = "" +
 	"HeaderRule\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12&\n" +
 	"\n" +
-	"header_map\x18\x02 \x03(\v2\a.HeaderR\theaderMap\"3\n" +
+	"header_map\x18\x02 \x03(\v2\a.HeaderR\theaderMap\"I\n" +
+	"\x0fBasicCredential\x12\x1a\n" +
+	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\"W\n" +
+	"\rBasicAuthRule\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x122\n" +
+	"\vcredentials\x18\x02 \x03(\v2\x10.BasicCredentialR\vcredentials\"3\n" +
 	"\aProblem\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x14\n" +
-	"\x05cause\x18\x02 \x01(\tR\x05cause\"\xb8\x03\n" +
+	"\x05cause\x18\x02 \x01(\tR\x05cause\"\xe7\x03\n" +
 	"\bManifest\x12\x19\n" +
 	"\brepo_url\x18\x01 \x01(\tR\arepoUrl\x12\x16\n" +
 	"\x06branch\x18\x02 \x01(\tR\x06branch\x12\x16\n" +
@@ -907,7 +1025,9 @@ const file_schema_proto_rawDesc = "" +
 	"\vstored_size\x18\b \x01(\x03R\n" +
 	"storedSize\x12+\n" +
 	"\tredirects\x18\x06 \x03(\v2\r.RedirectRuleR\tredirects\x12%\n" +
-	"\aheaders\x18\t \x03(\v2\v.HeaderRuleR\aheaders\x12$\n" +
+	"\aheaders\x18\t \x03(\v2\v.HeaderRuleR\aheaders\x12-\n" +
+	"\n" +
+	"basic_auth\x18\v \x03(\v2\x0e.BasicAuthRuleR\tbasicAuth\x12$\n" +
 	"\bproblems\x18\a \x03(\v2\b.ProblemR\bproblems\x1aC\n" +
 	"\rContentsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x1c\n" +
@@ -964,7 +1084,7 @@ func file_schema_proto_rawDescGZIP() []byte {
 }
 
 var file_schema_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_schema_proto_goTypes = []any{
 	(Type)(0),                     // 0: Type
 	(Transform)(0),                // 1: Transform
@@ -973,33 +1093,37 @@ var file_schema_proto_goTypes = []any{
 	(*RedirectRule)(nil),          // 4: RedirectRule
 	(*Header)(nil),                // 5: Header
 	(*HeaderRule)(nil),            // 6: HeaderRule
-	(*Problem)(nil),               // 7: Problem
-	(*Manifest)(nil),              // 8: Manifest
-	(*AuditRecord)(nil),           // 9: AuditRecord
-	(*Principal)(nil),             // 10: Principal
-	(*ForgeUser)(nil),             // 11: ForgeUser
-	nil,                           // 12: Manifest.ContentsEntry
-	(*timestamppb.Timestamp)(nil), // 13: google.protobuf.Timestamp
+	(*BasicCredential)(nil),       // 7: BasicCredential
+	(*BasicAuthRule)(nil),         // 8: BasicAuthRule
+	(*Problem)(nil),               // 9: Problem
+	(*Manifest)(nil),              // 10: Manifest
+	(*AuditRecord)(nil),           // 11: AuditRecord
+	(*Principal)(nil),             // 12: Principal
+	(*ForgeUser)(nil),             // 13: ForgeUser
+	nil,                           // 14: Manifest.ContentsEntry
+	(*timestamppb.Timestamp)(nil), // 15: google.protobuf.Timestamp
 }
 var file_schema_proto_depIdxs = []int32{
 	0,  // 0: Entry.type:type_name -> Type
 	1,  // 1: Entry.transform:type_name -> Transform
 	5,  // 2: HeaderRule.header_map:type_name -> Header
-	12, // 3: Manifest.contents:type_name -> Manifest.ContentsEntry
-	4,  // 4: Manifest.redirects:type_name -> RedirectRule
-	6,  // 5: Manifest.headers:type_name -> HeaderRule
-	7,  // 6: Manifest.problems:type_name -> Problem
-	13, // 7: AuditRecord.timestamp:type_name -> google.protobuf.Timestamp
-	2,  // 8: AuditRecord.event:type_name -> AuditEvent
-	10, // 9: AuditRecord.principal:type_name -> Principal
-	8,  // 10: AuditRecord.manifest:type_name -> Manifest
-	11, // 11: Principal.forge_user:type_name -> ForgeUser
-	3,  // 12: Manifest.ContentsEntry.value:type_name -> Entry
-	13, // [13:13] is the sub-list for method output_type
-	13, // [13:13] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	7,  // 3: BasicAuthRule.credentials:type_name -> BasicCredential
+	14, // 4: Manifest.contents:type_name -> Manifest.ContentsEntry
+	4,  // 5: Manifest.redirects:type_name -> RedirectRule
+	6,  // 6: Manifest.headers:type_name -> HeaderRule
+	8,  // 7: Manifest.basic_auth:type_name -> BasicAuthRule
+	9,  // 8: Manifest.problems:type_name -> Problem
+	15, // 9: AuditRecord.timestamp:type_name -> google.protobuf.Timestamp
+	2,  // 10: AuditRecord.event:type_name -> AuditEvent
+	12, // 11: AuditRecord.principal:type_name -> Principal
+	10, // 12: AuditRecord.manifest:type_name -> Manifest
+	13, // 13: Principal.forge_user:type_name -> ForgeUser
+	3,  // 14: Manifest.ContentsEntry.value:type_name -> Entry
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_schema_proto_init() }
@@ -1013,7 +1137,7 @@ func file_schema_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_schema_proto_rawDesc), len(file_schema_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
