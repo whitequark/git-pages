@@ -44,16 +44,17 @@ jobs:
     container:
       image: docker.io/library/node:24-trixie-slim@sha256:c319bb4fac67c01ced508b67193a0397e02d37555d8f9b72958649efd302b7f8
     steps:
+      - name: Install dependencies
+        run: |
+          apt-get -y update
+          apt-get -y install ca-certificates git
+          # git needs to be installed for build information embedding to work
       - name: Check out source code
         uses: https://code.forgejo.org/actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Set up toolchain
         uses: https://code.forgejo.org/actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version: '>=1.25.6'
-      - name: Install dependencies
-        run: |
-          apt-get -y update
-          apt-get -y install ca-certificates
       - name: Build release assets
         # If you want more platforms to be represented, send a pull request.
         run: |
