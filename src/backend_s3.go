@@ -583,7 +583,7 @@ func (s3 *S3Backend) CommitManifest(
 	data := EncodeManifest(manifest)
 	logc.Printf(ctx, "s3: commit manifest %x -> %s", sha256.Sum256(data), name)
 
-	_, domain, _ := strings.Cut(name, "/")
+	domain, _, _ := strings.Cut(name, "/")
 	if err := s3.checkDomainFrozen(ctx, domain); err != nil {
 		return err
 	}
@@ -625,7 +625,7 @@ func (s3 *S3Backend) DeleteManifest(
 ) error {
 	logc.Printf(ctx, "s3: delete manifest %s\n", name)
 
-	_, domain, _ := strings.Cut(name, "/")
+	domain, _, _ := strings.Cut(name, "/")
 	if err := s3.checkDomainFrozen(ctx, domain); err != nil {
 		return err
 	}
