@@ -1,6 +1,7 @@
 package git_pages
 
 import (
+	"cmp"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -16,6 +17,7 @@ import (
 	"os"
 	"path"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"time"
 
@@ -188,7 +190,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "(audit)  "+
 		"git-pages {-audit-log|-audit-read <id>|-audit-server <endpoint> <program> [args...]}\n")
 	fmt.Fprintf(os.Stderr, "(maint)  "+
-		"git-pages {-run-migration <name>|-trace-garbage}\n")
+		"git-pages {-run-migration <name>|-trace-garbage|-size-histogram {original|stored}}\n")
 	flag.PrintDefaults()
 }
 
@@ -230,6 +232,8 @@ func Main(versionInfo string) {
 		"listen for notifications on `endpoint` and spawn a process for each audit event")
 	runMigration := flag.String("run-migration", "",
 		"run a store `migration` (one of: create-domain-markers)")
+	sizeHistogram := flag.String("size-histogram", "",
+		"display histogram of `size-type` (original or stored) per domain")
 	traceGarbage := flag.Bool("trace-garbage", false,
 		"estimate total size of unreachable blobs")
 	version := flag.Bool("version", false,
@@ -256,6 +260,7 @@ func Main(versionInfo string) {
 		*auditRollback != "",
 		*auditServer != "",
 		*runMigration != "",
+		*sizeHistogram != "",
 		*traceGarbage,
 	} {
 		if selected {
@@ -265,8 +270,8 @@ func Main(versionInfo string) {
 	if cliOperations > 1 {
 		logc.Fatalln(ctx, "-list-blobs, -list-manifests, -get-blob, -get-manifest, -get-archive, "+
 			"-update-site, -freeze-domain, -unfreeze-domain, -audit-log, -audit-read, "+
-			"-audit-rollback, -audit-server, -run-migration, and -trace-garbage are "+
-			"mutually exclusive")
+			"-audit-rollback, -audit-server, -run-migration, -size-histogram, "+
+			"and -trace-garbage are mutually exclusive")
 	}
 
 	if *configTomlPath != "" && *noConfig {
@@ -545,6 +550,48 @@ func Main(versionInfo string) {
 	case *runMigration != "":
 		if err = RunMigration(ctx, *runMigration); err != nil {
 			logc.Fatalln(ctx, err)
+		}
+
+	case *sizeHistogram != "":
+		extractSize := func(s *DomainStatistics) int64 { return 0 }
+		switch *sizeHistogram {
+		case "original":
+			// Displays a size histogram using the `manifest.OriginalSize`, which is useful to see
+			// which site is the closest to hitting the size limit (checked against apparent size).
+			// This apparent size does not have any direct relationship with used storage.
+			extractSize = func(s *DomainStatistics) int64 { return s.OriginalSize }
+		case "stored":
+			// Displays a size histogram using the `manifest.StoredSize`, which is useful to see
+			// which site consumes the most resources. The site is keeping at least this many
+			// bytes worth of blobs alive, but removing it may not free any space because
+			// deduplication is global.
+			extractSize = func(s *DomainStatistics) int64 { return s.StoredSize }
+		default:
+			logc.Fatalln(ctx, "unknown histogram type")
+		}
+
+		histogram, err := SizeHistogram(ctx)
+		if err != nil {
+			logc.Fatalln(ctx, err)
+		}
+		slices.SortFunc(histogram, func(a *DomainStatistics, b *DomainStatistics) int {
+			return cmp.Compare(extractSize(a), extractSize(b))
+		})
+
+		if len(histogram) > 0 {
+			fullScaleSize := max(extractSize(histogram[len(histogram)-1]), 1)
+			fullScaleWidth := int64(40)
+			for _, statistics := range histogram {
+				size := extractSize(statistics)
+				barWidth := size * fullScaleWidth / fullScaleSize
+				spaceWidth := fullScaleWidth - barWidth
+				bar := strings.Repeat("*", int(barWidth)) + strings.Repeat(" ", int(spaceWidth))
+				fmt.Fprintf(color.Output, "%s %s %s\n",
+					color.HiBlackString(fmt.Sprint("|", bar, "|")),
+					statistics.Domain,
+					color.HiGreenString(datasize.ByteSize(extractSize(statistics)).HR()),
+				)
+			}
 		}
 
 	case *traceGarbage:
