@@ -127,6 +127,9 @@ func panicHandler(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
+				if err, ok := err.(error); ok && errors.Is(err, http.ErrAbortHandler) {
+					panic(http.ErrAbortHandler)
+				}
 				logc.Printf(r.Context(), "panic: %s %s %s: %s\n%s",
 					r.Method, r.Host, r.URL.Path, err, string(debug.Stack()))
 				http.Error(w,
