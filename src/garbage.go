@@ -44,11 +44,8 @@ func TraceGarbage(ctx context.Context) error {
 	}
 
 	// Enumerate blobs live via site manifests.
-	for metadata, err := range backend.EnumerateManifests(ctx) {
-		if err != nil {
-			return fmt.Errorf("trace sites err: %w", err)
-		}
-		manifest, _, err := backend.GetManifest(ctx, metadata.Name, GetManifestOptions{})
+	for item, err := range backend.GetAllManifests(ctx) {
+		metadata, manifest := item.Splat()
 		if err != nil {
 			return fmt.Errorf("trace sites err: %w", err)
 		}

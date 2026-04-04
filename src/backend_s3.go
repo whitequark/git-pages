@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/c2h5oh/datasize"
@@ -640,8 +641,8 @@ func (s3 *S3Backend) DeleteManifest(
 	return err
 }
 
-func (s3 *S3Backend) EnumerateManifests(ctx context.Context) iter.Seq2[ManifestMetadata, error] {
-	return func(yield func(ManifestMetadata, error) bool) {
+func (s3 *S3Backend) EnumerateManifests(ctx context.Context) iter.Seq2[*ManifestMetadata, error] {
+	return func(yield func(*ManifestMetadata, error) bool) {
 		logc.Print(ctx, "s3: enumerate manifests")
 
 		ctx, cancel := context.WithCancel(ctx)
@@ -652,7 +653,7 @@ func (s3 *S3Backend) EnumerateManifests(ctx context.Context) iter.Seq2[ManifestM
 			Prefix:    prefix,
 			Recursive: true,
 		}) {
-			var metadata ManifestMetadata
+			var metadata *ManifestMetadata
 			var err error
 			if err = object.Err; err == nil {
 				key := strings.TrimPrefix(object.Key, prefix)
@@ -662,13 +663,57 @@ func (s3 *S3Backend) EnumerateManifests(ctx context.Context) iter.Seq2[ManifestM
 				} else if project == "" || strings.HasPrefix(project, ".") && project != ".index" {
 					continue // internal; skip
 				} else {
-					metadata.Name = key
-					metadata.Size = object.Size
-					metadata.LastModified = object.LastModified
-					metadata.ETag = object.ETag
+					metadata = &ManifestMetadata{
+						Name:         key,
+						Size:         object.Size,
+						LastModified: object.LastModified,
+						ETag:         object.ETag,
+					}
 				}
 			}
 			if !yield(metadata, err) {
+				break
+			}
+		}
+	}
+}
+
+// Limits the number of concurrent uploads, globally across the entire git-pages process.
+// Not currently configurable as there seems to be little need.
+var getAllManifestsSemaphore = make(chan struct{}, 64)
+
+func (s3 *S3Backend) GetAllManifests(ctx context.Context) iter.Seq2[tuple[*ManifestMetadata, *Manifest], error] {
+	type result struct {
+		metadata *ManifestMetadata
+		manifest *Manifest
+		err      error
+	}
+
+	resultsChan := make(chan result)
+	enumeratorCtx, cancel := context.WithCancel(ctx)
+	go func(ctx context.Context) {
+		wg := sync.WaitGroup{}
+		for metadata, err := range s3.EnumerateManifests(ctx) {
+			if err != nil {
+				resultsChan <- result{nil, nil, err}
+			} else {
+				getAllManifestsSemaphore <- struct{}{} // acquire
+				wg.Go(func() {
+					defer func() { <-getAllManifestsSemaphore }() // release
+					manifest, _, err := backend.GetManifest(ctx, metadata.Name, GetManifestOptions{})
+					resultsChan <- result{metadata, manifest, err}
+				})
+			}
+		}
+		wg.Wait()
+		close(resultsChan)
+	}(enumeratorCtx)
+
+	return func(yield func(tuple[*ManifestMetadata, *Manifest], error) bool) {
+		for result := range resultsChan {
+			item := tuple[*ManifestMetadata, *Manifest]{result.metadata, result.manifest}
+			if !yield(item, result.err) {
+				cancel()
 				break
 			}
 		}

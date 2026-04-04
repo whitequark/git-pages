@@ -365,7 +365,7 @@ var ErrManifestTooLarge = errors.New("manifest too large")
 // As created, there is no limit, but reinitializing the semaphore with a bounded channel
 // limits the concurrency to the channel size. Note that the default *configuration* does
 // limit the number of uploads.
-var blobUploadSemaphore = make(chan struct{})
+var putBlobSemaphore = make(chan struct{})
 
 // Uploads inline file data over certain size to the storage backend. Returns a copy of
 // the manifest updated to refer to an external content-addressable store.
@@ -441,9 +441,9 @@ func StoreManifest(
 		// If the entry in the original manifest is already an external reference, there's no need
 		// to externalize it (and no way for us to do so, since the entry only contains the blob name).
 		if entry.GetType() == Type_ExternalFile && manifest.Contents[name].GetType() == Type_InlineFile {
-			blobUploadSemaphore <- struct{}{} // acquire (and maybe block)
+			putBlobSemaphore <- struct{}{} // acquire (and maybe block)
 			wg.Go(func() {
-				defer func() { <-blobUploadSemaphore }() // release
+				defer func() { <-putBlobSemaphore }() // release
 				err := backend.PutBlob(ctx, string(entry.Data), manifest.Contents[name].Data)
 				if err != nil {
 					ch <- fmt.Errorf("put blob %s: %w", name, err)

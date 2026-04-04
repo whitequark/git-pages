@@ -6,6 +6,15 @@ import (
 	"strings"
 )
 
+type tuple[A, B any] struct {
+	A A
+	B B
+}
+
+func (t tuple[A, B]) Splat() (A, B) {
+	return t.A, t.B
+}
+
 type BoundedReader struct {
 	inner io.Reader
 	fuel  int64

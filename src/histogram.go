@@ -17,11 +17,8 @@ type DomainStatistics struct {
 
 func SizeHistogram(ctx context.Context) ([]*DomainStatistics, error) {
 	statisticsMap := map[string]*DomainStatistics{}
-	for metadata, err := range backend.EnumerateManifests(ctx) {
-		if err != nil {
-			return nil, fmt.Errorf("size histogram err: %w", err)
-		}
-		manifest, _, err := backend.GetManifest(ctx, metadata.Name, GetManifestOptions{})
+	for item, err := range backend.GetAllManifests(ctx) {
+		metadata, manifest := item.Splat()
 		if err != nil {
 			return nil, fmt.Errorf("size histogram err: %w", err)
 		}

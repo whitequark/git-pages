@@ -65,7 +65,7 @@ func configureMemLimit(ctx context.Context) (err error) {
 
 // Can only be safely called during initial configuration.
 func configureConcurrency(_ context.Context) (err error) {
-	blobUploadSemaphore = make(chan struct{}, config.Limits.ConcurrentUploads)
+	putBlobSemaphore = make(chan struct{}, config.Limits.ConcurrentUploads)
 	return
 }
 

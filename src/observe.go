@@ -294,11 +294,23 @@ func (backend *observedBackend) DeleteManifest(ctx context.Context, name string,
 	return
 }
 
-func (backend *observedBackend) EnumerateManifests(ctx context.Context) iter.Seq2[ManifestMetadata, error] {
-	return func(yield func(ManifestMetadata, error) bool) {
+func (backend *observedBackend) EnumerateManifests(ctx context.Context) iter.Seq2[*ManifestMetadata, error] {
+	return func(yield func(*ManifestMetadata, error) bool) {
 		span, ctx := ObserveFunction(ctx, "EnumerateManifests")
 		for metadata, err := range backend.inner.EnumerateManifests(ctx) {
 			if !yield(metadata, err) {
+				break
+			}
+		}
+		span.Finish()
+	}
+}
+
+func (backend *observedBackend) GetAllManifests(ctx context.Context) iter.Seq2[tuple[*ManifestMetadata, *Manifest], error] {
+	return func(yield func(tuple[*ManifestMetadata, *Manifest], error) bool) {
+		span, ctx := ObserveFunction(ctx, "GetAllManifests")
+		for item, err := range backend.inner.GetAllManifests(ctx) {
+			if !yield(item, err) {
 				break
 			}
 		}

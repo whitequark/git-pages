@@ -124,9 +124,13 @@ type Backend interface {
 	// Delete a manifest.
 	DeleteManifest(ctx context.Context, name string, opts ModifyManifestOptions) error
 
-	// Iterate through all manifests. Whether manifests that are newly added during iteration
-	// will appear in the results is unspecified.
-	EnumerateManifests(ctx context.Context) iter.Seq2[ManifestMetadata, error]
+	// Iterate through metadata of all manifests. Whether manifests that are newly added during
+	// iteration will appear in the results is unspecified.
+	EnumerateManifests(ctx context.Context) iter.Seq2[*ManifestMetadata, error]
+
+	// Iterate through contents of all manifests. Same considerations apply as for
+	// `EnumerateManifests`.
+	GetAllManifests(ctx context.Context) iter.Seq2[tuple[*ManifestMetadata, *Manifest], error]
 
 	// Check whether a domain has any deployments.
 	CheckDomain(ctx context.Context, domain string) (found bool, err error)

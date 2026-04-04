@@ -402,12 +402,12 @@ func (fs *FSBackend) DeleteManifest(
 	}
 }
 
-func (fs *FSBackend) EnumerateManifests(ctx context.Context) iter.Seq2[ManifestMetadata, error] {
-	return func(yield func(ManifestMetadata, error) bool) {
+func (fs *FSBackend) EnumerateManifests(ctx context.Context) iter.Seq2[*ManifestMetadata, error] {
+	return func(yield func(*ManifestMetadata, error) bool) {
 		iofs.WalkDir(fs.siteRoot.FS(), ".",
 			func(path string, entry iofs.DirEntry, err error) error {
 				_, project, _ := strings.Cut(path, "/")
-				var metadata ManifestMetadata
+				var metadata *ManifestMetadata
 				if err != nil {
 					// report error
 				} else if entry.IsDir() {
@@ -420,9 +420,11 @@ func (fs *FSBackend) EnumerateManifests(ctx context.Context) iter.Seq2[ManifestM
 					// report error
 				} else {
 					// report blob
-					metadata.Name = path
-					metadata.Size = info.Size()
-					metadata.LastModified = info.ModTime()
+					metadata = &ManifestMetadata{
+						Name:         path,
+						Size:         info.Size(),
+						LastModified: info.ModTime(),
+					}
 					// not setting metadata.ETag since it is too costly
 				}
 				if !yield(metadata, err) {
@@ -430,6 +432,22 @@ func (fs *FSBackend) EnumerateManifests(ctx context.Context) iter.Seq2[ManifestM
 				}
 				return nil
 			})
+	}
+}
+
+func (fs *FSBackend) GetAllManifests(ctx context.Context) iter.Seq2[tuple[*ManifestMetadata, *Manifest], error] {
+	return func(yield func(tuple[*ManifestMetadata, *Manifest], error) bool) {
+		for metadata, err := range fs.EnumerateManifests(ctx) {
+			var item tuple[*ManifestMetadata, *Manifest]
+			if err == nil {
+				var manifest *Manifest
+				manifest, _, err = backend.GetManifest(ctx, metadata.Name, GetManifestOptions{})
+				item = tuple[*ManifestMetadata, *Manifest]{metadata, manifest}
+			}
+			if !yield(item, err) {
+				break
+			}
+		}
 	}
 }
 
