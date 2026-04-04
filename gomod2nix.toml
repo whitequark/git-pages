@@ -56,8 +56,8 @@ schema = 3
     version = "v6.0.0-20260328065524-593ae452e14d"
     hash = "sha256-/mt8A6xZqRNL2xqy/laaRzLbWc7yHK5ThsfIhar1tww="
   [mod."github.com/go-git/go-git/v6"]
-    version = "v6.0.0-20260328145551-a93bccd59f82"
-    hash = "sha256-fZh/Cy+8m/mIwYuJ1uTx3OG8l6PujjMxk4HTSUaIPts="
+    version = "v6.0.0-alpha.1"
+    hash = "sha256-ZnBhf7EMUKBz1HuJ9FCFwIZpH9H21BV1CoCjINmonyw="
   [mod."github.com/go-ini/ini"]
     version = "v1.67.0"
     hash = "sha256-V10ahGNGT+NLRdKUyRg1dos5RxLBXBk1xutcnquc/+4="
@@ -104,8 +104,8 @@ schema = 3
     version = "v1.1.2"
     hash = "sha256-vykcXvy2VBBAXnJott/XsGTT0gk2UL36JzZKfJ1KAUY="
   [mod."github.com/minio/minio-go/v7"]
-    version = "v7.0.99"
-    hash = "sha256-Q2VISIvHDggBzidGWzgHbVUZrDCsSIGBPcWfMJcC39w="
+    version = "v7.0.100"
+    hash = "sha256-MjWYoX4b+OOSOkjsitQQqcTbpQ7CYNghN9XCdrqgYaM="
   [mod."github.com/munnerz/goautoneg"]
     version = "v0.0.0-20191010083416-a7dc8b61c822"
     hash = "sha256-79URDDFenmGc9JZu+5AXHToMrtTREHb3BC84b/gym9Q="

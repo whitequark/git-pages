@@ -11,12 +11,12 @@ require (
 	github.com/dghubble/trie v0.1.0
 	github.com/fatih/color v1.19.0
 	github.com/go-git/go-billy/v6 v6.0.0-20260328065524-593ae452e14d
-	github.com/go-git/go-git/v6 v6.0.0-20260328145551-a93bccd59f82
+	github.com/go-git/go-git/v6 v6.0.0-alpha.1
 	github.com/jpillora/backoff v1.0.0
 	github.com/kankanreno/go-snowflake v1.2.0
 	github.com/klauspost/compress v1.18.5
 	github.com/maypok86/otter/v2 v2.3.0
-	github.com/minio/minio-go/v7 v7.0.99
+	github.com/minio/minio-go/v7 v7.0.100
 	github.com/pelletier/go-toml/v2 v2.3.0
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/prometheus/client_golang v1.23.2
