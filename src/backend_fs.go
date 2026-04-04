@@ -152,7 +152,13 @@ func (fs *FSBackend) PutBlob(ctx context.Context, name string, data []byte) erro
 	}
 
 	if err := fs.blobRoot.Chmod(tempPath, 0o444); err != nil {
-		return fmt.Errorf("chmod: %w", err)
+		if errors.Is(err, os.ErrPermission) {
+			// NFSv4 configured with ACLs doesn't have a working `chmod` even though it's a Unix
+			// system. This `chmod` call is done entirely for convenience (to help the system
+			// administrator avoid accidentally overwriting files), so just skip it.
+		} else {
+			return fmt.Errorf("chmod: %w", err)
+		}
 	}
 
 again:
