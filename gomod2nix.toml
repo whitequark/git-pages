@@ -19,6 +19,12 @@ schema = 3
   [mod."github.com/beorn7/perks"]
     version = "v1.0.1"
     hash = "sha256-h75GUqfwJKngCJQVE5Ao5wnO3cfKD9lSIteoLp/3xJ4="
+  [mod."github.com/bits-and-blooms/bitset"]
+    version = "v1.24.2"
+    hash = "sha256-hT88EpdWmKnqdxApJhs/aIAptf33HmtSp2KXPI+Ym7o="
+  [mod."github.com/bits-and-blooms/bloom/v3"]
+    version = "v3.7.1"
+    hash = "sha256-KZduCu+k4+xqBcFRTfg8Yc/PEf5jfpjn0I1YoxfnVPo="
   [mod."github.com/c2h5oh/datasize"]
     version = "v0.0.0-20231215233829-aa82cc1e6500"
     hash = "sha256-8MqL7xCvE6fIjanz2jwkaLP1OE5kLu62TOcQx452DHQ="

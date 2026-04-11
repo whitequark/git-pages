@@ -65,8 +65,12 @@ func observeSiteUpdate(via string, result *UpdateResult) {
 	}
 }
 
+func normalizeHost(host string) string {
+	return strings.ToLower(host)
+}
+
 func makeWebRoot(host string, projectName string) string {
-	return path.Join(strings.ToLower(host), projectName)
+	return path.Join(normalizeHost(host), projectName)
 }
 
 func getWebRoot(r *http.Request) (string, error) {
@@ -113,6 +117,13 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	host, err := GetHost(r)
 	if err != nil {
 		return err
+	}
+
+	host = normalizeHost(host)
+	if !domainCache.CheckDomain(r.Context(), host) {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, "site not found\n")
+		return nil
 	}
 
 	type indexManifestResult struct {

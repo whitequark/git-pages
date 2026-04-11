@@ -643,8 +643,11 @@ func (s3 *S3Backend) DeleteManifest(
 
 	err := s3.client.RemoveObject(ctx, s3.bucket, manifestObjectName(name),
 		minio.RemoveObjectOptions{})
+	if err != nil {
+		return err
+	}
 	s3.siteCache.Cache.Invalidate(name)
-	return err
+	return s3.bumpLastDomainUpdateTimestamp(ctx)
 }
 
 func (s3 *S3Backend) EnumerateManifests(ctx context.Context) iter.Seq2[*ManifestMetadata, error] {
@@ -764,8 +767,19 @@ func (s3 *S3Backend) CheckDomain(ctx context.Context, domain string) (exists boo
 func (s3 *S3Backend) CreateDomain(ctx context.Context, domain string) error {
 	logc.Printf(ctx, "s3: create domain %s\n", domain)
 
-	_, err := s3.client.PutObject(ctx, s3.bucket, domainCheckObjectName(domain),
+	exists, err := s3.CheckDomain(ctx, domain)
+	if err != nil {
+		return err
+	}
+
+	_, err = s3.client.PutObject(ctx, s3.bucket, domainCheckObjectName(domain),
 		&bytes.Reader{}, 0, minio.PutObjectOptions{})
+	if err != nil {
+		return err
+	}
+	if !exists {
+		err = s3.bumpLastDomainUpdateTimestamp(ctx)
+	}
 	return err
 }
 
@@ -788,6 +802,25 @@ func (s3 *S3Backend) UnfreezeDomain(ctx context.Context, domain string) error {
 	} else {
 		return err
 	}
+}
+
+const lastDomainUpdateObjectName = "meta/last-domain-update"
+
+func (s3 *S3Backend) HaveDomainsChanged(ctx context.Context, since time.Time) (bool, error) {
+	info, err := s3.client.StatObject(ctx, s3.bucket, lastDomainUpdateObjectName,
+		minio.GetObjectOptions{})
+	if err != nil {
+		return false, err
+	}
+
+	return info.LastModified.After(since), nil
+}
+
+func (s3 *S3Backend) bumpLastDomainUpdateTimestamp(ctx context.Context) error {
+	logc.Print(ctx, "s3: bumping last domain update timestamp")
+	_, err := s3.client.PutObject(ctx, s3.bucket, lastDomainUpdateObjectName,
+		&bytes.Reader{}, 0, minio.PutObjectOptions{})
+	return err
 }
 
 func auditObjectName(id AuditID) string {

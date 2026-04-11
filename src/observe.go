@@ -346,6 +346,13 @@ func (backend *observedBackend) UnfreezeDomain(ctx context.Context, domain strin
 	return
 }
 
+func (backend *observedBackend) HaveDomainsChanged(ctx context.Context, since time.Time) (changed bool, err error) {
+	span, ctx := ObserveFunction(ctx, "HaveDomainsChanged", "since", since)
+	changed, err = backend.inner.HaveDomainsChanged(ctx, since)
+	span.Finish()
+	return
+}
+
 func (backend *observedBackend) AppendAuditLog(ctx context.Context, id AuditID, record *AuditRecord) (err error) {
 	span, ctx := ObserveFunction(ctx, "AppendAuditLog", "audit.id", id)
 	err = backend.inner.AppendAuditLog(ctx, id, record)

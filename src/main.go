@@ -33,6 +33,7 @@ var config *Config
 var wildcards []*WildcardPattern
 var fallback http.Handler
 var backend Backend
+var domainCache DomainCache
 
 func configureFeatures(ctx context.Context) (err error) {
 	if len(config.Features) > 0 {
@@ -638,6 +639,10 @@ func Main(versionInfo string) {
 			logc.Fatalln(ctx, err)
 		}
 		backend = NewObservedBackend(backend)
+
+		if domainCache, err = CreateDomainCache(ctx); err != nil {
+			logc.Fatalln(ctx, err)
+		}
 
 		middleware := chainHTTPMiddleware(
 			panicHandler,

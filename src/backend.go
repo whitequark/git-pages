@@ -138,12 +138,15 @@ type Backend interface {
 	// Create a domain. This allows us to start serving content for the domain.
 	CreateDomain(ctx context.Context, domain string) error
 
-	// Freeze  a domain. This allows a site to be administratively locked, e.g. if it
+	// Freeze a domain. This allows a site to be administratively locked, e.g. if it
 	// is discovered serving abusive content.
 	FreezeDomain(ctx context.Context, domain string) error
 
 	// Thaw a domain. This removes the previously placed administrative lock (if any).
 	UnfreezeDomain(ctx context.Context, domain string) error
+
+	// Check whether the set of domains we serve has changed since the time passed to this method.
+	HaveDomainsChanged(ctx context.Context, since time.Time) (changed bool, err error)
 
 	// Append a record to the audit log.
 	AppendAuditLog(ctx context.Context, id AuditID, record *AuditRecord) error

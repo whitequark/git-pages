@@ -26,7 +26,17 @@ func ServeCaddy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	found, err := backend.CheckDomain(r.Context(), strings.ToLower(domain))
+	var err error
+	domain = strings.ToLower(domain)
+
+	// Run a cheap check as to whether we might be serving the domain.
+	var found = domainCache.CheckDomain(r.Context(), domain)
+
+	if !found {
+		// Run an expensive check as to whether we are actually serving the domain.
+		found, err = backend.CheckDomain(r.Context(), domain)
+	}
+
 	if !found {
 		// If we don't serve the domain, but a fallback server does, then we should let our
 		// Caddy instance request a TLS certificate. Otherwise, we'll never have an opportunity

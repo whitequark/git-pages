@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type FSBackend struct {
@@ -477,6 +478,10 @@ func (fs *FSBackend) UnfreezeDomain(ctx context.Context, domain string) error {
 	} else {
 		return err
 	}
+}
+
+func (fs *FSBackend) HaveDomainsChanged(ctx context.Context, since time.Time) (bool, error) {
+	return true, nil // not implemented
 }
 
 func (fs *FSBackend) AppendAuditLog(ctx context.Context, id AuditID, record *AuditRecord) error {
