@@ -46,13 +46,18 @@
             ];
           };
 
-          buildInputs = with pkgs; [
-            pkgsStatic.musl
-          ];
+          buildInputs = pkgs.lib.optionals pkgs.stdenv.targetPlatform.isLinux (
+            with pkgs;
+            [
+              pkgsStatic.musl
+            ]
+          );
 
           ldflags = [
             "-linkmode external"
             "-X main.versionOverride=${self.shortRev or self.dirtyShortRev}"
+          ]
+          ++ pkgs.lib.optionals pkgs.stdenv.targetPlatform.isLinux [
             "-extldflags -static"
             "-s -w"
           ];
