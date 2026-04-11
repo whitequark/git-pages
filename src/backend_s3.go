@@ -179,6 +179,12 @@ func NewS3Backend(ctx context.Context, config *S3Config) (*S3Backend, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		err = (&S3Backend{client: client, bucket: bucket}).
+			EnableFeature(ctx, FeatureCheckDomainMarker)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	initS3BackendMetrics()
