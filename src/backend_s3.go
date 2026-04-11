@@ -848,3 +848,40 @@ func (s3 *S3Backend) SearchAuditLog(
 		}
 	}
 }
+
+var getAuditLogRecordsSemaphore = make(chan struct{}, 64)
+
+func (s3 *S3Backend) GetAuditLogRecords(
+	ctx context.Context, ids iter.Seq2[AuditID, error],
+) iter.Seq2[*AuditRecord, error] {
+	return func(yield func(*AuditRecord, error) bool) {
+		resultsChan := make(chan tuple[*AuditRecord, error])
+		enumeratorCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		go func(ctx context.Context) {
+			wg := sync.WaitGroup{}
+			for id, err := range ids {
+				if err != nil {
+					resultsChan <- tuple[*AuditRecord, error]{nil, err}
+				} else {
+					getAuditLogRecordsSemaphore <- struct{}{} // acquire
+					wg.Go(func() {
+						defer func() { <-getAuditLogRecordsSemaphore }() // release
+						record, err := s3.QueryAuditLog(ctx, id)
+						resultsChan <- tuple[*AuditRecord, error]{record, err}
+					})
+				}
+			}
+			wg.Wait()
+			close(resultsChan)
+		}(enumeratorCtx)
+
+		for result := range resultsChan {
+			record, err := result.Splat()
+			if !yield(record, err) {
+				break
+			}
+		}
+	}
+}

@@ -524,3 +524,19 @@ func (fs *FSBackend) SearchAuditLog(
 			})
 	}
 }
+
+func (fs *FSBackend) GetAuditLogRecords(
+	ctx context.Context, ids iter.Seq2[AuditID, error],
+) iter.Seq2[*AuditRecord, error] {
+	return func(yield func(*AuditRecord, error) bool) {
+		for id, err := range ids {
+			var record *AuditRecord
+			if err == nil {
+				record, err = fs.QueryAuditLog(ctx, id)
+			}
+			if !yield(record, err) {
+				break
+			}
+		}
+	}
+}

@@ -376,3 +376,17 @@ func (backend *observedBackend) SearchAuditLog(
 		span.Finish()
 	}
 }
+
+func (backend *observedBackend) GetAuditLogRecords(
+	ctx context.Context, ids iter.Seq2[AuditID, error],
+) iter.Seq2[*AuditRecord, error] {
+	return func(yield func(*AuditRecord, error) bool) {
+		span, ctx := ObserveFunction(ctx, "GetAuditLogRecords")
+		for item, err := range backend.inner.GetAuditLogRecords(ctx, ids) {
+			if !yield(item, err) {
+				break
+			}
+		}
+		span.Finish()
+	}
+}

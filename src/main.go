@@ -462,30 +462,20 @@ func Main(versionInfo string) {
 		}
 
 	case *auditLog:
-		ch := make(chan *AuditRecord)
-		ids := []AuditID{}
-		for id, err := range backend.SearchAuditLog(ctx, SearchAuditLogOptions{}) {
+		records := []*AuditRecord{}
+		ids := backend.SearchAuditLog(ctx, SearchAuditLogOptions{})
+		for record, err := range backend.GetAuditLogRecords(ctx, ids) {
 			if err != nil {
 				logc.Fatalln(ctx, err)
 			}
-			go func() {
-				if record, err := backend.QueryAuditLog(ctx, id); err != nil {
-					logc.Fatalln(ctx, err)
-				} else {
-					ch <- record
-				}
-			}()
-			ids = append(ids, id)
+			records = append(records, record)
 		}
 
-		records := map[AuditID]*AuditRecord{}
-		for len(records) < len(ids) {
-			record := <-ch
-			records[record.GetAuditID()] = record
-		}
+		slices.SortFunc(records, func(a, b *AuditRecord) int {
+			return cmp.Compare(a.GetAuditID(), b.GetAuditID())
+		})
 
-		for _, id := range ids {
-			record := records[id]
+		for _, record := range records {
 			fmt.Fprintf(color.Output, "%s %s %s %s %s\n",
 				record.GetAuditID().String(),
 				color.HiWhiteString(record.GetTimestamp().AsTime().UTC().Format(time.RFC3339)),

@@ -151,8 +151,11 @@ type Backend interface {
 	// Retrieve a single record from the audit log.
 	QueryAuditLog(ctx context.Context, id AuditID) (record *AuditRecord, err error)
 
-	// Retrieve records from the audit log by time range.
+	// Retrieve record IDs from the audit log by time range.
 	SearchAuditLog(ctx context.Context, opts SearchAuditLogOptions) iter.Seq2[AuditID, error]
+
+	// Retrieve audit record contents for given IDs.
+	GetAuditLogRecords(ctx context.Context, ids iter.Seq2[AuditID, error]) iter.Seq2[*AuditRecord, error]
 }
 
 func CreateBackend(ctx context.Context, config *StorageConfig) (backend Backend, err error) {
