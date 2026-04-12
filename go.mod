@@ -10,7 +10,7 @@ require (
 	github.com/creasty/defaults v1.8.0
 	github.com/dghubble/trie v0.1.0
 	github.com/fatih/color v1.19.0
-	github.com/go-git/go-billy/v6 v6.0.0-20260328065524-593ae452e14d
+	github.com/go-git/go-billy/v6 v6.0.0-20260410103409-85b6241850b5
 	github.com/go-git/go-git/v6 v6.0.0-alpha.1
 	github.com/jpillora/backoff v1.0.0
 	github.com/kankanreno/go-snowflake v1.2.0
@@ -23,7 +23,7 @@ require (
 	github.com/samber/slog-multi v1.8.0
 	github.com/tj/go-redirects v0.0.0-20200911105812-fd1ba1020b37
 	github.com/valyala/fasttemplate v1.2.2
-	golang.org/x/net v0.52.0
+	golang.org/x/net v0.53.0
 	google.golang.org/protobuf v1.36.11
 )
 
@@ -68,9 +68,9 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.49.0 // indirect
+	golang.org/x/crypto v0.50.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/text v0.35.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/text v0.36.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
