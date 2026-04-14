@@ -862,6 +862,8 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add("Server", fmt.Sprintf("git-pages (%s)", hostname))
 			ObserveData(r.Context(), "server.name", hostname)
 		}
+	} else {
+		w.Header().Add("Server", "git-pages")
 	}
 	allowedMethods := []string{"OPTIONS", "HEAD", "GET", "PUT", "PATCH", "DELETE", "POST"}
 	if r.Method == "OPTIONS" || !slices.Contains(allowedMethods, r.Method) {
