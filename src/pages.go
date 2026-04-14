@@ -846,30 +846,21 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 	if config.Audit.IncludeIPs != "" {
 		GetPrincipal(r.Context()).IpAddress = proto.String(r.RemoteAddr)
 	}
-	// We want upstream health checks to be done as closely to the normal flow as possible;
-	// any intentional deviation is an opportunity to miss an issue that will affect our
-	// visitors but not our health checks.
-	if r.Header.Get("Health-Check") == "" {
-		var mediaType string
-		switch r.Method {
-		case "HEAD", "GET":
-			mediaType = r.Header.Get("Accept")
-		default:
-			mediaType = r.Header.Get("Content-Type")
-		}
-		logc.Println(r.Context(), "pages:", r.Method, r.Host, r.URL, mediaType)
-		if region := os.Getenv("FLY_REGION"); region != "" {
-			machine_id := os.Getenv("FLY_MACHINE_ID")
-			w.Header().Add("Server", fmt.Sprintf("git-pages (fly.io; %s; %s)", region, machine_id))
-			ObserveData(r.Context(), "server.name", machine_id, "server.region", region)
-		} else if hostname, err := os.Hostname(); err == nil {
-			if region := os.Getenv("PAGES_REGION"); region != "" {
-				w.Header().Add("Server", fmt.Sprintf("git-pages (%s; %s)", region, hostname))
-				ObserveData(r.Context(), "server.name", hostname, "server.region", region)
-			} else {
-				w.Header().Add("Server", fmt.Sprintf("git-pages (%s)", hostname))
-				ObserveData(r.Context(), "server.name", hostname)
-			}
+	var mediaType string
+	switch r.Method {
+	case "HEAD", "GET":
+		mediaType = r.Header.Get("Accept")
+	default:
+		mediaType = r.Header.Get("Content-Type")
+	}
+	logc.Println(r.Context(), "pages:", r.Method, r.Host, r.URL, mediaType)
+	if hostname, err := os.Hostname(); err == nil {
+		if region := os.Getenv("PAGES_REGION"); region != "" {
+			w.Header().Add("Server", fmt.Sprintf("git-pages (%s; %s)", region, hostname))
+			ObserveData(r.Context(), "server.name", hostname, "server.region", region)
+		} else {
+			w.Header().Add("Server", fmt.Sprintf("git-pages (%s)", hostname))
+			ObserveData(r.Context(), "server.name", hostname)
 		}
 	}
 	allowedMethods := []string{"OPTIONS", "HEAD", "GET", "PUT", "PATCH", "DELETE", "POST"}
