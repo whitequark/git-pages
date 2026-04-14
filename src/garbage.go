@@ -56,16 +56,14 @@ func TraceGarbage(ctx context.Context) error {
 	}
 
 	// Enumerate blobs live via audit records.
-	for auditID, err := range backend.SearchAuditLog(ctx, SearchAuditLogOptions{}) {
+
+	auditIDs := backend.SearchAuditLog(ctx, SearchAuditLogOptions{})
+	for record, err := range backend.GetAuditLogRecords(ctx, auditIDs) {
 		if err != nil {
-			return fmt.Errorf("trace audit err: %w", err)
+			logc.Fatalln(ctx, err)
 		}
-		auditRecord, err := backend.QueryAuditLog(ctx, auditID)
-		if err != nil {
-			return fmt.Errorf("trace audit err: %w", err)
-		}
-		if auditRecord.Manifest != nil {
-			err = traceManifest(auditID.String(), auditRecord.Manifest)
+		if record.Manifest != nil {
+			err = traceManifest(record.GetAuditID().String(), record.Manifest)
 			if err != nil {
 				return fmt.Errorf("trace audit err: %w", err)
 			}
