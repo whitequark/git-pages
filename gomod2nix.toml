@@ -62,14 +62,11 @@ schema = 3
     version = "v6.0.0-20260410103409-85b6241850b5"
     hash = "sha256-2qQeUjkswSqI9joCKhvMB1lvnKHL9INbAzy4UBveHsw="
   [mod."github.com/go-git/go-git/v6"]
-    version = "v6.0.0-alpha.1"
-    hash = "sha256-ZnBhf7EMUKBz1HuJ9FCFwIZpH9H21BV1CoCjINmonyw="
+    version = "v6.0.0-alpha.2"
+    hash = "sha256-nUjRn1uIZKhIKqdNXfTirGtm07XCUKF2z3aat9O0dqM="
   [mod."github.com/go-ini/ini"]
     version = "v1.67.0"
     hash = "sha256-V10ahGNGT+NLRdKUyRg1dos5RxLBXBk1xutcnquc/+4="
-  [mod."github.com/golang/groupcache"]
-    version = "v0.0.0-20241129210726-2c02b8208cf8"
-    hash = "sha256-AdLZ3dJLe/yduoNvZiXugZxNfmwJjNQyQGsIdzYzH74="
   [mod."github.com/google/uuid"]
     version = "v1.6.0"
     hash = "sha256-VWl9sqUzdOuhW0KzQlv0gwwUQClYkmZwSydHG2sALYw="
