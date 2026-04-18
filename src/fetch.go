@@ -16,6 +16,7 @@ import (
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/go-git/go-git/v6/plumbing/cache"
+	"github.com/go-git/go-git/v6/plumbing/client"
 	"github.com/go-git/go-git/v6/plumbing/filemode"
 	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/go-git/go-git/v6/plumbing/protocol/packp"
@@ -165,28 +166,18 @@ func FetchRepository(
 	// Third, if we still don't have data for some manifest entries, re-establish a git transport
 	// and request the missing blobs (only) from the server.
 	if len(blobsNeeded) > 0 {
-		client, err := transport.Get(parsedRepoURL.Scheme)
-		if err != nil {
-			return nil, fmt.Errorf("git transport: %w", err)
-		}
+		gitClient := client.New()
+		request := &transport.Request{
+			URL:     parsedRepoURL,
+			Command: transport.UploadPackService}
 
-		endpoint, err := transport.NewEndpoint(repoURL)
-		if err != nil {
-			return nil, fmt.Errorf("git endpoint: %w", err)
-		}
-
-		session, err := client.NewSession(storer, endpoint, nil)
-		if err != nil {
-			return nil, fmt.Errorf("git session: %w", err)
-		}
-
-		connection, err := session.Handshake(ctx, transport.UploadPackService)
+		session, err := gitClient.Handshake(ctx, request)
 		if err != nil {
 			return nil, fmt.Errorf("git connection: %w", err)
 		}
-		defer connection.Close()
+		defer session.Close()
 
-		if err := connection.Fetch(ctx, &transport.FetchRequest{
+		if err := session.Fetch(ctx, storer, &transport.FetchRequest{
 			Wants: slices.Collect(maps.Keys(blobsNeeded)),
 			Depth: 1,
 			// Git CLI behaves like this, even if the wants above are references to blobs.
