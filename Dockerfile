@@ -11,7 +11,7 @@ RUN git clone https://github.com/ochinchina/supervisord . && \
 RUN GOBIN=/usr/bin go install -ldflags "-s -w"
 
 # Build Caddy with S3 storage backend.
-FROM docker.io/library/caddy:2.11.2-builder@sha256:930cbe20ab83d080fc0f6f0de7ddc90840ee94f9dd1ec1725e70f938ffa715dc AS caddy-builder
+FROM docker.io/library/caddy:2.11.2-builder@sha256:10ed0251c5cd1dbb4db0b71ad43121147961a51adfec35febce2c93ea25c24f4 AS caddy-builder
 RUN xcaddy build ${CADDY_VERSION} \
     --with=github.com/ss098/certmagic-s3@v0.0.0-20250922022452-8af482af5f39
 
