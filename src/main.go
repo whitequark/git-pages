@@ -204,6 +204,8 @@ func Main(versionInfo string) {
 	flag.Usage = usage
 	configTomlPath := flag.String("config", "",
 		"load configuration from `filename` (default: 'config.toml')")
+	secretTomlPath := flag.String("secrets", "",
+		"load additional configuration values from `filename` (default: '$CREDENTIALS_DIRECTORY/secrets.toml' if it exists)")
 	noConfig := flag.Bool("no-config", false,
 		"run without configuration file (configure via environment variables)")
 	printConfigEnvVars := flag.Bool("print-config-env-vars", false,
@@ -291,7 +293,19 @@ func Main(versionInfo string) {
 	if *configTomlPath == "" && !*noConfig {
 		*configTomlPath = "config.toml"
 	}
-	if config, err = Configure(*configTomlPath); err != nil {
+
+	if *secretTomlPath == "" && !*noConfig {
+		// check for a second config file at $CREDENTIALS_DIRECTORY/secrets.toml, and use it
+		if systemdCredentialsDir := os.Getenv("CREDENTIALS_DIRECTORY"); systemdCredentialsDir != "" {
+			secretTomlTestPath := path.Join(systemdCredentialsDir, "secrets.toml")
+			_, err := os.Stat(secretTomlTestPath)
+			if !errors.Is(err, os.ErrNotExist) {
+				*secretTomlPath = secretTomlTestPath
+			}
+		}
+	}
+
+	if config, err = Configure(*configTomlPath, *secretTomlPath); err != nil {
 		logc.Fatalln(ctx, "config:", err)
 	}
 
@@ -602,7 +616,7 @@ func Main(versionInfo string) {
 		// Note that not all of the configuration is updated on reload. Listeners are kept as-is.
 		// The backend is not recreated (this is intentional as it allows preserving the cache).
 		OnReload(func() {
-			if newConfig, err := Configure(*configTomlPath); err != nil {
+			if newConfig, err := Configure(*configTomlPath, *secretTomlPath); err != nil {
 				logc.Println(ctx, "config: reload err:", err)
 			} else {
 				// From https://go.dev/ref/mem:

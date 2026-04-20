@@ -309,25 +309,38 @@ func PrintConfigEnvVars() {
 	})
 }
 
-func Configure(tomlPath string) (config *Config, err error) {
-	// start with an all-default configuration
-	config = new(Config)
-	defaults.MustSet(config)
-
-	// inject values from `config.toml`
+func ReadConfigFile(config *Config, tomlPath string) (err error) {
 	if tomlPath != "" {
 		var file *os.File
 		file, err = os.Open(tomlPath)
 		if err != nil {
 			return
 		}
-		defer file.Close()
+
+		defer func(file *os.File) {
+			err = file.Close()
+		}(file)
 
 		decoder := toml.NewDecoder(file)
 		decoder.DisallowUnknownFields()
 		decoder.EnableUnmarshalerInterface()
 		if err = decoder.Decode(&config); err != nil {
 			return
+		}
+	}
+	return nil
+}
+
+func Configure(tomlPaths ...string) (config *Config, err error) {
+	// start with an all-default configuration
+	config = new(Config)
+	defaults.MustSet(config)
+
+	// inject values from each toml file
+	for _, tomlPath := range tomlPaths {
+		err := ReadConfigFile(config, tomlPath)
+		if err != nil {
+			return nil, err
 		}
 	}
 
