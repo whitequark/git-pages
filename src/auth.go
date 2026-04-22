@@ -578,6 +578,11 @@ func checkGogsRepositoryPushPermission(baseURL *url.URL, authorization string) e
 			http.StatusNotFound,
 			fmt.Sprintf("no repository %s", ownerAndRepo),
 		}
+	} else if response.StatusCode == http.StatusUnauthorized {
+		return AuthError{
+			http.StatusUnauthorized,
+			fmt.Sprintf("no access to %s or invalid token", ownerAndRepo),
+		}
 	} else if response.StatusCode != http.StatusOK {
 		return AuthError{
 			http.StatusServiceUnavailable,
