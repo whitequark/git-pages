@@ -315,17 +315,16 @@ func authorizeCodebergPagesV2(r *http.Request) (*Authorization, error) {
 			if domainParts[0] == "page" && domainParts[1] == "codeberg" {
 				// map of domain names to allowed repository and branch:
 				//  * {username}.codeberg.page =>
-				//      https://codeberg.org/{username}/pages.git#main
+				//      https://codeberg.org/{username}/pages.git#pages
 				//  * {reponame}.{username}.codeberg.page =>
 				//      https://codeberg.org/{username}/{reponame}.git#pages
 				//  * {branch}.{reponame}.{username}.codeberg.page =>
 				//      https://codeberg.org/{username}/{reponame}.git#{branch}
 				username := domainParts[2]
 				reponame := "pages"
-				branch := "main"
+				branch := "pages"
 				if len(domainParts) >= 4 {
 					reponame = domainParts[3]
-					branch = "pages"
 				}
 				if len(domainParts) == 5 {
 					branch = domainParts[4]
