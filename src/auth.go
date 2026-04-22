@@ -463,21 +463,23 @@ func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 	return nil, joinErrors(causes...)
 }
 
-func checkAllowedURLPrefix(repoURL string) error {
+func checkAllowedURLPrefixes(repoURLs ...string) error {
 	if len(config.Limits.AllowedRepositoryURLPrefixes) > 0 {
-		allowedPrefix := false
-		repoURL = strings.ToLower(repoURL)
-		for _, allowedRepoURLPrefix := range config.Limits.AllowedRepositoryURLPrefixes {
-			if strings.HasPrefix(repoURL, strings.ToLower(allowedRepoURLPrefix)) {
-				allowedPrefix = true
-				break
+		for _, repoURL := range repoURLs {
+			allowedPrefix := false
+			repoURL = strings.ToLower(repoURL)
+			for _, allowedRepoURLPrefix := range config.Limits.AllowedRepositoryURLPrefixes {
+				if strings.HasPrefix(repoURL, strings.ToLower(allowedRepoURLPrefix)) {
+					allowedPrefix = true
+					break
+				}
 			}
-		}
-		if !allowedPrefix {
-			return AuthError{
-				http.StatusUnauthorized,
-				fmt.Sprintf("clone URL not in prefix allowlist %v",
-					config.Limits.AllowedRepositoryURLPrefixes),
+			if !allowedPrefix {
+				return AuthError{
+					http.StatusUnauthorized,
+					fmt.Sprintf("clone URL %v not in prefix allowlist %v",
+						repoURL, config.Limits.AllowedRepositoryURLPrefixes),
+				}
 			}
 		}
 	}
@@ -510,7 +512,7 @@ func AuthorizeRepository(repoURL string, auth *Authorization) error {
 		return nil // any
 	}
 
-	if err = checkAllowedURLPrefix(repoURL); err != nil {
+	if err = checkAllowedURLPrefixes(repoURL); err != nil {
 		return err
 	}
 
@@ -730,7 +732,7 @@ func authorizeForgeWithToken(r *http.Request) (*Authorization, error) {
 	return nil, joinErrors(errs...)
 }
 
-func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
+func authorizeDNSChallengeOrForgeWithToken(r *http.Request) (*Authorization, error) {
 	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
 
 	if err := CheckForbiddenDomain(r); err != nil {
@@ -742,57 +744,18 @@ func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
 		return auth, nil
 	}
 
-	// Token authorization allows updating a site on a wildcard domain from an archive.
-	auth, err := authorizeForgeWithToken(r)
-	if err != nil && IsUnauthorized(err) {
-		causes = append(causes, err)
-	} else if err != nil { // bad request
-		return nil, err
-	} else {
-		logc.Printf(r.Context(), "auth: forge token: allow\n")
-		return auth, nil
-	}
-
-	if len(config.Limits.AllowedRepositoryURLPrefixes) > 0 {
-		causes = append(causes, AuthError{http.StatusUnauthorized, "DNS challenge not allowed"})
-	} else {
-		// DNS challenge gives absolute authority.
-		auth, err = authorizeDNSChallenge(r)
-		if err != nil && IsUnauthorized(err) {
-			causes = append(causes, err)
-		} else if err != nil { // bad request
-			return nil, err
-		} else {
-			logc.Println(r.Context(), "auth: DNS challenge")
-			return auth, nil
-		}
-	}
-
-	return nil, joinErrors(causes...)
-}
-
-func AuthorizeDeletion(r *http.Request) (*Authorization, error) {
-	causes := []error{AuthError{http.StatusUnauthorized, "unauthorized"}}
-
-	if err := CheckForbiddenDomain(r); err != nil {
-		return nil, err
-	}
-
-	auth := authorizeInsecure(r)
-	if auth != nil {
-		return auth, nil
-	}
-
+	// DNS challenge gives absolute authority.
 	auth, err := authorizeDNSChallenge(r)
 	if err != nil && IsUnauthorized(err) {
 		causes = append(causes, err)
 	} else if err != nil { // bad request
 		return nil, err
 	} else {
-		logc.Printf(r.Context(), "auth: DNS challenge: allow *\n")
+		logc.Println(r.Context(), "auth: DNS challenge: allow *")
 		return auth, nil
 	}
 
+	// Token authorization allows updating a site on a wildcard domain from an archive.
 	auth, err = authorizeForgeWithToken(r)
 	if err != nil && IsUnauthorized(err) {
 		causes = append(causes, err)
@@ -804,6 +767,32 @@ func AuthorizeDeletion(r *http.Request) (*Authorization, error) {
 	}
 
 	return nil, joinErrors(causes...)
+}
+
+func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
+	auth, err := authorizeDNSChallengeOrForgeWithToken(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// If only uploads from specific repositories are allowed, then only forge authorization
+	// is acceptable, and the repository must match the configured limits.
+	if len(config.Limits.AllowedRepositoryURLPrefixes) > 0 {
+		if len(auth.repoURLs) == 0 {
+			logc.Println(r.Context(), "auth: DNS challenge: deny (limits)")
+			return nil, AuthError{http.StatusUnauthorized, "DNS challenge not allowed"}
+		}
+
+		if err = checkAllowedURLPrefixes(auth.repoURLs...); err != nil {
+			return nil, err
+		}
+	}
+
+	return auth, nil
+}
+
+func AuthorizeDeletion(r *http.Request) (*Authorization, error) {
+	return authorizeDNSChallengeOrForgeWithToken(r)
 }
 
 func CheckForbiddenDomain(r *http.Request) error {
