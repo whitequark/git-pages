@@ -620,7 +620,7 @@ func checkGogsRepositoryPushPermission(baseURL *url.URL, authorization string) e
 }
 
 // Gogs, Gitea, and Forgejo all support the same API here.
-func fetchGogsAuthorizedUser(baseURL *url.URL, authorization string) (*ForgeUser, error) {
+func fetchGogsAuthorizedUser(baseURL *url.URL, forgeToken string) (*ForgeUser, error) {
 	request, err := http.NewRequest("GET", baseURL.ResolveReference(&url.URL{
 		Path: "/api/v1/user",
 	}).String(), nil)
@@ -628,7 +628,7 @@ func fetchGogsAuthorizedUser(baseURL *url.URL, authorization string) (*ForgeUser
 		panic(err) // misconfiguration
 	}
 	request.Header.Set("Accept", "application/json")
-	request.Header.Set("Authorization", authorization)
+	request.Header.Set("Authorization", forgeToken)
 
 	httpClient := http.Client{Timeout: 5 * time.Second}
 	response, err := httpClient.Do(request)
@@ -674,9 +674,34 @@ func fetchGogsAuthorizedUser(baseURL *url.URL, authorization string) (*ForgeUser
 	}, nil
 }
 
-func authorizeForgeWithToken(r *http.Request) (*Authorization, error) {
-	authorization := r.Header.Get("Forge-Authorization")
-	if authorization == "" {
+// Check whether a forge token has access to a repository, and if it does, which user it
+// belongs to. Precondition: `repoURL` is well-formed.
+func authorizeGogsUser(repoURL string, forgeToken string) (*Authorization, error) {
+	parsedRepoURL, err := url.Parse(repoURL)
+	if err != nil {
+		panic(err)
+	}
+
+	if err = checkGogsRepositoryPushPermission(parsedRepoURL, forgeToken); err != nil {
+		return nil, err
+	}
+
+	authorizedUser, err := fetchGogsAuthorizedUser(parsedRepoURL, forgeToken)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Authorization{
+		repoURLs:  []string{repoURL},
+		forgeUser: authorizedUser,
+	}, nil
+}
+
+// Validates a provided forge token against a repository URL constructed by mapping the host
+// and project name via the `[[wildcard]]` section of the configuration file.
+func authorizeForgeWildcard(r *http.Request) (*Authorization, error) {
+	forgeToken := r.Header.Get("Forge-Authorization")
+	if forgeToken == "" {
 		return nil, AuthError{http.StatusUnauthorized, "missing Forge-Authorization header"}
 	}
 
@@ -692,42 +717,56 @@ func authorizeForgeWithToken(r *http.Request) (*Authorization, error) {
 
 	var errs []error
 	for _, pattern := range wildcards {
-		if !pattern.Authorization {
-			continue
+		if pattern.Authorization {
+			if userName, found := pattern.Matches(host); found {
+				repoURL, branch := pattern.ApplyTemplate(userName, projectName)
+				auth, err := authorizeGogsUser(repoURL, forgeToken)
+				if err != nil {
+					errs = append(errs, err)
+				} else {
+					auth.branch = branch
+					return auth, nil
+				}
+			}
 		}
+	}
+	if len(errs) == 0 {
+		errs = append(errs, AuthError{http.StatusUnauthorized, "no matching wildcard domain"})
+	}
 
-		if userName, found := pattern.Matches(host); found {
-			repoURL, branch := pattern.ApplyTemplate(userName, projectName)
-			parsedRepoURL, err := url.Parse(repoURL)
+	errs = append([]error{
+		AuthError{http.StatusUnauthorized, "not authorized by forge (wildcard)"},
+	}, errs...)
+	return nil, joinErrors(errs...)
+}
+
+// Validates a provided forge token against a repository URL extracted from the DNS allowlist
+// records of the target domain (`_git-pages-repository.*`).
+func authorizeForgeDNSAllowlist(r *http.Request) (*Authorization, error) {
+	forgeToken := r.Header.Get("Forge-Authorization")
+	if forgeToken == "" {
+		return nil, AuthError{http.StatusUnauthorized, "missing Forge-Authorization header"}
+	}
+
+	var errs []error
+	if dnsAuth, err := authorizeDNSAllowlist(r); err != nil {
+		errs = append(errs, err)
+	} else if dnsAuth != nil {
+		// DNS allows uploads from some repositories, but we don't know yet if the forge token
+		// has a push permission to any of these repositories.
+		for _, repoURL := range dnsAuth.repoURLs {
+			auth, err := authorizeGogsUser(repoURL, forgeToken)
 			if err != nil {
-				panic(err) // misconfiguration
-			}
-
-			if err = checkGogsRepositoryPushPermission(parsedRepoURL, authorization); err != nil {
 				errs = append(errs, err)
-				continue
+			} else {
+				// There is both DNS authorization and forge authorization.
+				return auth, nil
 			}
-
-			authorizedUser, err := fetchGogsAuthorizedUser(parsedRepoURL, authorization)
-			if err != nil {
-				errs = append(errs, err)
-				continue
-			}
-
-			return &Authorization{
-				// This will actually be ignored by the callers of AuthorizeUpdateFromArchive and
-				// AuthorizeDeletion, but we return this information as it makes sense to do
-				// contextually here.
-				repoURLs: []string{repoURL},
-				branch:   branch,
-
-				forgeUser: authorizedUser,
-			}, nil
 		}
 	}
 
 	errs = append([]error{
-		AuthError{http.StatusUnauthorized, "not authorized by forge"},
+		AuthError{http.StatusUnauthorized, "not authorized by forge (DNS allowlist)"},
 	}, errs...)
 	return nil, joinErrors(errs...)
 }
@@ -756,13 +795,26 @@ func authorizeDNSChallengeOrForgeWithToken(r *http.Request) (*Authorization, err
 	}
 
 	// Token authorization allows updating a site on a wildcard domain from an archive.
-	auth, err = authorizeForgeWithToken(r)
+	// This sub-method uses the `[[wildcard]]` configuration section to derive repository URL.
+	auth, err = authorizeForgeWildcard(r)
 	if err != nil && IsUnauthorized(err) {
 		causes = append(causes, err)
 	} else if err != nil { // bad request
 		return nil, err
 	} else {
-		logc.Printf(r.Context(), "auth: forge token: allow\n")
+		logc.Printf(r.Context(), "auth: forge (wildcard): allow\n")
+		return auth, nil
+	}
+
+	// Token authorization allows updating a site on a wildcard domain from an archive.
+	// This sub-method uses the DNS allowlist authorization mechanism to derive repository URL.
+	auth, err = authorizeForgeDNSAllowlist(r)
+	if err != nil && IsUnauthorized(err) {
+		causes = append(causes, err)
+	} else if err != nil { // bad request
+		return nil, err
+	} else {
+		logc.Printf(r.Context(), "auth: forge (DNS allowlist): allow\n")
 		return auth, nil
 	}
 
