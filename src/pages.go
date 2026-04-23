@@ -846,14 +846,13 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 	if config.Audit.IncludeIPs != "" {
 		GetPrincipal(r.Context()).IpAddress = proto.String(r.RemoteAddr)
 	}
-	var mediaType string
 	switch r.Method {
-	case "HEAD", "GET":
-		mediaType = r.Header.Get("Accept")
+	case "PUT", "PATCH", "POST":
+		mediaType := r.Header.Get("Content-Type")
+		logc.Println(r.Context(), "pages:", r.Method, r.Host, r.URL, mediaType)
 	default:
-		mediaType = r.Header.Get("Content-Type")
+		logc.Println(r.Context(), "pages:", r.Method, r.Host, r.URL)
 	}
-	logc.Println(r.Context(), "pages:", r.Method, r.Host, r.URL, mediaType)
 	if hostname, err := os.Hostname(); err == nil {
 		if region := os.Getenv("PAGES_REGION"); region != "" {
 			w.Header().Add("Server", fmt.Sprintf("git-pages (%s; %s)", region, hostname))
