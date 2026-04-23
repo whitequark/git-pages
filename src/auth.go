@@ -179,7 +179,7 @@ func authorizeDNSChallenge(r *http.Request) (*Authorization, error) {
 	}, nil
 }
 
-func authorizeDNSAllowlist(r *http.Request) (*Authorization, error) {
+func authorizeDNSAllowlist(r *http.Request, scope string) (*Authorization, error) {
 	host, err := GetHost(r)
 	if err != nil {
 		return nil, err
@@ -190,7 +190,7 @@ func authorizeDNSAllowlist(r *http.Request) (*Authorization, error) {
 		return nil, err
 	}
 
-	allowlistHostname := fmt.Sprintf("_git-pages-repository.%s", host)
+	allowlistHostname := fmt.Sprintf("_%s.%s", scope, host)
 	records, err := net.LookupTXT(allowlistHostname)
 	if err != nil {
 		return nil, AuthError{http.StatusUnauthorized,
@@ -421,7 +421,7 @@ func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 
 	// DNS allowlist gives authority to update but not delete.
 	if r.Method == http.MethodPut || r.Method == http.MethodPost {
-		auth, err = authorizeDNSAllowlist(r)
+		auth, err = authorizeDNSAllowlist(r, "git-pages-repository")
 		if err != nil && IsUnauthorized(err) {
 			causes = append(causes, err)
 		} else if err != nil { // bad request
@@ -741,7 +741,7 @@ func authorizeForgeWildcard(r *http.Request) (*Authorization, error) {
 }
 
 // Validates a provided forge token against a repository URL extracted from the DNS allowlist
-// records of the target domain (`_git-pages-repository.*`).
+// records of the target domain specified in `_git-pages-forge-authorization.*`.
 func authorizeForgeDNSAllowlist(r *http.Request) (*Authorization, error) {
 	forgeToken := r.Header.Get("Forge-Authorization")
 	if forgeToken == "" {
@@ -749,7 +749,7 @@ func authorizeForgeDNSAllowlist(r *http.Request) (*Authorization, error) {
 	}
 
 	var errs []error
-	if dnsAuth, err := authorizeDNSAllowlist(r); err != nil {
+	if dnsAuth, err := authorizeDNSAllowlist(r, "git-pages-forge-allowlist"); err != nil {
 		errs = append(errs, err)
 	} else if dnsAuth != nil {
 		// DNS allows uploads from some repositories, but we don't know yet if the forge token
