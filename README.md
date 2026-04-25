@@ -1,6 +1,9 @@
 git-pages
 =========
 
+<a href="ircs://irc.libera.chat/#git-pages"><img alt="Discuss on IRC at #git-pages on libera.chat" src="https://img.shields.io/badge/irc-libera.chat-blue"></a>
+<a href="https://matrix.to/#/#git-pages:catircservices.org"><img alt="Discuss on Matrix at #git-pages:catircservices.org" src="https://img.shields.io/matrix/git-pages%3Acatircservices.org?server_fqdn=matrix.org&fetchMode=summary&label=matrix&color=blue"></a>
+
 _git-pages_ is a static site server for use with Git forges (i.e. a GitHub Pages replacement). It is written with efficiency in mind, scaling horizontally to any number of machines and serving sites up to multiple gigabytes in size, while being equally suitable for small single-user deployments.
 
 It is implemented in Go and has no other mandatory dependencies, although it is designed to be used together with the [Caddy server][caddy] for TLS termination. Site data may be stored on the filesystem or in an [Amazon S3](https://aws.amazon.com/s3/) compatible object store.
