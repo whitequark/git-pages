@@ -27,9 +27,9 @@ func SizeHistogram(ctx context.Context) ([]*DomainStatistics, error) {
 			statisticsMap[domain] = &DomainStatistics{Domain: domain}
 		}
 		statistics := statisticsMap[domain]
-		statistics.OriginalSize += manifest.GetOriginalSize()
-		statistics.CompressedSize += manifest.GetCompressedSize()
-		statistics.StoredSize += manifest.GetStoredSize()
+		statistics.OriginalSize += metadata.Size + manifest.GetOriginalSize()
+		statistics.CompressedSize += metadata.Size + manifest.GetCompressedSize()
+		statistics.StoredSize += metadata.Size + manifest.GetStoredSize()
 	}
 	return slices.Collect(maps.Values(statisticsMap)), nil
 }
