@@ -328,6 +328,10 @@ func Main(versionInfo string) {
 		logc.Fatalln(ctx, err)
 	}
 
+	if domainCache, err = CreateDomainCache(ctx); err != nil {
+		logc.Fatalln(ctx, err)
+	}
+
 	// The server has its own logic for creating the backend.
 	if cliOperations > 0 {
 		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
@@ -653,10 +657,6 @@ func Main(versionInfo string) {
 			logc.Fatalln(ctx, err)
 		}
 		backend = NewObservedBackend(backend)
-
-		if domainCache, err = CreateDomainCache(ctx); err != nil {
-			logc.Fatalln(ctx, err)
-		}
 
 		middleware := chainHTTPMiddleware(
 			panicHandler,
