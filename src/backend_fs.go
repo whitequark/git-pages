@@ -489,7 +489,7 @@ func (fs *FSBackend) AppendAuditLog(ctx context.Context, id AuditID, record *Aud
 		panic(fmt.Errorf("audit ID collision: %s", id))
 	}
 
-	return fs.auditRoot.WriteFile(id.String(), EncodeAuditRecord(record), 0o644)
+	return fs.auditRoot.WriteFile(id.String(), EncodeAuditRecord(record), 0o444)
 }
 
 func (fs *FSBackend) QueryAuditLog(ctx context.Context, id AuditID) (*AuditRecord, error) {
