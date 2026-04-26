@@ -924,3 +924,10 @@ func (s3 *S3Backend) GetAuditLogRecords(
 		}
 	}
 }
+
+func (s3 *S3Backend) ExpireAuditRecord(ctx context.Context, id AuditID) error {
+	logc.Printf(ctx, "s3: expire audit record %s\n", id)
+
+	return s3.client.RemoveObject(ctx, s3.bucket, auditObjectName(id),
+		minio.RemoveObjectOptions{})
+}

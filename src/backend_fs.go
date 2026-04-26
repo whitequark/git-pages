@@ -545,3 +545,7 @@ func (fs *FSBackend) GetAuditLogRecords(
 		}
 	}
 }
+
+func (fs *FSBackend) ExpireAuditRecord(ctx context.Context, id AuditID) error {
+	return fs.auditRoot.Remove(id.String())
+}

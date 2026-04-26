@@ -397,3 +397,10 @@ func (backend *observedBackend) GetAuditLogRecords(
 		span.Finish()
 	}
 }
+
+func (backend *observedBackend) ExpireAuditRecord(ctx context.Context, id AuditID) (err error) {
+	span, ctx := ObserveFunction(ctx, "ExpireAuditRecord", "audit.id", id)
+	err = backend.inner.ExpireAuditRecord(ctx, id)
+	span.Finish()
+	return
+}

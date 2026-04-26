@@ -159,6 +159,9 @@ type Backend interface {
 
 	// Retrieve audit record contents for given IDs.
 	GetAuditLogRecords(ctx context.Context, ids iter.Seq2[AuditID, error]) iter.Seq2[*AuditRecord, error]
+
+	// Delete an audit record with a given ID.
+	ExpireAuditRecord(ctx context.Context, id AuditID) error
 }
 
 func CreateBackend(ctx context.Context, config *StorageConfig) (backend Backend, err error) {

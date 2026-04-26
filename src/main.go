@@ -18,6 +18,7 @@ import (
 	"path"
 	"runtime/debug"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -193,6 +194,8 @@ func usage() {
 		"git-pages {-freeze-domain <domain>|-unfreeze-domain <domain>}\n")
 	fmt.Fprintf(os.Stderr, "(audit)  "+
 		"git-pages {-audit-log|-audit-read <id>|-audit-server <endpoint> <program> [args...]}\n")
+	fmt.Fprintf(os.Stderr, "(audit)  "+
+		"git-pages {-audit-expire <days>}\n")
 	fmt.Fprintf(os.Stderr, "(maint)  "+
 		"git-pages {-run-migration <name>|-trace-garbage|-size-histogram {original|stored}}\n")
 	flag.PrintDefaults()
@@ -236,6 +239,8 @@ func Main(versionInfo string) {
 		"restore site from contents of audit record `id`")
 	auditServer := flag.String("audit-server", "",
 		"listen for notifications on `endpoint` and spawn a process for each audit event")
+	auditExpire := flag.String("audit-expire", "",
+		"expire audit records older than `days` old")
 	runMigration := flag.String("run-migration", "",
 		"run a store `migration` (one of: create-domain-markers)")
 	sizeHistogram := flag.String("size-histogram", "",
@@ -265,6 +270,7 @@ func Main(versionInfo string) {
 		*auditRead != "",
 		*auditRollback != "",
 		*auditServer != "",
+		*auditExpire != "",
 		*runMigration != "",
 		*sizeHistogram != "",
 		*traceGarbage,
@@ -558,6 +564,34 @@ func Main(versionInfo string) {
 		}
 
 		serve(ctx, listen(ctx, "audit", *auditServer), ObserveHTTPHandler(processor))
+
+	case *auditExpire != "":
+		days, err := strconv.ParseInt(*auditExpire, 10, 0)
+		if err != nil {
+			logc.Fatalln(ctx, err)
+		}
+
+		ids := backend.SearchAuditLog(ctx, SearchAuditLogOptions{
+			Until: time.Now().AddDate(0, 0, int(-days)),
+		})
+
+		count := 0
+		for id, err := range ids {
+			if err != nil {
+				logc.Fatalln(ctx, err)
+				continue
+			}
+
+			err = backend.ExpireAuditRecord(ctx, id)
+			if err != nil {
+				logc.Fatalln(ctx, err)
+			} else {
+				logc.Printf(ctx, "audit: expired record %s\n", id)
+				count += 1
+			}
+		}
+
+		logc.Printf(ctx, "audit: expired %d records\n", count)
 
 	case *runMigration != "":
 		if err = RunMigration(ctx, *runMigration); err != nil {
