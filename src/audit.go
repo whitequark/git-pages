@@ -50,6 +50,8 @@ func GetPrincipal(ctx context.Context) *Principal {
 	return nil
 }
 
+var AuditSnowflakeStartTime = time.Date(2025, 12, 1, 0, 0, 0, 0, time.UTC)
+
 type AuditID int64
 
 func GenerateAuditID() AuditID {
@@ -74,6 +76,7 @@ func (id AuditID) String() string {
 
 func (id AuditID) CompareTime(when time.Time) int {
 	idMillis := int64(id) >> (snowflake.MachineIDLength + snowflake.SequenceLength)
+	idMillis += AuditSnowflakeStartTime.UnixMilli()
 	whenMillis := when.UTC().UnixNano() / 1e6
 	return cmp.Compare(idMillis, whenMillis)
 }

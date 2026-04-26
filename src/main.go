@@ -101,7 +101,7 @@ func configureFallback(_ context.Context) (err error) {
 
 // Thread-unsafe, must be called only during initial configuration.
 func configureAudit(_ context.Context) (err error) {
-	snowflake.SetStartTime(time.Date(2025, 12, 1, 0, 0, 0, 0, time.UTC))
+	snowflake.SetStartTime(AuditSnowflakeStartTime)
 	snowflake.SetMachineID(config.Audit.NodeID)
 	return
 }
