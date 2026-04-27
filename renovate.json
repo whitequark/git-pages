@@ -8,10 +8,6 @@
     {
       "matchPackageNames": ["actions/buildah-simple"],
       "enabled": false
-    },
-    {
-      "matchPackageNames": ["github.com/pelletier/go-toml/v2"],
-      "enabled": false // added AGENTS.md; v2.3.0 has been manually reviewed
     }
   ],
   "automerge": false,

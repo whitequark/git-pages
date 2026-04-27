@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	codeberg.org/git-pages/go-headers v1.1.1
 	codeberg.org/git-pages/go-slog-syslog v0.0.0-20251207093707-892f654e80b7
+	github.com/BurntSushi/toml v1.6.0
 	github.com/KimMachineGun/automemlimit v0.7.5
 	github.com/bits-and-blooms/bloom/v3 v3.7.1
 	github.com/c2h5oh/datasize v0.0.0-20231215233829-aa82cc1e6500
@@ -18,7 +19,6 @@ require (
 	github.com/klauspost/compress v1.18.5
 	github.com/maypok86/otter/v2 v2.3.0
 	github.com/minio/minio-go/v7 v7.0.100
-	github.com/pelletier/go-toml/v2 v2.3.0
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/samber/slog-multi v1.8.0

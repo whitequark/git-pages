@@ -7,6 +7,9 @@ schema = 3
   [mod."codeberg.org/git-pages/go-slog-syslog"]
     version = "v0.0.0-20251207093707-892f654e80b7"
     hash = "sha256-ye+DBIyxqTEOViYRrQPWyGJCaLmyKSDwH5btlqDPizM="
+  [mod."github.com/BurntSushi/toml"]
+    version = "v1.6.0"
+    hash = "sha256-ptdUJvuc21ixeLt+M5way/na3aCnCO4MYHWulWp8NEY="
   [mod."github.com/KimMachineGun/automemlimit"]
     version = "v0.7.5"
     hash = "sha256-lH/ip9j2hbYUc2W/XIYve/5TScQPZtEZe3hu76CY//k="
@@ -115,9 +118,6 @@ schema = 3
   [mod."github.com/pbnjay/memory"]
     version = "v0.0.0-20210728143218-7b4eea64cf58"
     hash = "sha256-QI+F1oPLOOtwNp8+m45OOoSfYFs3QVjGzE0rFdpF/IA="
-  [mod."github.com/pelletier/go-toml/v2"]
-    version = "v2.3.0"
-    hash = "sha256-3ftKBqSwUp5rs10NigReAJ8RxfnP4Aol45EkP0XRaa4="
   [mod."github.com/philhofer/fwd"]
     version = "v1.2.0"
     hash = "sha256-cGx2/0QQay46MYGZuamFmU0TzNaFyaO+J7Ddzlr/3dI="

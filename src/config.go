@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/c2h5oh/datasize"
 	"github.com/creasty/defaults"
-	"github.com/pelletier/go-toml/v2"
 )
 
 // For an unknown reason, the standard `time.Duration` type doesn't implement the standard
@@ -309,23 +309,28 @@ func PrintConfigEnvVars() {
 	})
 }
 
+func PrettyTomlKey(key toml.Key) string {
+	if len(key) == 1 {
+		return key.String()
+	} else {
+		// `toml.Key.String()` adds quotes if necessary.
+		return fmt.Sprintf("[%s].%s", key[:len(key)-1].String(), key[len(key)-1:].String())
+	}
+}
+
 func ReadConfigFile(config *Config, tomlPath string) (err error) {
 	if tomlPath != "" {
-		var file *os.File
-		file, err = os.Open(tomlPath)
+		meta, err := toml.DecodeFile(tomlPath, config)
 		if err != nil {
-			return
+			return err
 		}
 
-		defer func(file *os.File) {
-			err = file.Close()
-		}(file)
-
-		decoder := toml.NewDecoder(file)
-		decoder.DisallowUnknownFields()
-		decoder.EnableUnmarshalerInterface()
-		if err = decoder.Decode(&config); err != nil {
-			return
+		unknownKeys := []string{}
+		for _, key := range meta.Undecoded() {
+			unknownKeys = append(unknownKeys, PrettyTomlKey(key))
+		}
+		if len(unknownKeys) > 0 {
+			return fmt.Errorf("unknown keys: %s", strings.Join(unknownKeys, ", "))
 		}
 	}
 	return nil
