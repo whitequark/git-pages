@@ -827,6 +827,10 @@ func auditObjectName(id AuditID) string {
 	return fmt.Sprintf("audit/%s", id)
 }
 
+func auditDetachedObjectName(id AuditID) string {
+	return fmt.Sprintf("audit/%s.detached", id)
+}
+
 func (s3 *S3Backend) AppendAuditLog(ctx context.Context, id AuditID, record *AuditRecord) error {
 	logc.Printf(ctx, "s3: append audit %s\n", id)
 
@@ -858,7 +862,20 @@ func (s3 *S3Backend) QueryAuditLog(ctx context.Context, id AuditID) (*AuditRecor
 		return nil, err
 	}
 
-	return DecodeAuditRecord(data)
+	record, err := DecodeAuditRecord(data)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = s3.client.StatObject(ctx, s3.bucket, auditDetachedObjectName(id),
+		minio.StatObjectOptions{})
+	if err == nil {
+		record.Manifest = nil
+	} else if errResp := minio.ToErrorResponse(err); err != nil && errResp.Code != "NoSuchKey" {
+		return nil, err
+	}
+
+	return record, nil
 }
 
 func (s3 *S3Backend) SearchAuditLog(
@@ -878,6 +895,8 @@ func (s3 *S3Backend) SearchAuditLog(
 			var err error
 			if object.Err != nil {
 				err = object.Err
+			} else if strings.Contains(object.Key, ".") {
+				continue
 			} else if id, err = ParseAuditID(strings.TrimPrefix(object.Key, prefix)); err != nil {
 				// report error
 			} else if !opts.Since.IsZero() && id.CompareTime(opts.Since) < 0 {
@@ -927,6 +946,14 @@ func (s3 *S3Backend) GetAuditLogRecords(
 			}
 		}
 	}
+}
+
+func (s3 *S3Backend) DetachAuditRecord(ctx context.Context, id AuditID) error {
+	logc.Printf(ctx, "s3: detach audit record %s\n", id)
+
+	_, err := s3.client.PutObject(ctx, s3.bucket, auditDetachedObjectName(id),
+		&bytes.Reader{}, 0, minio.PutObjectOptions{})
+	return err
 }
 
 func (s3 *S3Backend) ExpireAuditRecord(ctx context.Context, id AuditID) error {

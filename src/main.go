@@ -193,7 +193,9 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "(admin)  "+
 		"git-pages {-freeze-domain <domain>|-unfreeze-domain <domain>}\n")
 	fmt.Fprintf(os.Stderr, "(audit)  "+
-		"git-pages {-audit-log|-audit-read <id>|-audit-server <endpoint> <program> [args...]}\n")
+		"git-pages {-audit-log|-audit-server <endpoint> <program> [args...]}\n")
+	fmt.Fprintf(os.Stderr, "(audit)  "+
+		"git-pages {-audit-read|-audit-rollback|-audit-detach} <id>\n")
 	fmt.Fprintf(os.Stderr, "(audit)  "+
 		"git-pages {-audit-expire <days>}\n")
 	fmt.Fprintf(os.Stderr, "(maint)  "+
@@ -237,6 +239,8 @@ func Main(versionInfo string) {
 		"extract contents of audit record `id` to files '<id>-*'")
 	auditRollback := flag.String("audit-rollback", "",
 		"restore site from contents of audit record `id`")
+	auditDetach := flag.String("audit-detach", "",
+		"detach all blobs of audit record `id`")
 	auditServer := flag.String("audit-server", "",
 		"listen for notifications on `endpoint` and spawn a process for each audit event")
 	auditExpire := flag.String("audit-expire", "",
@@ -269,6 +273,7 @@ func Main(versionInfo string) {
 		*auditLog,
 		*auditRead != "",
 		*auditRollback != "",
+		*auditDetach != "",
 		*auditServer != "",
 		*auditExpire != "",
 		*runMigration != "",
@@ -282,8 +287,8 @@ func Main(versionInfo string) {
 	if cliOperations > 1 {
 		logc.Fatalln(ctx, "-list-blobs, -list-manifests, -get-blob, -get-manifest, -get-archive, "+
 			"-update-site, -freeze-domain, -unfreeze-domain, -audit-log, -audit-read, "+
-			"-audit-rollback, -audit-server, -run-migration, -size-histogram, "+
-			"and -trace-garbage are mutually exclusive")
+			"-audit-rollback, -audit-detach, -audit-server, -audit-expire, -run-migration, "+
+			"-size-histogram, and -trace-garbage are mutually exclusive")
 	}
 
 	if *configTomlPath != "" && *noConfig {
@@ -334,13 +339,13 @@ func Main(versionInfo string) {
 		logc.Fatalln(ctx, err)
 	}
 
-	if domainCache, err = CreateDomainCache(ctx); err != nil {
-		logc.Fatalln(ctx, err)
-	}
-
 	// The server has its own logic for creating the backend.
 	if cliOperations > 0 {
 		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
+			logc.Fatalln(ctx, err)
+		}
+
+		if domainCache, err = CreateDomainCache(ctx); err != nil {
 			logc.Fatalln(ctx, err)
 		}
 	}
@@ -553,6 +558,17 @@ func Main(versionInfo string) {
 			logc.Fatalln(ctx, err)
 		}
 
+	case *auditDetach != "":
+		id, err := ParseAuditID(*auditDetach)
+		if err != nil {
+			logc.Fatalln(ctx, err)
+		}
+
+		err = backend.DetachAuditRecord(ctx, id)
+		if err != nil {
+			logc.Fatalln(ctx, err)
+		}
+
 	case *auditServer != "":
 		if flag.NArg() < 1 {
 			logc.Fatalln(ctx, "handler path not provided")
@@ -691,6 +707,10 @@ func Main(versionInfo string) {
 			logc.Fatalln(ctx, err)
 		}
 		backend = NewObservedBackend(backend)
+
+		if domainCache, err = CreateDomainCache(ctx); err != nil {
+			logc.Fatalln(ctx, err)
+		}
 
 		middleware := chainHTTPMiddleware(
 			panicHandler,

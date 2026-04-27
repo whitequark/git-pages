@@ -484,6 +484,10 @@ func (fs *FSBackend) HaveDomainsChanged(ctx context.Context, since time.Time) (b
 	return true, nil // not implemented
 }
 
+func auditDetachedName(id AuditID) string {
+	return fmt.Sprintf("%s.detached", id)
+}
+
 func (fs *FSBackend) AppendAuditLog(ctx context.Context, id AuditID, record *AuditRecord) error {
 	if _, err := fs.auditRoot.Stat(id.String()); err == nil {
 		panic(fmt.Errorf("audit ID collision: %s", id))
@@ -498,6 +502,11 @@ func (fs *FSBackend) QueryAuditLog(ctx context.Context, id AuditID) (*AuditRecor
 	} else if record, err := DecodeAuditRecord(data); err != nil {
 		return nil, fmt.Errorf("decode: %w", err)
 	} else {
+		if _, err := fs.auditRoot.Stat(auditDetachedName(id)); err == nil {
+			record.Manifest = nil
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("stat detached marker: %w", err)
+		}
 		return record, nil
 	}
 }
@@ -514,6 +523,8 @@ func (fs *FSBackend) SearchAuditLog(
 				var id AuditID
 				if err != nil {
 					// report error
+				} else if strings.Contains(path, ".") {
+					return nil // skip
 				} else if id, err = ParseAuditID(path); err != nil {
 					// report error
 				} else if !opts.Since.IsZero() && id.CompareTime(opts.Since) < 0 {
@@ -544,6 +555,10 @@ func (fs *FSBackend) GetAuditLogRecords(
 			}
 		}
 	}
+}
+
+func (fs *FSBackend) DetachAuditRecord(ctx context.Context, id AuditID) error {
+	return fs.auditRoot.WriteFile(auditDetachedName(id), []byte{}, 0o644)
 }
 
 func (fs *FSBackend) ExpireAuditRecord(ctx context.Context, id AuditID) error {

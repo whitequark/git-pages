@@ -160,6 +160,9 @@ type Backend interface {
 	// Retrieve audit record contents for given IDs.
 	GetAuditLogRecords(ctx context.Context, ids iter.Seq2[AuditID, error]) iter.Seq2[*AuditRecord, error]
 
+	// Detach an audit record from its blobs.
+	DetachAuditRecord(ctx context.Context, id AuditID) error
+
 	// Delete an audit record with a given ID.
 	ExpireAuditRecord(ctx context.Context, id AuditID) error
 }
