@@ -878,8 +878,12 @@ func (s3 *S3Backend) SearchAuditLog(
 			var err error
 			if object.Err != nil {
 				err = object.Err
-			} else {
-				id, err = ParseAuditID(strings.TrimPrefix(object.Key, prefix))
+			} else if id, err = ParseAuditID(strings.TrimPrefix(object.Key, prefix)); err != nil {
+				// report error
+			} else if !opts.Since.IsZero() && id.CompareTime(opts.Since) < 0 {
+				continue
+			} else if !opts.Until.IsZero() && id.CompareTime(opts.Until) > 0 {
+				continue
 			}
 			if !yield(id, err) {
 				break
