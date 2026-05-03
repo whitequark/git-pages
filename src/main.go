@@ -506,13 +506,19 @@ func Main(versionInfo string) {
 		})
 
 		for _, record := range records {
-			fmt.Fprintf(color.Output, "%s %s %s %s %s\n",
+			parts := []string{
 				record.GetAuditID().String(),
 				color.HiWhiteString(record.GetTimestamp().AsTime().UTC().Format(time.RFC3339)),
 				color.HiMagentaString(record.DescribePrincipal()),
 				color.HiGreenString(record.DescribeResource()),
-				record.GetEvent(),
-			)
+				fmt.Sprint(record.GetEvent()),
+			}
+			if record.IsDetached() {
+				parts = append(parts,
+					color.HiYellowString("(detached)"),
+				)
+			}
+			fmt.Println(color.Output, strings.Join(parts, " "))
 		}
 
 	case *auditRead != "":
@@ -578,17 +584,23 @@ func Main(versionInfo string) {
 				logc.Fatalln(ctx, err)
 			}
 			if record.GetDomain() == domain && (project == "*" || record.GetProject() == project) {
-				logc.Printf(ctx, "detaching audit record %s\n", record.GetAuditID())
-				err = backend.DetachAuditRecord(ctx, record.GetAuditID())
-				if err != nil {
-					logc.Fatalln(ctx, err)
+				if !record.IsDetachable() {
+					continue
+				} else if !record.IsDetached() {
+					logc.Printf(ctx, "detaching audit record %s\n", record.GetAuditID())
+					err = backend.DetachAuditRecord(ctx, record.GetAuditID())
+					if err != nil {
+						logc.Fatalln(ctx, err)
+					}
+					count++
+				} else {
+					logc.Printf(ctx, "audit record %s already detached\n", record.GetAuditID())
 				}
-				count++
 			}
 		}
 
 		if count == 0 {
-			logc.Printf(ctx, "no audit records found for %s/%s", domain, project)
+			logc.Printf(ctx, "no detachable audit records found for %s/%s", domain, project)
 		}
 
 	case *auditServer != "":

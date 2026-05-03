@@ -132,6 +132,14 @@ func (record *AuditRecord) DescribeResource() string {
 	return desc
 }
 
+func (record *AuditRecord) IsDetachable() bool {
+	return record.GetEvent() == AuditEvent_CommitManifest
+}
+
+func (record *AuditRecord) IsDetached() bool {
+	return record.IsDetachable() && record.Manifest == nil
+}
+
 type AuditRecordScope int
 
 const (
