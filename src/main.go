@@ -518,7 +518,7 @@ func Main(versionInfo string) {
 					color.HiYellowString("(detached)"),
 				)
 			}
-			fmt.Println(color.Output, strings.Join(parts, " "))
+			fmt.Fprintln(color.Output, strings.Join(parts, " "))
 		}
 
 	case *auditRead != "":
