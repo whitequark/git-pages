@@ -78,16 +78,25 @@ func GetHost(r *http.Request) (string, error) {
 	return host, nil
 }
 
-func IsValidProjectName(name string) bool {
-	return !strings.HasPrefix(name, ".") && !strings.Contains(name, "%")
+func ValidateProjectName(name string) error {
+	if strings.HasPrefix(name, ".") {
+		return fmt.Errorf("must not start with %q", ".")
+	}
+
+	forbiddenChars := "%*"
+	if strings.ContainsAny(name, forbiddenChars) {
+		return fmt.Errorf("must not contain any of %q", forbiddenChars)
+	}
+
+	return nil
 }
 
 func GetProjectName(r *http.Request) (string, error) {
 	// path must be either `/` or `/foo/` (`/foo` is accepted as an alias)
 	path := strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, "/"), "/")
-	if !IsValidProjectName(path) {
+	if err := ValidateProjectName(path); err != nil {
 		return "", AuthError{http.StatusBadRequest,
-			fmt.Sprintf("directory name %q is reserved", ".index")}
+			fmt.Sprintf("directory name: %v", err)}
 	} else if strings.Contains(path, "/") {
 		return "", AuthError{http.StatusBadRequest,
 			"directories nested too deep"}

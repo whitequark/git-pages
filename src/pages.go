@@ -143,7 +143,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	err = nil
 	sitePath = strings.TrimPrefix(r.URL.Path, "/")
 	if projectName, projectPath, hasProjectSlash := strings.Cut(sitePath, "/"); projectName != "" {
-		if IsValidProjectName(projectName) {
+		if ValidateProjectName(projectName) == nil {
 			var projectManifest *Manifest
 			var projectMetadata ManifestMetadata
 			projectManifest, projectMetadata, err = backend.GetManifest(

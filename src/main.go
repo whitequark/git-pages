@@ -191,13 +191,13 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "(debug)  "+
 		"git-pages {-get-blob|-get-manifest|-get-archive|-update-site} <ref> [file]\n")
 	fmt.Fprintf(os.Stderr, "(admin)  "+
-		"git-pages {-freeze-domain <domain>|-unfreeze-domain <domain>}\n")
+		"git-pages {-freeze-domain|-unfreeze-domain} <domain>\n")
 	fmt.Fprintf(os.Stderr, "(audit)  "+
-		"git-pages {-audit-log|-audit-server <endpoint> <program> [args...]}\n")
+		"git-pages {-audit-log|-audit-read <id>|-audit-rollback <id>}\n")
 	fmt.Fprintf(os.Stderr, "(audit)  "+
-		"git-pages {-audit-read|-audit-rollback|-audit-detach} <id>\n")
+		"git-pages {-audit-expire <days>|-audit-detach <domain>/<project>}\n")
 	fmt.Fprintf(os.Stderr, "(audit)  "+
-		"git-pages {-audit-expire <days>}\n")
+		"git-pages  -audit-server <endpoint> <program> [args...]\n")
 	fmt.Fprintf(os.Stderr, "(maint)  "+
 		"git-pages {-run-migration <name>|-trace-garbage|-size-histogram {original|stored}}\n")
 	flag.PrintDefaults()
@@ -239,12 +239,12 @@ func Main(versionInfo string) {
 		"extract contents of audit record `id` to files '<id>-*'")
 	auditRollback := flag.String("audit-rollback", "",
 		"restore site from contents of audit record `id`")
-	auditDetach := flag.String("audit-detach", "",
-		"detach all blobs of audit record `id`")
-	auditServer := flag.String("audit-server", "",
-		"listen for notifications on `endpoint` and spawn a process for each audit event")
 	auditExpire := flag.String("audit-expire", "",
 		"expire audit records older than `days` old")
+	auditDetach := flag.String("audit-detach", "",
+		"detach all blobs of audit records for a single `site` (or the entire domain with 'domain.tld/*')")
+	auditServer := flag.String("audit-server", "",
+		"listen for notifications on `endpoint` and spawn a process for each audit event")
 	runMigration := flag.String("run-migration", "",
 		"run a store `migration` (one of: create-domain-markers)")
 	sizeHistogram := flag.String("size-histogram", "",
@@ -273,9 +273,9 @@ func Main(versionInfo string) {
 		*auditLog,
 		*auditRead != "",
 		*auditRollback != "",
+		*auditExpire != "",
 		*auditDetach != "",
 		*auditServer != "",
-		*auditExpire != "",
 		*runMigration != "",
 		*sizeHistogram != "",
 		*traceGarbage,
@@ -287,7 +287,7 @@ func Main(versionInfo string) {
 	if cliOperations > 1 {
 		logc.Fatalln(ctx, "-list-blobs, -list-manifests, -get-blob, -get-manifest, -get-archive, "+
 			"-update-site, -freeze-domain, -unfreeze-domain, -audit-log, -audit-read, "+
-			"-audit-rollback, -audit-detach, -audit-server, -audit-expire, -run-migration, "+
+			"-audit-rollback, -audit-expire, -audit-detach, -audit-server, -run-migration, "+
 			"-size-histogram, and -trace-garbage are mutually exclusive")
 	}
 
@@ -559,14 +559,36 @@ func Main(versionInfo string) {
 		}
 
 	case *auditDetach != "":
-		id, err := ParseAuditID(*auditDetach)
-		if err != nil {
-			logc.Fatalln(ctx, err)
+		domain, project, found := strings.Cut(*auditDetach, "/")
+		if !found || domain == "" || project == "" {
+			logc.Fatalln(ctx, "argument to -audit-detach must be in the form of "+
+				"'domain.tld/project' or 'domain.tld/*'")
 		}
 
-		err = backend.DetachAuditRecord(ctx, id)
-		if err != nil {
-			logc.Fatalln(ctx, err)
+		if project != "*" && project != ".index" {
+			if err := ValidateProjectName(project); err != nil {
+				logc.Fatalf(ctx, "audit detach: project name: %v\n", err)
+			}
+		}
+
+		count := 0
+		ids := backend.SearchAuditLog(ctx, SearchAuditLogOptions{})
+		for record, err := range backend.GetAuditLogRecords(ctx, ids) {
+			if err != nil {
+				logc.Fatalln(ctx, err)
+			}
+			if record.GetDomain() == domain && (project == "*" || record.GetProject() == project) {
+				logc.Printf(ctx, "detaching audit record %s\n", record.GetAuditID())
+				err = backend.DetachAuditRecord(ctx, record.GetAuditID())
+				if err != nil {
+					logc.Fatalln(ctx, err)
+				}
+				count++
+			}
+		}
+
+		if count == 0 {
+			logc.Printf(ctx, "no audit records found for %s/%s", domain, project)
 		}
 
 	case *auditServer != "":
