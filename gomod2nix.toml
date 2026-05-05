@@ -46,9 +46,6 @@ schema = 3
   [mod."github.com/davecgh/go-spew"]
     version = "v1.1.1"
     hash = "sha256-nhzSUrE1fCkN0+RL04N4h8jWmRFPPPWbCuDc7Ss0akI="
-  [mod."github.com/dghubble/trie"]
-    version = "v0.1.0"
-    hash = "sha256-hVh7uYylpMCCSPcxl70hJTmzSwaA1MxBmJFBO5Xdncc="
   [mod."github.com/dustin/go-humanize"]
     version = "v1.0.1"
     hash = "sha256-yuvxYYngpfVkUg9yAmG99IUVmADTQA0tMbBXe0Fq0Mc="
