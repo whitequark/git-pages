@@ -92,7 +92,7 @@ Features
 * All updates to site content are atomic (subject to consistency guarantees of the storage backend). That is, there is an instantaneous moment during an update before which the server will return the old content and after which it will return the new content.
 * Files with a certain name, when placed in the root of a site, have special functions:
     - [Netlify `_redirects`][_redirects] file can be used to specify HTTP redirect and rewrite rules. The _git-pages_ implementation currently does not support placeholders, query parameters, or conditions, and may differ from Netlify in other minor ways. If you find that a supported `_redirects` file feature does not work the same as on Netlify, please file an issue. (Note that _git-pages_ does not perform URL normalization; `/foo` and `/foo/` are *not* the same, unlike with Netlify.)
-    - [Netlify `_headers`][_headers] file can be used to specify custom HTTP response headers (if allowlisted by configuration). In particular, this is useful to enable [CORS requests][cors]. The _git-pages_ implementation may differ from Netlify in minor ways; if you find that a `_headers` file feature does not work the same as on Netlify, please file an issue.
+    - [Netlify `_headers`][_headers] file can be used to specify custom HTTP response headers (if allowlisted by configuration). In particular, this is useful to enable [cross-origin isolation (COOP/COEP)][isolation]. The _git-pages_ implementation may differ from Netlify in minor ways; if you find that a `_headers` file feature does not work the same as on Netlify, please file an issue.
     - [Netlify `Basic-Auth:`][basic-auth] pseudo-header in the `_headers` file can be used to password-protect parts of a site, if enabled via the `[limits].allow-basic-auth` configuration option. **This is not a security feature: credentials are stored in cleartext and are accessible to anyone who can update the site. *Only* use it in low-stakes applications, e.g. preventing search engines from indexing parts of a site.** The authors of _git-pages_ shall not be held liable for any unauthorized information disclosures resulting from the use of this feature.
 * Incremental updates can be made using `PUT` or `PATCH` requests where the body contains an archive (both tar and zip are supported).
     - Any archive entry that is a symlink to `/git/blobs/<git-sha256>` is replaced with an existing manifest entry for the same site whose git blob hash matches `<git-sha256>`. If there is no existing manifest entry with the specified git hash, the update fails with a `422 Unprocessable Entity`.
@@ -103,7 +103,7 @@ Features
 [_redirects]: https://docs.netlify.com/manage/routing/redirects/overview/
 [_headers]: https://docs.netlify.com/manage/routing/headers/
 [basic-auth]: https://docs.netlify.com/manage/security/secure-access-to-sites/basic-authentication-with-custom-http-headers/
-[cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS
+[isolation]: https://web.dev/articles/cross-origin-isolation-guide
 [go-git-sha256]: https://github.com/go-git/go-git/issues/706
 [whiteout]: https://docs.kernel.org/filesystems/overlayfs.html#whiteouts-and-opaque-directories
 
