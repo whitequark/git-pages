@@ -509,9 +509,9 @@ func Main(versionInfo string) {
 			parts := []string{
 				record.GetAuditID().String(),
 				color.HiWhiteString(record.GetTimestamp().AsTime().UTC().Format(time.RFC3339)),
-				color.HiMagentaString(record.DescribePrincipal()),
-				color.HiGreenString(record.DescribeResource()),
 				fmt.Sprint(record.GetEvent()),
+				color.HiGreenString(record.DescribeResource()),
+				color.HiMagentaString(record.DescribePrincipal()),
 			}
 			if record.IsDetached() {
 				parts = append(parts,
