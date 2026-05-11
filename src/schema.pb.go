@@ -863,6 +863,7 @@ type Principal struct {
 	IpAddress     *string                `protobuf:"bytes,1,opt,name=ip_address,json=ipAddress" json:"ip_address,omitempty"`
 	CliAdmin      *bool                  `protobuf:"varint,2,opt,name=cli_admin,json=cliAdmin" json:"cli_admin,omitempty"`
 	ForgeUser     *ForgeUser             `protobuf:"bytes,3,opt,name=forge_user,json=forgeUser" json:"forge_user,omitempty"`
+	RepoUrl       *string                `protobuf:"bytes,4,opt,name=repo_url,json=repoUrl" json:"repo_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -916,6 +917,13 @@ func (x *Principal) GetForgeUser() *ForgeUser {
 		return x.ForgeUser
 	}
 	return nil
+}
+
+func (x *Principal) GetRepoUrl() string {
+	if x != nil && x.RepoUrl != nil {
+		return *x.RepoUrl
+	}
+	return ""
 }
 
 type ForgeUser struct {
@@ -1041,14 +1049,15 @@ const file_schema_proto_rawDesc = "" +
 	"\x06domain\x18\n" +
 	" \x01(\tR\x06domain\x12\x18\n" +
 	"\aproject\x18\v \x01(\tR\aproject\x12%\n" +
-	"\bmanifest\x18\f \x01(\v2\t.ManifestR\bmanifest\"r\n" +
+	"\bmanifest\x18\f \x01(\v2\t.ManifestR\bmanifest\"\x8d\x01\n" +
 	"\tPrincipal\x12\x1d\n" +
 	"\n" +
 	"ip_address\x18\x01 \x01(\tR\tipAddress\x12\x1b\n" +
 	"\tcli_admin\x18\x02 \x01(\bR\bcliAdmin\x12)\n" +
 	"\n" +
 	"forge_user\x18\x03 \x01(\v2\n" +
-	".ForgeUserR\tforgeUser\"K\n" +
+	".ForgeUserR\tforgeUser\x12\x19\n" +
+	"\brepo_url\x18\x04 \x01(\tR\arepoUrl\"K\n" +
 	"\tForgeUser\x12\x16\n" +
 	"\x06origin\x18\x01 \x01(\tR\x06origin\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\x03R\x02id\x12\x16\n" +

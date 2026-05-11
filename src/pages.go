@@ -65,6 +65,17 @@ func observeSiteUpdate(via string, result *UpdateResult) {
 	}
 }
 
+func copyForgeAuthToPrincipal(principal *Principal, auth *Authorization) {
+	if auth.forgeUser != nil {
+		principal.ForgeUser = auth.forgeUser
+	}
+
+	repoURL := auth.ForgeRepoURL()
+	if repoURL != "" {
+		principal.RepoUrl = &repoURL
+	}
+}
+
 func normalizeHost(host string) string {
 	return strings.ToLower(host)
 }
@@ -526,9 +537,10 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		auth, err := AuthorizeUpdateFromArchive(r)
 		if err != nil {
 			return err
-		} else if auth.forgeUser != nil {
-			GetPrincipal(r.Context()).ForgeUser = auth.forgeUser
 		}
+
+		principal := GetPrincipal(r.Context())
+		copyForgeAuthToPrincipal(principal, auth)
 
 		repoURL := auth.ForgeRepoURL()
 
@@ -559,11 +571,13 @@ func patchPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	if auth, err := AuthorizeUpdateFromArchive(r); err != nil {
+	auth, err := AuthorizeUpdateFromArchive(r)
+	if err != nil {
 		return err
-	} else if auth.forgeUser != nil {
-		GetPrincipal(r.Context()).ForgeUser = auth.forgeUser
 	}
+
+	principal := GetPrincipal(r.Context())
+	copyForgeAuthToPrincipal(principal, auth)
 
 	if checkDryRun(w, r) {
 		return nil
@@ -691,11 +705,13 @@ func deletePage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	if auth, err := AuthorizeDeletion(r); err != nil {
+	auth, err := AuthorizeDeletion(r)
+	if err != nil {
 		return err
-	} else if auth.forgeUser != nil {
-		GetPrincipal(r.Context()).ForgeUser = auth.forgeUser
 	}
+
+	principal := GetPrincipal(r.Context())
+	copyForgeAuthToPrincipal(principal, auth)
 
 	if checkDryRun(w, r) {
 		return nil

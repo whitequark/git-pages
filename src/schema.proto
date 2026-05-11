@@ -144,6 +144,7 @@ message Principal {
 	string ip_address = 1;
 	bool cli_admin = 2;
 	ForgeUser forge_user = 3;
+	string repo_url = 4;
 }
 
 message ForgeUser {

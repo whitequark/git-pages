@@ -111,6 +111,9 @@ func (record *AuditRecord) DescribePrincipal() string {
 				record.Principal.GetForgeUser().GetHandle(),
 				record.Principal.GetForgeUser().GetId()))
 		}
+		if record.Principal.GetRepoUrl() != "" {
+			items = append(items, record.Principal.GetRepoUrl())
+		}
 		if record.Principal.GetCliAdmin() {
 			items = append(items, "<cli-admin>")
 		}
