@@ -437,7 +437,7 @@ func Main(versionInfo string) {
 			}
 
 			webRoot := webRootArg(*updateSite)
-			result = UpdateFromArchive(ctx, webRoot, contentType, file)
+			result = UpdateFromArchive(ctx, webRoot, "", contentType, file)
 		} else {
 			branch := "pages"
 			if sourceURL.Fragment != "" {

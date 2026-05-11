@@ -523,11 +523,14 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		result = UpdateFromRepository(ctx, webRoot, repoURL, branch)
 
 	default:
-		if auth, err := AuthorizeUpdateFromArchive(r); err != nil {
+		auth, err := AuthorizeUpdateFromArchive(r)
+		if err != nil {
 			return err
 		} else if auth.forgeUser != nil {
 			GetPrincipal(r.Context()).ForgeUser = auth.forgeUser
 		}
+
+		repoURL := auth.ForgeRepoURL()
 
 		if checkDryRun(w, r) {
 			return nil
@@ -535,7 +538,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 
 		// request body contains archive
 		reader := http.MaxBytesReader(w, r.Body, int64(config.Limits.MaxSiteSize.Bytes()))
-		result = UpdateFromArchive(ctx, webRoot, contentType, reader)
+		result = UpdateFromArchive(ctx, webRoot, repoURL, contentType, reader)
 	}
 
 	return reportUpdateResult(w, r, result)

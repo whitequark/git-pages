@@ -119,6 +119,13 @@ type Authorization struct {
 	forgeUser *ForgeUser
 }
 
+func (auth *Authorization) ForgeRepoURL() string {
+	if auth.forgeUser != nil && len(auth.repoURLs) == 1 {
+		return auth.repoURLs[0]
+	}
+	return ""
+}
+
 func authorizeDNSChallenge(r *http.Request) (*Authorization, error) {
 	host, err := GetHost(r)
 	if err != nil {

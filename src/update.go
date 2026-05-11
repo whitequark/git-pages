@@ -128,6 +128,7 @@ var errArchiveFormat = errors.New("unsupported archive format")
 func UpdateFromArchive(
 	ctx context.Context,
 	webRoot string,
+	repoURL string,
 	contentType string,
 	reader io.Reader,
 ) (result UpdateResult) {
@@ -162,6 +163,10 @@ func UpdateFromArchive(
 		logc.Printf(ctx, "update %s err: %s", webRoot, err)
 		result = UpdateResult{UpdateError, nil, err}
 	} else {
+		if repoURL != "" {
+			newManifest.RepoUrl = &repoURL
+		}
+
 		result = Update(ctx, webRoot, oldManifest, newManifest, ModifyManifestOptions{})
 	}
 
