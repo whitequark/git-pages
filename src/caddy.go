@@ -32,7 +32,7 @@ func ServeCaddy(w http.ResponseWriter, r *http.Request) {
 	// Run a cheap check as to whether we might be serving the domain.
 	var found = domainCache.CheckDomain(r.Context(), domain)
 
-	if !found {
+	if found {
 		// Run an expensive check as to whether we are actually serving the domain.
 		found, err = backend.CheckDomain(r.Context(), domain)
 	}
