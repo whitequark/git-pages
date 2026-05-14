@@ -838,6 +838,11 @@ func authorizeDNSChallengeOrForgeWithToken(r *http.Request) (*Authorization, err
 }
 
 func AuthorizeUpdateFromArchive(r *http.Request) (*Authorization, error) {
+	auth := authorizeInsecure(r)
+	if auth != nil {
+		return auth, nil
+	}
+
 	auth, err := authorizeDNSChallengeOrForgeWithToken(r)
 	if err != nil {
 		return nil, err
