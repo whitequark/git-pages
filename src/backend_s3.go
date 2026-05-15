@@ -563,25 +563,28 @@ func (s3 *S3Backend) HasAtomicCAS(ctx context.Context) bool {
 
 func (s3 *S3Backend) checkManifestPrecondition(
 	ctx context.Context, name string, opts ModifyManifestOptions,
-) error {
-	if opts.IfUnmodifiedSince.IsZero() && opts.IfMatch == "" {
-		return nil
-	}
-
+) (exists bool, err error) {
 	stat, err := s3.client.StatObject(ctx, s3.bucket, manifestObjectName(name),
 		minio.GetObjectOptions{})
 	if err != nil {
-		return err
+		errResp := minio.ToErrorResponse(err)
+		if opts.IfUnmodifiedSince.IsZero() && opts.IfMatch == "" && errResp.Code == "NoSuchKey" {
+			exists = false
+		} else {
+			return false, err
+		}
+	} else {
+		exists = true
 	}
 
 	if !opts.IfUnmodifiedSince.IsZero() && stat.LastModified.Compare(opts.IfUnmodifiedSince) > 0 {
-		return fmt.Errorf("%w: If-Unmodified-Since", ErrPreconditionFailed)
+		return exists, fmt.Errorf("%w: If-Unmodified-Since", ErrPreconditionFailed)
 	}
 	if opts.IfMatch != "" && stat.ETag != opts.IfMatch {
-		return fmt.Errorf("%w: If-Match", ErrPreconditionFailed)
+		return exists, fmt.Errorf("%w: If-Match", ErrPreconditionFailed)
 	}
 
-	return nil
+	return exists, nil
 }
 
 func (s3 *S3Backend) CommitManifest(
@@ -595,7 +598,8 @@ func (s3 *S3Backend) CommitManifest(
 		return err
 	}
 
-	if err := s3.checkManifestPrecondition(ctx, name, opts); err != nil {
+	existed, err := s3.checkManifestPrecondition(ctx, name, opts)
+	if err != nil {
 		return err
 	}
 
@@ -622,9 +626,15 @@ func (s3 *S3Backend) CommitManifest(
 		}
 	} else if removeErr != nil {
 		return removeErr
-	} else {
-		return nil
 	}
+
+	if !existed {
+		if err := s3.bumpLastSiteUpdateTimestamp(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s3 *S3Backend) DeleteManifest(
@@ -637,17 +647,25 @@ func (s3 *S3Backend) DeleteManifest(
 		return err
 	}
 
-	if err := s3.checkManifestPrecondition(ctx, name, opts); err != nil {
+	existed, err := s3.checkManifestPrecondition(ctx, name, opts)
+	if err != nil {
 		return err
 	}
 
-	err := s3.client.RemoveObject(ctx, s3.bucket, manifestObjectName(name),
+	err = s3.client.RemoveObject(ctx, s3.bucket, manifestObjectName(name),
 		minio.RemoveObjectOptions{})
 	if err != nil {
 		return err
 	}
 	s3.siteCache.Cache.Invalidate(name)
-	return s3.bumpLastDomainUpdateTimestamp(ctx)
+
+	if existed {
+		if err := s3.bumpLastSiteUpdateTimestamp(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s3 *S3Backend) EnumerateManifests(ctx context.Context) iter.Seq2[*ManifestMetadata, error] {
@@ -767,19 +785,8 @@ func (s3 *S3Backend) CheckDomain(ctx context.Context, domain string) (exists boo
 func (s3 *S3Backend) CreateDomain(ctx context.Context, domain string) error {
 	logc.Printf(ctx, "s3: create domain %s\n", domain)
 
-	exists, err := s3.CheckDomain(ctx, domain)
-	if err != nil {
-		return err
-	}
-
-	_, err = s3.client.PutObject(ctx, s3.bucket, domainCheckObjectName(domain),
+	_, err := s3.client.PutObject(ctx, s3.bucket, domainCheckObjectName(domain),
 		&bytes.Reader{}, 0, minio.PutObjectOptions{})
-	if err != nil {
-		return err
-	}
-	if !exists {
-		err = s3.bumpLastDomainUpdateTimestamp(ctx)
-	}
 	return err
 }
 
@@ -789,7 +796,6 @@ func (s3 *S3Backend) FreezeDomain(ctx context.Context, domain string) error {
 	_, err := s3.client.PutObject(ctx, s3.bucket, domainFrozenObjectName(domain),
 		&bytes.Reader{}, 0, minio.PutObjectOptions{})
 	return err
-
 }
 
 func (s3 *S3Backend) UnfreezeDomain(ctx context.Context, domain string) error {
@@ -804,21 +810,24 @@ func (s3 *S3Backend) UnfreezeDomain(ctx context.Context, domain string) error {
 	}
 }
 
-const lastDomainUpdateObjectName = "meta/last-domain-update"
+const lastSiteUpdateObjectName = "meta/last-site-update"
 
-func (s3 *S3Backend) HaveDomainsChanged(ctx context.Context, since time.Time) (bool, error) {
-	info, err := s3.client.StatObject(ctx, s3.bucket, lastDomainUpdateObjectName,
+func (s3 *S3Backend) HasSiteListChanged(ctx context.Context, since time.Time) (bool, error) {
+	info, err := s3.client.StatObject(ctx, s3.bucket, lastSiteUpdateObjectName,
 		minio.GetObjectOptions{})
 	if err != nil {
+		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
+			return true, nil
+		}
 		return false, err
 	}
 
 	return info.LastModified.After(since), nil
 }
 
-func (s3 *S3Backend) bumpLastDomainUpdateTimestamp(ctx context.Context) error {
-	logc.Print(ctx, "s3: bumping last domain update timestamp")
-	_, err := s3.client.PutObject(ctx, s3.bucket, lastDomainUpdateObjectName,
+func (s3 *S3Backend) bumpLastSiteUpdateTimestamp(ctx context.Context) error {
+	logc.Print(ctx, "s3: bumping last site update timestamp")
+	_, err := s3.client.PutObject(ctx, s3.bucket, lastSiteUpdateObjectName,
 		&bytes.Reader{}, 0, minio.PutObjectOptions{})
 	return err
 }

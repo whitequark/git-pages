@@ -34,7 +34,7 @@ var config *Config
 var wildcards []*WildcardPattern
 var fallback http.Handler
 var backend Backend
-var domainCache DomainCache
+var siteExistenceCache SiteExistenceCache
 
 func configureFeatures(ctx context.Context) (err error) {
 	if len(config.Features) > 0 {
@@ -345,7 +345,7 @@ func Main(versionInfo string) {
 			logc.Fatalln(ctx, err)
 		}
 
-		if domainCache, err = CreateDomainCache(ctx); err != nil {
+		if siteExistenceCache, err = CreateSiteExistenceCache(ctx); err != nil {
 			logc.Fatalln(ctx, err)
 		}
 	}
@@ -742,7 +742,7 @@ func Main(versionInfo string) {
 		}
 		backend = NewObservedBackend(backend)
 
-		if domainCache, err = CreateDomainCache(ctx); err != nil {
+		if siteExistenceCache, err = CreateSiteExistenceCache(ctx); err != nil {
 			logc.Fatalln(ctx, err)
 		}
 

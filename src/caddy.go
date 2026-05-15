@@ -30,7 +30,7 @@ func ServeCaddy(w http.ResponseWriter, r *http.Request) {
 	domain = strings.ToLower(domain)
 
 	// Run a cheap check as to whether we might be serving the domain.
-	var found = domainCache.CheckDomain(r.Context(), domain)
+	var found = siteExistenceCache.CheckDomain(r.Context(), domain)
 
 	if found {
 		// Run an expensive check as to whether we are actually serving the domain.

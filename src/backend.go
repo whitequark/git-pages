@@ -132,6 +132,9 @@ type Backend interface {
 	// `EnumerateManifests`.
 	GetAllManifests(ctx context.Context) iter.Seq2[tuple[*ManifestMetadata, *Manifest], error]
 
+	// Check whether the set of sites we serve has changed since the time passed to this method.
+	HasSiteListChanged(ctx context.Context, since time.Time) (changed bool, err error)
+
 	// Check whether a domain has any deployments.
 	CheckDomain(ctx context.Context, domain string) (found bool, err error)
 
@@ -144,9 +147,6 @@ type Backend interface {
 
 	// Thaw a domain. This removes the previously placed administrative lock (if any).
 	UnfreezeDomain(ctx context.Context, domain string) error
-
-	// Check whether the set of domains we serve has changed since the time passed to this method.
-	HaveDomainsChanged(ctx context.Context, since time.Time) (changed bool, err error)
 
 	// Append a record to the audit log.
 	AppendAuditLog(ctx context.Context, id AuditID, record *AuditRecord) error

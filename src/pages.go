@@ -129,13 +129,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-
 	host = normalizeHost(host)
-	if !domainCache.CheckDomain(r.Context(), host) {
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintf(w, "site not found\n")
-		return nil
-	}
 
 	type indexManifestResult struct {
 		manifest *Manifest
@@ -144,8 +138,13 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	}
 	indexManifestCh := make(chan indexManifestResult, 1)
 	go func() {
+		webRoot := makeWebRoot(host, ".index")
+		if !siteExistenceCache.CheckSite(r.Context(), webRoot) {
+			close(indexManifestCh)
+			return
+		}
 		manifest, metadata, err := backend.GetManifest(
-			r.Context(), makeWebRoot(host, ".index"),
+			r.Context(), webRoot,
 			GetManifestOptions{BypassCache: bypassCache},
 		)
 		indexManifestCh <- (indexManifestResult{manifest, metadata, err})
@@ -154,11 +153,12 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	err = nil
 	sitePath = strings.TrimPrefix(r.URL.Path, "/")
 	if projectName, projectPath, hasProjectSlash := strings.Cut(sitePath, "/"); projectName != "" {
-		if ValidateProjectName(projectName) == nil {
+		webRoot := makeWebRoot(host, projectName)
+		if ValidateProjectName(projectName) == nil && siteExistenceCache.CheckSite(r.Context(), webRoot) {
 			var projectManifest *Manifest
 			var projectMetadata ManifestMetadata
 			projectManifest, projectMetadata, err = backend.GetManifest(
-				r.Context(), makeWebRoot(host, projectName),
+				r.Context(), webRoot,
 				GetManifestOptions{BypassCache: bypassCache},
 			)
 			if err == nil {
@@ -173,7 +173,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	if manifest == nil && (err == nil || errors.Is(err, ErrObjectNotFound)) {
 		result := <-indexManifestCh
 		manifest, metadata, err = result.manifest, result.metadata, result.err
-		if manifest == nil && errors.Is(err, ErrObjectNotFound) {
+		if manifest == nil && (err == nil || errors.Is(err, ErrObjectNotFound)) {
 			if fallback != nil {
 				logc.Printf(r.Context(), "fallback: %s via %s", host, config.Fallback.ProxyTo)
 				fallback.ServeHTTP(w, r)
