@@ -74,7 +74,26 @@ func ApplyTarPatch(manifest *Manifest, reader io.Reader, parents CreateParentsMo
 			return err
 		}
 
-		segments := strings.Split(normalizeArchiveMemberName(header.Name), "/")
+		memberName := normalizeArchiveMemberName(header.Name)
+		// This is a special case: while member name "a" refers to a child node of the root
+		// node, the member name "" refers to the root node itself, which violates assumptions
+		// of the generic code afterwards.
+		if memberName == "" {
+			switch header.Typeflag {
+			case tar.TypeDir:
+				root = &Node{
+					entry:    NewManifestEntry(Type_Directory, nil),
+					children: map[string]*Node{},
+				}
+				continue
+			default:
+				AddProblem(manifest, header.Name,
+					"tar: unsupported type '%c' for root node", header.Typeflag)
+				continue
+			}
+		}
+
+		segments := strings.Split(memberName, "/")
 		fileName := segments[len(segments)-1]
 		node := root
 		for index, segment := range segments[:len(segments)-1] {
