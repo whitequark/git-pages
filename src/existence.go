@@ -54,10 +54,17 @@ type ExistenceCache interface {
 }
 
 func CreateExistenceCache(ctx context.Context) (ExistenceCache, error) {
-	if !config.Feature("existence-cache") {
-		return &dummyExistenceCache{}, nil
+	if config.Feature("existence-cache") {
+		switch config.Storage.Type {
+		case "s3":
+			maxAge := time.Duration(config.Storage.S3.SiteCache.MaxAge)
+			return createBloomExistenceCache(ctx, maxAge)
+		default:
+			// not needed
+		}
 	}
-	return createBloomExistenceCache(ctx)
+
+	return &dummyExistenceCache{}, nil
 }
 
 type bloomExistenceCache struct {
@@ -71,18 +78,10 @@ type bloomExistenceCache struct {
 	maxAge      time.Duration
 }
 
-func createBloomExistenceCache(ctx context.Context) (ExistenceCache, error) {
+func createBloomExistenceCache(ctx context.Context, maxAge time.Duration) (ExistenceCache, error) {
 	cache := bloomExistenceCache{
 		accessCh: make(chan struct{}),
-	}
-
-	switch config.Storage.Type {
-	case "fs":
-		// the FS backend has no cache
-	case "s3":
-		cache.maxAge = time.Duration(config.Storage.S3.SiteCache.MaxAge)
-	default:
-		panic(fmt.Errorf("unknown backend: %s", config.Storage.Type))
+		maxAge:   maxAge,
 	}
 
 	if err := cache.refresh(ctx); err != nil {
@@ -90,7 +89,6 @@ func createBloomExistenceCache(ctx context.Context) (ExistenceCache, error) {
 	}
 
 	go cache.handleFilterUpdates(ctx)
-
 	return &cache, nil
 }
 
