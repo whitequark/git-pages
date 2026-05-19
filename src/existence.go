@@ -1,3 +1,9 @@
+// The existence cache allows fast rejection of requests for nonexistent domains or sites.
+// This is principally important for floods of crawler requests which probe either random
+// domains (with A/AAAA records not pointing to the git-pages host), or random sites
+// (typically as a result of probing for vulnerable URLs). With the S3 backend this can
+// result in severe congestion of the backend channel and high CPU use.
+
 package git_pages
 
 import (
@@ -10,7 +16,7 @@ import (
 	"github.com/bits-and-blooms/bloom/v3"
 )
 
-type SiteExistenceCache interface {
+type ExistenceCache interface {
 	// Check if we might be serving the site.
 	CheckSite(ctx context.Context, site string) (found bool)
 
@@ -21,14 +27,14 @@ type SiteExistenceCache interface {
 	AddSite(ctx context.Context, site string)
 }
 
-func CreateSiteExistenceCache(ctx context.Context) (SiteExistenceCache, error) {
-	if !config.Feature("site-existence-cache") {
-		return &dummySiteExistenceCache{}, nil
+func CreateExistenceCache(ctx context.Context) (ExistenceCache, error) {
+	if !config.Feature("existence-cache") {
+		return &dummyExistenceCache{}, nil
 	}
-	return createBloomSiteExistenceCache(ctx)
+	return createBloomExistenceCache(ctx)
 }
 
-type bloomSiteExistenceCache struct {
+type bloomExistenceCache struct {
 	sites    *bloom.BloomFilter
 	domains  *bloom.BloomFilter
 	filterMu sync.Mutex
@@ -39,8 +45,8 @@ type bloomSiteExistenceCache struct {
 	maxAge      time.Duration
 }
 
-func createBloomSiteExistenceCache(ctx context.Context) (SiteExistenceCache, error) {
-	cache := bloomSiteExistenceCache{
+func createBloomExistenceCache(ctx context.Context) (ExistenceCache, error) {
+	cache := bloomExistenceCache{
 		accessCh: make(chan struct{}),
 	}
 
@@ -62,33 +68,35 @@ func createBloomSiteExistenceCache(ctx context.Context) (SiteExistenceCache, err
 	return &cache, nil
 }
 
-func (c *bloomSiteExistenceCache) handleFilterUpdates(ctx context.Context) {
+func (c *bloomExistenceCache) handleFilterUpdates(ctx context.Context) {
 	for range c.accessCh {
 		if time.Since(c.lastRefresh) > c.maxAge {
-			logc.Print(ctx, "site existence cache: refreshing")
+			logc.Print(ctx, "existence: refreshing")
 			if err := c.refresh(ctx); err != nil {
-				logc.Printf(ctx, "site existence cache: refresh error: %v", err)
+				logc.Printf(ctx, "existence: refresh error: %v", err)
 			}
 		}
 	}
 }
 
-func (c *bloomSiteExistenceCache) refresh(ctx context.Context) error {
+func (c *bloomExistenceCache) refresh(ctx context.Context) error {
 	c.refreshMu.Lock()
 	defer c.refreshMu.Unlock()
 
 	if changed, err := backend.HasSiteListChanged(ctx, c.lastRefresh); err != nil {
 		return err
 	} else if !changed {
-		logc.Print(ctx, "site existence cache: unchanged")
+		logc.Print(ctx, "existence: unchanged")
 		c.lastRefresh = time.Now()
 		return nil
 	}
 
-	var siteCount int
 	// Create two 256 KiB Bloom filters that will fit ~150K entries each with 0.1% false positive rate.
 	sites := bloom.New(256*1024, 10)
 	domains := bloom.New(256*1024, 10)
+
+	logc.Printf(ctx, "existence: refreshing")
+	siteCount := 0
 	for metadata, err := range backend.EnumerateManifests(ctx) {
 		if err != nil {
 			return fmt.Errorf("enum manifests: %w", err)
@@ -105,12 +113,12 @@ func (c *bloomSiteExistenceCache) refresh(ctx context.Context) error {
 	c.domains = domains
 	c.filterMu.Unlock()
 
-	logc.Printf(ctx, "site existence cache: refreshed with %d sites", siteCount)
+	logc.Printf(ctx, "existence: refreshed with %d sites", siteCount)
 	c.lastRefresh = time.Now()
 	return nil
 }
 
-func (c *bloomSiteExistenceCache) CheckSite(ctx context.Context, site string) (found bool) {
+func (c *bloomExistenceCache) CheckSite(ctx context.Context, site string) (found bool) {
 	select {
 	case c.accessCh <- struct{}{}:
 	default:
@@ -120,11 +128,15 @@ func (c *bloomSiteExistenceCache) CheckSite(ctx context.Context, site string) (f
 	found = c.sites.TestString(site)
 	c.filterMu.Unlock()
 
-	logc.Printf(ctx, "site existence cache: bloom filter returns %v for site %q", found, site)
+	result := "miss"
+	if found {
+		result = "hit"
+	}
+	logc.Printf(ctx, "existence: site %s: %s", site, result)
 	return
 }
 
-func (c *bloomSiteExistenceCache) CheckDomain(ctx context.Context, domain string) (found bool) {
+func (c *bloomExistenceCache) CheckDomain(ctx context.Context, domain string) (found bool) {
 	select {
 	case c.accessCh <- struct{}{}:
 	default:
@@ -134,11 +146,15 @@ func (c *bloomSiteExistenceCache) CheckDomain(ctx context.Context, domain string
 	found = c.domains.TestString(domain)
 	c.filterMu.Unlock()
 
-	logc.Printf(ctx, "site existence cache: bloom filter returns %v for domain %q", found, domain)
+	result := "miss"
+	if found {
+		result = "hit"
+	}
+	logc.Printf(ctx, "existence: domain %s: %s", domain, result)
 	return
 }
 
-func (c *bloomSiteExistenceCache) AddSite(ctx context.Context, site string) {
+func (c *bloomExistenceCache) AddSite(ctx context.Context, site string) {
 	c.refreshMu.Lock()
 	defer c.refreshMu.Unlock()
 
@@ -149,13 +165,13 @@ func (c *bloomSiteExistenceCache) AddSite(ctx context.Context, site string) {
 	c.domains.AddString(domain)
 	c.filterMu.Unlock()
 
-	logc.Printf(ctx, "site existence cache: added site %q", site)
+	logc.Printf(ctx, "existence: added site %s", site)
 }
 
-type dummySiteExistenceCache struct{}
+type dummyExistenceCache struct{}
 
-func (d dummySiteExistenceCache) CheckSite(context.Context, string) bool { return true }
+func (d dummyExistenceCache) CheckSite(context.Context, string) bool { return true }
 
-func (d dummySiteExistenceCache) CheckDomain(context.Context, string) bool { return true }
+func (d dummyExistenceCache) CheckDomain(context.Context, string) bool { return true }
 
-func (d dummySiteExistenceCache) AddSite(context.Context, string) {}
+func (d dummyExistenceCache) AddSite(context.Context, string) {}

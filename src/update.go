@@ -59,7 +59,7 @@ func Update(
 		if err == nil {
 			domain, _, _ := strings.Cut(webRoot, "/")
 			err = backend.CreateDomain(ctx, domain)
-			siteExistenceCache.AddSite(ctx, webRoot)
+			existenceCache.AddSite(ctx, webRoot)
 		}
 		if err == nil {
 			if oldManifest == nil {
