@@ -871,7 +871,7 @@ func (s3 *S3Backend) QueryAuditLog(ctx context.Context, id AuditID) (*AuditRecor
 		minio.StatObjectOptions{})
 	if err == nil {
 		record.Manifest = nil
-	} else if errResp := minio.ToErrorResponse(err); err != nil && errResp.Code != "NoSuchKey" {
+	} else if errResp := minio.ToErrorResponse(err); errResp.Code != "NoSuchKey" {
 		return nil, err
 	}
 
