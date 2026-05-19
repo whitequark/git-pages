@@ -139,7 +139,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	indexManifestCh := make(chan indexManifestResult, 1)
 	go func() {
 		webRoot := makeWebRoot(host, ".index")
-		if !existenceCache.CheckSite(r.Context(), webRoot) {
+		if existenceCache.CheckSite(r.Context(), webRoot).IsImpossible() {
 			close(indexManifestCh)
 			return
 		}
@@ -154,7 +154,8 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	sitePath = strings.TrimPrefix(r.URL.Path, "/")
 	if projectName, projectPath, hasProjectSlash := strings.Cut(sitePath, "/"); projectName != "" {
 		webRoot := makeWebRoot(host, projectName)
-		if ValidateProjectName(projectName) == nil && existenceCache.CheckSite(r.Context(), webRoot) {
+		if ValidateProjectName(projectName) == nil &&
+			existenceCache.CheckSite(r.Context(), webRoot).IsPossible() {
 			var projectManifest *Manifest
 			var projectMetadata ManifestMetadata
 			projectManifest, projectMetadata, err = backend.GetManifest(

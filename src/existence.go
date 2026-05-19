@@ -16,12 +16,38 @@ import (
 	"github.com/bits-and-blooms/bloom/v3"
 )
 
+type Existence int
+
+const (
+	ExistenceImpossible Existence = iota
+	ExistencePossible
+)
+
+func (value Existence) IsImpossible() bool {
+	return value == ExistenceImpossible
+}
+
+func (value Existence) IsPossible() bool {
+	return value == ExistencePossible
+}
+
+func (value Existence) String() string {
+	switch value {
+	case ExistenceImpossible:
+		return "impossible"
+	case ExistencePossible:
+		return "possible"
+	default:
+		return "(invalid)"
+	}
+}
+
 type ExistenceCache interface {
 	// Check if we might be serving the site.
-	CheckSite(ctx context.Context, site string) (found bool)
+	CheckSite(ctx context.Context, site string) (result Existence)
 
 	// Check if we might be serving the domain.
-	CheckDomain(ctx context.Context, domain string) (found bool)
+	CheckDomain(ctx context.Context, domain string) (result Existence)
 
 	// Add the site to the cache.
 	AddSite(ctx context.Context, site string)
@@ -118,38 +144,38 @@ func (c *bloomExistenceCache) refresh(ctx context.Context) error {
 	return nil
 }
 
-func (c *bloomExistenceCache) CheckSite(ctx context.Context, site string) (found bool) {
+func (c *bloomExistenceCache) CheckSite(ctx context.Context, site string) (result Existence) {
 	select {
 	case c.accessCh <- struct{}{}:
 	default:
 	}
 
 	c.filterMu.Lock()
-	found = c.sites.TestString(site)
+	if c.sites.TestString(site) {
+		result = ExistencePossible
+	} else {
+		result = ExistenceImpossible
+	}
 	c.filterMu.Unlock()
 
-	result := "miss"
-	if found {
-		result = "hit"
-	}
 	logc.Printf(ctx, "existence: site %s: %s", site, result)
 	return
 }
 
-func (c *bloomExistenceCache) CheckDomain(ctx context.Context, domain string) (found bool) {
+func (c *bloomExistenceCache) CheckDomain(ctx context.Context, domain string) (result Existence) {
 	select {
 	case c.accessCh <- struct{}{}:
 	default:
 	}
 
 	c.filterMu.Lock()
-	found = c.domains.TestString(domain)
+	if c.domains.TestString(domain) {
+		result = ExistencePossible
+	} else {
+		result = ExistenceImpossible
+	}
 	c.filterMu.Unlock()
 
-	result := "miss"
-	if found {
-		result = "hit"
-	}
 	logc.Printf(ctx, "existence: domain %s: %s", domain, result)
 	return
 }
@@ -170,8 +196,12 @@ func (c *bloomExistenceCache) AddSite(ctx context.Context, site string) {
 
 type dummyExistenceCache struct{}
 
-func (d dummyExistenceCache) CheckSite(context.Context, string) bool { return true }
+func (d dummyExistenceCache) CheckSite(context.Context, string) Existence {
+	return ExistencePossible
+}
 
-func (d dummyExistenceCache) CheckDomain(context.Context, string) bool { return true }
+func (d dummyExistenceCache) CheckDomain(context.Context, string) Existence {
+	return ExistencePossible
+}
 
 func (d dummyExistenceCache) AddSite(context.Context, string) {}
