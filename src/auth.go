@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path"
 	"slices"
 	"strings"
 	"time"
@@ -698,12 +699,22 @@ func authorizeGogsUser(repoURL string, forgeToken string) (*Authorization, error
 		panic(err)
 	}
 
-	if err = checkGogsRepositoryPushPermission(parsedRepoURL, forgeToken); err != nil {
+	authorizedUser, err := fetchGogsAuthorizedUser(parsedRepoURL, forgeToken)
+	if err != nil {
 		return nil, err
 	}
 
-	authorizedUser, err := fetchGogsAuthorizedUser(parsedRepoURL, forgeToken)
-	if err != nil {
+	ownerAndRepo := strings.TrimPrefix(path.Clean(parsedRepoURL.Path), "/")
+	owner, _, found := strings.Cut(ownerAndRepo, "/")
+	if found && owner == authorizedUser.GetHandle() {
+		// The authorized user owns any repository in their namespace.
+		return &Authorization{
+			repoURLs:  []string{repoURL},
+			forgeUser: authorizedUser,
+		}, nil
+	}
+
+	if err = checkGogsRepositoryPushPermission(parsedRepoURL, forgeToken); err != nil {
 		return nil, err
 	}
 
