@@ -150,5 +150,5 @@ message Principal {
 message ForgeUser {
 	string origin = 1;
 	int64 id = 2;
-	string handle = 3;
+	string name = 3;
 }

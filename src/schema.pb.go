@@ -930,7 +930,7 @@ type ForgeUser struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Origin        *string                `protobuf:"bytes,1,opt,name=origin" json:"origin,omitempty"`
 	Id            *int64                 `protobuf:"varint,2,opt,name=id" json:"id,omitempty"`
-	Handle        *string                `protobuf:"bytes,3,opt,name=handle" json:"handle,omitempty"`
+	Name          *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -979,9 +979,9 @@ func (x *ForgeUser) GetId() int64 {
 	return 0
 }
 
-func (x *ForgeUser) GetHandle() string {
-	if x != nil && x.Handle != nil {
-		return *x.Handle
+func (x *ForgeUser) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
 	}
 	return ""
 }
@@ -1057,11 +1057,11 @@ const file_schema_proto_rawDesc = "" +
 	"\n" +
 	"forge_user\x18\x03 \x01(\v2\n" +
 	".ForgeUserR\tforgeUser\x12\x19\n" +
-	"\brepo_url\x18\x04 \x01(\tR\arepoUrl\"K\n" +
+	"\brepo_url\x18\x04 \x01(\tR\arepoUrl\"G\n" +
 	"\tForgeUser\x12\x16\n" +
 	"\x06origin\x18\x01 \x01(\tR\x06origin\x12\x0e\n" +
-	"\x02id\x18\x02 \x01(\x03R\x02id\x12\x16\n" +
-	"\x06handle\x18\x03 \x01(\tR\x06handle*V\n" +
+	"\x02id\x18\x02 \x01(\x03R\x02id\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name*V\n" +
 	"\x04Type\x12\x10\n" +
 	"\fInvalidEntry\x10\x00\x12\r\n" +
 	"\tDirectory\x10\x01\x12\x0e\n" +

@@ -108,7 +108,7 @@ func (record *AuditRecord) DescribePrincipal() string {
 		if record.Principal.GetForgeUser() != nil {
 			items = append(items, fmt.Sprintf("%s/%s(%d)",
 				record.Principal.GetForgeUser().GetOrigin(),
-				record.Principal.GetForgeUser().GetHandle(),
+				record.Principal.GetForgeUser().GetName(),
 				record.Principal.GetForgeUser().GetId()))
 		}
 		if record.Principal.GetRepoUrl() != "" {

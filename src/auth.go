@@ -256,7 +256,7 @@ func authorizeWildcardMatchHost(r *http.Request, pattern *WildcardPattern) (*Aut
 		return nil, err
 	}
 
-	if _, found := pattern.Matches(host); found {
+	if _, found := pattern.Matches(host, WildcardDomainAny); found {
 		return &Authorization{
 			repoURLs: []string{},
 			branch:   "",
@@ -281,7 +281,7 @@ func authorizeWildcardMatchSite(r *http.Request, pattern *WildcardPattern) (*Aut
 		return nil, err
 	}
 
-	if userName, found := pattern.Matches(host); found {
+	if userName, found := pattern.Matches(host, WildcardDomainPrimary); found {
 		repoURL, branch := pattern.ApplyTemplate(userName, projectName)
 		return &Authorization{repoURLs: []string{repoURL}, branch: branch}, nil
 	} else {
@@ -583,7 +583,7 @@ func authorizeGogsUser(repoURL string, forgeToken string) (*Authorization, error
 
 	ownerAndRepo := strings.TrimPrefix(path.Clean(parsedRepoURL.Path), "/")
 	owner, _, found := strings.Cut(ownerAndRepo, "/")
-	if found && owner == authorizedUser.GetHandle() {
+	if found && owner == authorizedUser.GetName() {
 		// The authorized user owns any repository in their namespace.
 		return &Authorization{
 			repoURLs:  []string{repoURL},
@@ -598,6 +598,31 @@ func authorizeGogsUser(repoURL string, forgeToken string) (*Authorization, error
 	return &Authorization{
 		repoURLs:  []string{repoURL},
 		forgeUser: authorizedUser,
+	}, nil
+}
+
+func authorizeForgejoActionRun(repoURL string, forgeToken string, prNumber string) (
+	*Authorization, error,
+) {
+	parsedRepoURL, err := url.Parse(repoURL)
+	if err != nil {
+		panic(err)
+	}
+
+	actionRun, err := FetchForgejoActionRun(parsedRepoURL, forgeToken)
+	if err != nil {
+		return nil, err
+	}
+	if actionRun.PullRequest == nil {
+		return nil, AuthError{http.StatusUnauthorized, "workflow run not triggered by pull request"}
+	}
+	if fmt.Sprintf("%d", actionRun.PullRequest.Number) != prNumber {
+		return nil, AuthError{http.StatusUnauthorized, "pull request number does not match"}
+	}
+
+	return &Authorization{
+		repoURLs:  []string{repoURL},
+		forgeUser: actionRun.TriggerUser,
 	}, nil
 }
 
@@ -622,14 +647,32 @@ func authorizeForgeWildcard(r *http.Request) (*Authorization, error) {
 	var errs []error
 	for _, pattern := range wildcards {
 		if pattern.Authorization {
-			if userName, found := pattern.Matches(host); found {
-				repoURL, branch := pattern.ApplyTemplate(userName, projectName)
+			if userName, found := pattern.Matches(host, WildcardDomainPrimary); found {
+				repoName := projectName
+				repoURL, branch := pattern.ApplyTemplate(userName, repoName)
 				auth, err := authorizeGogsUser(repoURL, forgeToken)
 				if err != nil {
 					errs = append(errs, err)
 				} else {
 					auth.branch = branch
 					return auth, nil
+				}
+			}
+
+			if userName, found := pattern.Matches(host, WildcardDomainPreview); found {
+				if repoName, atSuffix, foundAt := strings.Cut(projectName, "@"); !foundAt {
+					errs = append([]error{
+						AuthError{http.StatusUnauthorized, "not a preview project name (no `@`)"},
+					}, errs...)
+				} else {
+					repoURL, branch := pattern.ApplyTemplate(userName, repoName)
+					auth, err := authorizeForgejoActionRun(repoURL, forgeToken, atSuffix)
+					if err != nil {
+						errs = append(errs, err)
+					} else {
+						auth.branch = branch
+						return auth, nil
+					}
 				}
 			}
 		}
