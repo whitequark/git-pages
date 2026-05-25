@@ -3,7 +3,6 @@ package git_pages
 import (
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -12,7 +11,6 @@ import (
 	"path"
 	"slices"
 	"strings"
-	"time"
 
 	"golang.org/x/net/idna"
 )
@@ -570,127 +568,6 @@ func AuthorizeBranch(branch string, auth *Authorization) error {
 	}
 }
 
-// Gogs, Gitea, and Forgejo all support the same API here.
-func checkGogsRepositoryPushPermission(baseURL *url.URL, authorization string) error {
-	ownerAndRepo := strings.TrimSuffix(strings.TrimPrefix(baseURL.Path, "/"), ".git")
-	request, err := http.NewRequest("GET", baseURL.ResolveReference(&url.URL{
-		Path: fmt.Sprintf("/api/v1/repos/%s", ownerAndRepo),
-	}).String(), nil)
-	if err != nil {
-		panic(err) // misconfiguration
-	}
-	request.Header.Set("Accept", "application/json")
-	request.Header.Set("Authorization", authorization)
-
-	httpClient := http.Client{Timeout: 5 * time.Second}
-	response, err := httpClient.Do(request)
-	if err != nil {
-		return AuthError{
-			http.StatusServiceUnavailable,
-			fmt.Sprintf("cannot check repository permissions: %s", err),
-		}
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode == http.StatusNotFound {
-		return AuthError{
-			http.StatusNotFound,
-			fmt.Sprintf("no repository %s", ownerAndRepo),
-		}
-	} else if response.StatusCode == http.StatusUnauthorized {
-		return AuthError{
-			http.StatusUnauthorized,
-			fmt.Sprintf("no access to %s or invalid token", ownerAndRepo),
-		}
-	} else if response.StatusCode != http.StatusOK {
-		return AuthError{
-			http.StatusServiceUnavailable,
-			fmt.Sprintf(
-				"cannot check repository permissions: GET %s returned %s",
-				request.URL,
-				response.Status,
-			),
-		}
-	}
-	decoder := json.NewDecoder(response.Body)
-
-	var repositoryInfo struct{ Permissions struct{ Push bool } }
-	if err = decoder.Decode(&repositoryInfo); err != nil {
-		return errors.Join(AuthError{
-			http.StatusServiceUnavailable,
-			fmt.Sprintf(
-				"cannot check repository permissions: GET %s returned malformed JSON",
-				request.URL,
-			),
-		}, err)
-	}
-
-	if !repositoryInfo.Permissions.Push {
-		return AuthError{
-			http.StatusUnauthorized,
-			fmt.Sprintf("no push permission for %s", ownerAndRepo),
-		}
-	}
-
-	// this token authorizes pushing to the repo, yay!
-	return nil
-}
-
-// Gogs, Gitea, and Forgejo all support the same API here.
-func fetchGogsAuthorizedUser(baseURL *url.URL, forgeToken string) (*ForgeUser, error) {
-	request, err := http.NewRequest("GET", baseURL.ResolveReference(&url.URL{
-		Path: "/api/v1/user",
-	}).String(), nil)
-	if err != nil {
-		panic(err) // misconfiguration
-	}
-	request.Header.Set("Accept", "application/json")
-	request.Header.Set("Authorization", forgeToken)
-
-	httpClient := http.Client{Timeout: 5 * time.Second}
-	response, err := httpClient.Do(request)
-	if err != nil {
-		return nil, AuthError{
-			http.StatusServiceUnavailable,
-			fmt.Sprintf("cannot fetch authorized forge user: %s", err),
-		}
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return nil, AuthError{
-			http.StatusServiceUnavailable,
-			fmt.Sprintf(
-				"cannot fetch authorized forge user: GET %s returned %s",
-				request.URL,
-				response.Status,
-			),
-		}
-	}
-	decoder := json.NewDecoder(response.Body)
-
-	var userInfo struct {
-		ID    int64
-		Login string
-	}
-	if err = decoder.Decode(&userInfo); err != nil {
-		return nil, errors.Join(AuthError{
-			http.StatusServiceUnavailable,
-			fmt.Sprintf(
-				"cannot fetch authorized forge user: GET %s returned malformed JSON",
-				request.URL,
-			),
-		}, err)
-	}
-
-	origin := request.URL.Hostname()
-	return &ForgeUser{
-		Origin: &origin,
-		Id:     &userInfo.ID,
-		Handle: &userInfo.Login,
-	}, nil
-}
-
 // Check whether a forge token has access to a repository, and if it does, which user it
 // belongs to. Precondition: `repoURL` is well-formed.
 func authorizeGogsUser(repoURL string, forgeToken string) (*Authorization, error) {
@@ -699,7 +576,7 @@ func authorizeGogsUser(repoURL string, forgeToken string) (*Authorization, error
 		panic(err)
 	}
 
-	authorizedUser, err := fetchGogsAuthorizedUser(parsedRepoURL, forgeToken)
+	authorizedUser, err := FetchGogsAuthorizedUser(parsedRepoURL, forgeToken)
 	if err != nil {
 		return nil, err
 	}
@@ -714,7 +591,7 @@ func authorizeGogsUser(repoURL string, forgeToken string) (*Authorization, error
 		}, nil
 	}
 
-	if err = checkGogsRepositoryPushPermission(parsedRepoURL, forgeToken); err != nil {
+	if err = CheckGogsRepositoryPushPermission(parsedRepoURL, forgeToken); err != nil {
 		return nil, err
 	}
 
