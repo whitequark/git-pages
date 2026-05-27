@@ -44,11 +44,11 @@ func configureFeatures(ctx context.Context) (err error) {
 	for _, feature := range config.Features {
 		switch feature {
 		// Work-in-progress features:
-		case "preview", "existence-cache":
+		case "preview":
 		// Permanently unstable features:
 		case "codeberg-pages-compat", "relaxed-idna":
 		// Stabilized features:
-		case "archive-site", "audit", "compress", "patch", "serve-h2c":
+		case "archive-site", "audit", "compress", "patch", "serve-h2c", "existence-cache":
 			logc.Printf(ctx, "feature %s has been stabilized", feature)
 		// Removed or renamed features:
 		case "h2c", "sentry-telemetry-buffer", "site-existence-cache", "domain-existence-cache":

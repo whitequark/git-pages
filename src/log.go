@@ -31,6 +31,14 @@ func (l slogWithCtx) log(ctx context.Context, level slog.Level, msg string) {
 	logger.Handler().Handle(ctx, record)
 }
 
+func (l slogWithCtx) Debugln(ctx context.Context, v ...any) {
+	l.log(ctx, slog.LevelDebug, fmt.Sprintln(v...))
+}
+
+func (l slogWithCtx) Debugf(ctx context.Context, format string, v ...any) {
+	l.log(ctx, slog.LevelDebug, fmt.Sprintf(format, v...))
+}
+
 func (l slogWithCtx) Printf(ctx context.Context, format string, v ...any) {
 	l.log(ctx, slog.LevelInfo, fmt.Sprintf(format, v...))
 }

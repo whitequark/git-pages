@@ -54,14 +54,12 @@ type ExistenceCache interface {
 }
 
 func CreateExistenceCache(ctx context.Context) (ExistenceCache, error) {
-	if config.Feature("existence-cache") {
-		switch config.Storage.Type {
-		case "s3":
-			maxAge := time.Duration(config.Storage.S3.SiteCache.MaxAge)
-			return createBloomExistenceCache(ctx, maxAge)
-		default:
-			// not needed
-		}
+	switch config.Storage.Type {
+	case "s3":
+		maxAge := time.Duration(config.Storage.S3.SiteCache.MaxAge)
+		return createBloomExistenceCache(ctx, maxAge)
+	default:
+		// not needed
 	}
 
 	return &dummyExistenceCache{}, nil
@@ -156,7 +154,7 @@ func (c *bloomExistenceCache) CheckSite(ctx context.Context, site string) (resul
 	}
 	c.filterMu.Unlock()
 
-	logc.Printf(ctx, "existence: site %s: %s", site, result)
+	logc.Debugf(ctx, "existence: site %s: %s", site, result)
 	return
 }
 
@@ -174,7 +172,7 @@ func (c *bloomExistenceCache) CheckDomain(ctx context.Context, domain string) (r
 	}
 	c.filterMu.Unlock()
 
-	logc.Printf(ctx, "existence: domain %s: %s", domain, result)
+	logc.Debugf(ctx, "existence: domain %s: %s", domain, result)
 	return
 }
 
