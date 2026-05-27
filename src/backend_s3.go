@@ -367,7 +367,7 @@ func (s3 *S3Backend) DeleteBlob(ctx context.Context, name string) error {
 
 func (s3 *S3Backend) EnumerateBlobs(ctx context.Context) iter.Seq2[BlobMetadata, error] {
 	return func(yield func(BlobMetadata, error) bool) {
-		logc.Print(ctx, "s3: enumerate blobs")
+		logc.Println(ctx, "s3: enumerate blobs")
 
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
@@ -670,7 +670,7 @@ func (s3 *S3Backend) DeleteManifest(
 
 func (s3 *S3Backend) EnumerateManifests(ctx context.Context) iter.Seq2[*ManifestMetadata, error] {
 	return func(yield func(*ManifestMetadata, error) bool) {
-		logc.Print(ctx, "s3: enumerate manifests")
+		logc.Println(ctx, "s3: enumerate manifests")
 
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
@@ -826,7 +826,7 @@ func (s3 *S3Backend) HasSiteListChanged(ctx context.Context, since time.Time) (b
 }
 
 func (s3 *S3Backend) bumpLastSiteUpdateTimestamp(ctx context.Context) error {
-	logc.Print(ctx, "s3: bumping last site update timestamp")
+	logc.Println(ctx, "s3: bumping last site update timestamp")
 	_, err := s3.client.PutObject(ctx, s3.bucket, lastSiteUpdateObjectName,
 		&bytes.Reader{}, 0, minio.PutObjectOptions{})
 	return err

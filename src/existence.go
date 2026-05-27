@@ -95,7 +95,7 @@ func createBloomExistenceCache(ctx context.Context, maxAge time.Duration) (Exist
 func (c *bloomExistenceCache) handleFilterUpdates(ctx context.Context) {
 	for range c.accessCh {
 		if time.Since(c.lastRefresh) > c.maxAge {
-			logc.Print(ctx, "existence: refreshing")
+			logc.Println(ctx, "existence: refreshing")
 			if err := c.refresh(ctx); err != nil {
 				logc.Printf(ctx, "existence: refresh error: %v", err)
 			}
@@ -110,7 +110,7 @@ func (c *bloomExistenceCache) refresh(ctx context.Context) error {
 	if changed, err := backend.HasSiteListChanged(ctx, c.lastRefresh); err != nil {
 		return err
 	} else if !changed {
-		logc.Print(ctx, "existence: unchanged")
+		logc.Println(ctx, "existence: unchanged")
 		c.lastRefresh = time.Now()
 		return nil
 	}

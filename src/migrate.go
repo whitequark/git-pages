@@ -18,7 +18,7 @@ func RunMigration(ctx context.Context, name string) error {
 
 func createDomainMarkers(ctx context.Context) error {
 	if backend.HasFeature(ctx, FeatureCheckDomainMarker) {
-		logc.Print(ctx, "store already has domain markers")
+		logc.Println(ctx, "store already has domain markers")
 		return nil
 	}
 
