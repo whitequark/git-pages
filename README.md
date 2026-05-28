@@ -70,7 +70,8 @@ Features
         - If the URL matches `https://<hostname>/...` and the previous rule did not apply, the index site is selected.
     - Site URLs that have a path starting with `.git-pages/...` are reserved for _git-pages_ itself.
         - The `.git-pages/health` URL returns `ok` with the `Last-Modified:` header set to the manifest modification time.
-        - The `.git-pages/manifest.json` URL returns a [ProtoJSON](https://protobuf.dev/programming-guides/json/) representation of the deployed site manifest with the `Last-Modified:` header set to the manifest modification time. It enumerates site structure, redirect rules, and errors that were not severe enough to abort publishing. Note that **the manifest JSON format is not stable and will change without notice**.
+        - The `.git-pages/manifest.json` URL returns a [ProtoJSON](https://protobuf.dev/programming-guides/json/) representation of the deployed site manifest with the `Last-Modified:` header set to the manifest modification time. It enumerates site structure, redirect rules, and errors that were not severe enough to abort publishing. Note that **the JSON manifest format is not stable and will change without notice**.
+        - The `.git-pages/manifest.pb` URL returns a binary representation of the deployed site manifest with the `Last-Modified:` header set to the manifest modification time. It contains the same information as what's exposed by the `.git-pages/manifest.json` endpoint. The binary manifest format is stable and backward-compatible with a [defined schema](src/schema.proto). Currently we do not publish a formal behavioral specification for this format; in case of doubt, [open an issue][new-issue] for clarification.
         - The `.git-pages/archive.tar` URL returns a tar archive of all site contents, including `_redirects` and `_headers` files (reconstructed from the manifest), with the `Last-Modified:` header set to the manifest modification time. Compression can be enabled using the `Accept-Encoding:` HTTP header (only).
 * In response to a `PUT` or `POST` request, the server updates a site with new content. The URL of the request must be the root URL of the site that is being published.
     - If the `PUT` method receives an `application/x-www-form-urlencoded` body, it contains a repository URL to be shallowly cloned. The `Branch` header contains the branch to be checked out; the `pages` branch is used if the header is absent.
@@ -106,6 +107,7 @@ Features
 [isolation]: https://web.dev/articles/cross-origin-isolation-guide
 [go-git-sha256]: https://github.com/go-git/go-git/issues/706
 [whiteout]: https://docs.kernel.org/filesystems/overlayfs.html#whiteouts-and-opaque-directories
+[new-issue]: https://codeberg.org/git-pages/git-pages/issues/new
 
 
 Authorization

@@ -214,7 +214,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			fmt.Fprintf(w, "ok\n")
 			return nil
 
-		case metadataPath == "manifest.json":
+		case metadataPath == "manifest.json" || metadataPath == "manifest.pb":
 			// metadata requests require authorization to avoid making pushes from private
 			// repositories enumerable or exposing basic-auth protected sections
 			_, err := AuthorizeMetadataRetrieval(r, ManifestHasBasicAuth(manifest))
@@ -222,11 +222,22 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 				return err
 			}
 
-			w.Header().Add("Content-Type", "application/json; charset=utf-8")
+			var contentType string
+			var content []byte
+			switch metadataPath {
+			case "manifest.json":
+				contentType = "application/protobuf+json; charset=utf-8"
+				content = ManifestJSON(manifest)
+			case "manifest.pb":
+				contentType = "application/protobuf"
+				content = EncodeManifest(manifest)
+			}
+
+			w.Header().Add("Content-Type", contentType)
 			w.Header().Add("Last-Modified", lastModified)
 			w.Header().Add("ETag", fmt.Sprintf("\"%s-manifest\"", metadata.ETag))
 			w.WriteHeader(http.StatusOK)
-			w.Write(ManifestJSON(manifest))
+			w.Write(content)
 			return nil
 
 		case metadataPath == "archive.tar":
