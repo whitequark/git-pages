@@ -40,6 +40,23 @@ func configureFeatures(ctx context.Context) (err error) {
 	if len(config.Features) > 0 {
 		logc.Println(ctx, "features:", strings.Join(config.Features, ", "))
 	}
+	for _, feature := range config.Features {
+		switch feature {
+		// Work-in-progress features:
+		case "preview", "existence-cache":
+		// Permanently unstable features:
+		case "codeberg-pages-compat", "relaxed-idna":
+		// Stabilized features:
+		case "archive-site", "audit", "compress", "patch", "serve-h2c":
+			logc.Printf(ctx, "feature %s has been stabilized", feature)
+		// Removed or renamed features:
+		case "h2c", "sentry-telemetry-buffer", "site-existence-cache", "domain-existence-cache":
+			logc.Printf(ctx, "feature %s has been removed", feature)
+		// Invalid features:
+		default:
+			return fmt.Errorf("unknown feature %q", feature)
+		}
+	}
 	return
 }
 
