@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	sys "codeberg.org/git-pages/git-pages/src/sys"
 	automemlimit "github.com/KimMachineGun/automemlimit/memlimit"
 	"github.com/c2h5oh/datasize"
 	"github.com/fatih/color"
@@ -720,7 +721,7 @@ func Main(versionInfo string) {
 		//
 		// Note that not all of the configuration is updated on reload. Listeners are kept as-is.
 		// The backend is not recreated (this is intentional as it allows preserving the cache).
-		OnReload(func() {
+		sys.OnReload(func() {
 			if newConfig, err := Configure(*configTomlPath, *secretTomlPath); err != nil {
 				logc.Println(ctx, "config: reload err:", err)
 			} else {
@@ -778,7 +779,7 @@ func Main(versionInfo string) {
 			logc.Println(ctx, "serve: ready")
 		}
 
-		WaitForInterrupt()
+		sys.WaitForInterrupt()
 		logc.Println(ctx, "serve: exiting")
 	}
 }

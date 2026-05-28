@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	sys "codeberg.org/git-pages/git-pages/src/sys"
 )
 
 type FSBackend struct {
@@ -66,8 +68,8 @@ func checkAtomicCAS(root *os.Root) bool {
 	root.Remove(fileName)
 	defer file.Close()
 
-	flockErr := FileLock(file)
-	funlockErr := FileUnlock(file)
+	flockErr := sys.FileLock(file)
+	funlockErr := sys.FileUnlock(file)
 	return (flockErr == nil && funlockErr == nil)
 }
 
@@ -295,7 +297,7 @@ func lockManifest(fs *os.Root, name string) (*manifestLockGuard, error) {
 	} else if err != nil {
 		return nil, fmt.Errorf("open: %w", err)
 	}
-	if err := FileLock(file); err != nil {
+	if err := sys.FileLock(file); err != nil {
 		file.Close()
 		return nil, fmt.Errorf("flock(LOCK_EX): %w", err)
 	}
@@ -304,7 +306,7 @@ func lockManifest(fs *os.Root, name string) (*manifestLockGuard, error) {
 
 func (guard *manifestLockGuard) Unlock() {
 	if guard.file != nil {
-		FileUnlock(guard.file)
+		sys.FileUnlock(guard.file)
 		guard.file.Close()
 	}
 }

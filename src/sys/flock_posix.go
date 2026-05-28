@@ -1,6 +1,6 @@
 //go:build unix
 
-package git_pages
+package os
 
 import (
 	"os"
