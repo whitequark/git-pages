@@ -79,12 +79,13 @@ type ServerConfig struct {
 }
 
 type WildcardConfig struct {
-	Domain          string `toml:"domain"`
-	PreviewDomain   string `toml:"preview-domain"`
-	CloneURL        string `toml:"clone-url"` // URL template, not an exact URL
-	IndexRepo       string `toml:"index-repo" default:"pages"`
-	IndexRepoBranch string `toml:"index-repo-branch" default:"pages"`
-	Authorization   string `toml:"authorization"`
+	Domain             string `toml:"domain"`
+	PreviewDomain      string `toml:"preview-domain"`
+	CloneURL           string `toml:"clone-url"` // URL template, not an exact URL
+	IndexRepo          string `toml:"index-repo" default:"pages"`
+	IndexRepoBranch    string `toml:"index-repo-branch" default:"pages"`
+	Authorization      string `toml:"authorization"`
+	MaxPreviewLifetime uint   `toml:"max-preview-lifetime"` // in days
 }
 
 type FallbackConfig struct {

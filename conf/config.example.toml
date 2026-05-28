@@ -16,6 +16,7 @@ clone-url = "https://codeberg.org/<user>/<project>.git"
 index-repo = "pages"
 index-repo-branch = "main"
 authorization = "forgejo"
+max-preview-lifetime = "7d"
 
 [fallback] # non-default section
 proxy-to = "https://codeberg.page"

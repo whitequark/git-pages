@@ -492,7 +492,9 @@ func checkDryRun(w http.ResponseWriter, r *http.Request) bool {
 	return false
 }
 
-func getUpdateOptions(w http.ResponseWriter, r *http.Request) (opts UpdateOptions, ok bool) {
+func getUpdateOptions(
+	w http.ResponseWriter, r *http.Request, auth *Authorization,
+) (opts UpdateOptions, ok bool) {
 	var err error
 
 	if config.Feature("expiration") {
@@ -505,6 +507,11 @@ func getUpdateOptions(w http.ResponseWriter, r *http.Request) (opts UpdateOption
 			if !config.Limits.AllowExpiration {
 				http.Error(w, "expiration forbidden by policy", http.StatusBadRequest)
 				return
+			}
+		}
+		if !auth.expiresNoLater.IsZero() {
+			if opts.expiresAt.IsZero() || opts.expiresAt.After(auth.expiresNoLater) {
+				opts.expiresAt = auth.expiresNoLater
 			}
 		}
 	}
@@ -528,11 +535,6 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 	webRoot, err := getWebRoot(r)
 	if err != nil {
 		return err
-	}
-
-	opts, ok := getUpdateOptions(w, r)
-	if !ok {
-		return nil
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
@@ -565,6 +567,11 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 
+		opts, ok := getUpdateOptions(w, r, auth)
+		if !ok {
+			return nil
+		}
+
 		if checkDryRun(w, r) {
 			return nil
 		}
@@ -581,6 +588,11 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		copyForgeAuthToPrincipal(principal, auth)
 
 		repoURL := auth.ForgeRepoURL()
+
+		opts, ok := getUpdateOptions(w, r, auth)
+		if !ok {
+			return nil
+		}
 
 		if checkDryRun(w, r) {
 			return nil
@@ -609,11 +621,6 @@ func patchPage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	opts, ok := getUpdateOptions(w, r)
-	if !ok {
-		return nil
-	}
-
 	auth, err := AuthorizeUpdateFromArchive(r)
 	if err != nil {
 		return err
@@ -621,6 +628,11 @@ func patchPage(w http.ResponseWriter, r *http.Request) error {
 
 	principal := GetPrincipal(r.Context())
 	copyForgeAuthToPrincipal(principal, auth)
+
+	opts, ok := getUpdateOptions(w, r, auth)
+	if !ok {
+		return nil
+	}
 
 	if checkDryRun(w, r) {
 		return nil

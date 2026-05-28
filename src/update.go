@@ -100,6 +100,9 @@ func Update(
 		case UpdateNoChange:
 			status = "unchanged"
 		}
+		if newManifest.ExpiresAt != nil {
+			logc.Printf(ctx, "expire %s: at %s", webRoot, newManifest.ExpiresAt.AsTime())
+		}
 		if storedManifest.Commit != nil {
 			logc.Printf(ctx, "update %s ok: %s %s", webRoot, *storedManifest.Commit, status)
 		} else {

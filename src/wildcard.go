@@ -9,12 +9,13 @@ import (
 )
 
 type WildcardPattern struct {
-	Domain        []string
-	PreviewDomain []string
-	CloneURL      *fasttemplate.Template
-	IndexRepo     *fasttemplate.Template
-	IndexBranch   string
-	Authorization bool
+	Domain             []string
+	PreviewDomain      []string
+	CloneURL           *fasttemplate.Template
+	IndexRepo          *fasttemplate.Template
+	IndexBranch        string
+	Authorization      bool
+	MaxPreviewLifetime uint
 }
 
 func (pattern *WildcardPattern) GetHost() string {
@@ -123,12 +124,13 @@ func TranslateWildcards(wildcardConfigs []WildcardConfig) ([]*WildcardPattern, e
 		}
 
 		wildcardPatterns = append(wildcardPatterns, &WildcardPattern{
-			Domain:        strings.Split(wildcardConfig.Domain, "."),
-			PreviewDomain: strings.Split(wildcardConfig.PreviewDomain, "."),
-			CloneURL:      cloneURLTemplate,
-			IndexRepo:     indexRepoTemplate,
-			IndexBranch:   indexRepoBranch,
-			Authorization: authorization,
+			Domain:             strings.Split(wildcardConfig.Domain, "."),
+			PreviewDomain:      strings.Split(wildcardConfig.PreviewDomain, "."),
+			CloneURL:           cloneURLTemplate,
+			IndexRepo:          indexRepoTemplate,
+			IndexBranch:        indexRepoBranch,
+			Authorization:      authorization,
+			MaxPreviewLifetime: wildcardConfig.MaxPreviewLifetime,
 		})
 	}
 	return wildcardPatterns, nil

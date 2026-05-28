@@ -11,6 +11,7 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"time"
 
 	"golang.org/x/net/idna"
 )
@@ -116,6 +117,8 @@ type Authorization struct {
 	branch string
 	// The authorized forge user.
 	forgeUser *ForgeUser
+	// If zero, any expiration is allowed. If not, site must expire no later than this time.
+	expiresNoLater time.Time
 }
 
 func (auth *Authorization) ForgeRepoURL() string {
@@ -671,6 +674,7 @@ func authorizeForgeWildcard(r *http.Request) (*Authorization, error) {
 						errs = append(errs, err)
 					} else {
 						auth.branch = branch
+						auth.expiresNoLater = time.Now().AddDate(0, 0, int(pattern.MaxPreviewLifetime))
 						return auth, nil
 					}
 				}
