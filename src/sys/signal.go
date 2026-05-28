@@ -2,7 +2,7 @@
 // will do on Windows (tl;dr nothing calls the reload handler, the interrupt handler works
 // more or less how you'd expect).
 
-package os
+package sys
 
 import (
 	"os"
