@@ -150,6 +150,10 @@ type LimitsConfig struct {
 	// Whether to allow Netlify-style credentials specified in a `Basic-Auth:` pseudo-header.
 	// These credentials are plaintext.
 	AllowBasicAuth bool `toml:"allow-basic-auth" default:"false"`
+	// Whether to allow an expiration date to be specified for uploaded sites. If enabled, you
+	// must also configure a scheduled job calling `git-pages -site-expire` regularly (perhaps
+	// hourly or daily).
+	AllowExpiration bool `toml:"allow-expiration" default:"false"`
 }
 
 type AuditConfig struct {

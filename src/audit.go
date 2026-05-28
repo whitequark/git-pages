@@ -394,6 +394,20 @@ func (audited *auditedBackend) DeleteManifest(
 	return audited.Backend.DeleteManifest(ctx, name, opts)
 }
 
+func (audited *auditedBackend) ExpireManifest(ctx context.Context, name string) (err error) {
+	domain, project, ok := strings.Cut(name, "/")
+	if !ok {
+		panic("malformed manifest name")
+	}
+	audited.appendNewAuditRecord(ctx, &AuditRecord{
+		Event:   AuditEvent_ExpireManifest.Enum(),
+		Domain:  proto.String(domain),
+		Project: proto.String(project),
+	})
+
+	return audited.Backend.ExpireManifest(ctx, name)
+}
+
 func (audited *auditedBackend) FreezeDomain(ctx context.Context, domain string) (err error) {
 	audited.appendNewAuditRecord(ctx, &AuditRecord{
 		Event:  AuditEvent_FreezeDomain.Enum(),

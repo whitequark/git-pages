@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const BlobReferencePrefix = "/git/blobs/"
@@ -18,6 +20,16 @@ type UnresolvedRefError struct {
 
 func (err UnresolvedRefError) Error() string {
 	return fmt.Sprintf("%d unresolved blob references", len(err.missing))
+}
+
+type UpdateOptions struct {
+	expiresAt time.Time
+}
+
+func (opts *UpdateOptions) Apply(manifest *Manifest) {
+	if !opts.expiresAt.IsZero() {
+		manifest.ExpiresAt = timestamppb.New(opts.expiresAt)
+	}
 }
 
 type UpdateOutcome int
@@ -37,6 +49,8 @@ type UpdateResult struct {
 	err      error
 }
 
+var errExpireExistingSite = fmt.Errorf("cannot expire an existing site")
+
 func Update(
 	ctx context.Context, webRoot string, oldManifest, newManifest *Manifest,
 	opts ModifyManifestOptions,
@@ -45,7 +59,9 @@ func Update(
 	var storedManifest *Manifest
 
 	outcome := UpdateError
-	if IsManifestEmpty(newManifest) {
+	if oldManifest != nil && oldManifest.ExpiresAt == nil && newManifest.ExpiresAt != nil {
+		err = errExpireExistingSite
+	} else if IsManifestEmpty(newManifest) {
 		storedManifest, err = newManifest, backend.DeleteManifest(ctx, webRoot, opts)
 		if err == nil {
 			if oldManifest == nil {
@@ -101,14 +117,20 @@ func UpdateFromRepository(
 	webRoot string,
 	repoURL string,
 	branch string,
+	opts UpdateOptions,
 ) (result UpdateResult) {
 	span, ctx := ObserveFunction(ctx, "UpdateFromRepository", "repo.url", repoURL)
 	defer span.Finish()
+	defer observeUpdateResult(result)
 
 	logc.Printf(ctx, "update %s: %s %s\n", webRoot, repoURL, branch)
 
-	// Ignore errors; worst case we have to re-fetch all of the blobs.
-	oldManifest, _, _ := backend.GetManifest(ctx, webRoot, GetManifestOptions{})
+	oldManifest, _, err := backend.GetManifest(ctx, webRoot, GetManifestOptions{})
+	if err != nil && !errors.Is(err, ErrObjectNotFound) {
+		logc.Printf(ctx, "update %s err: %s", webRoot, err)
+		result = UpdateResult{UpdateError, nil, err}
+		return
+	}
 
 	newManifest, err := FetchRepository(ctx, repoURL, branch, oldManifest)
 	if errors.Is(err, context.DeadlineExceeded) {
@@ -116,11 +138,11 @@ func UpdateFromRepository(
 	} else if err != nil {
 		result = UpdateResult{UpdateError, nil, err}
 	} else {
+		opts.Apply(newManifest)
 		result = Update(ctx, webRoot, oldManifest, newManifest, ModifyManifestOptions{})
 	}
 
-	observeUpdateResult(result)
-	return result
+	return
 }
 
 var errArchiveFormat = errors.New("unsupported archive format")
@@ -131,11 +153,19 @@ func UpdateFromArchive(
 	repoURL string,
 	contentType string,
 	reader io.Reader,
+	opts UpdateOptions,
 ) (result UpdateResult) {
-	var err error
+	span, ctx := ObserveFunction(ctx, "UpdateFromArchive",
+		"repo.url", repoURL, "archive.type", contentType)
+	defer span.Finish()
+	defer observeUpdateResult(result)
 
-	// Ignore errors; worst case we have to re-fetch all of the blobs.
-	oldManifest, _, _ := backend.GetManifest(ctx, webRoot, GetManifestOptions{})
+	oldManifest, _, err := backend.GetManifest(ctx, webRoot, GetManifestOptions{})
+	if err != nil && !errors.Is(err, ErrObjectNotFound) {
+		logc.Printf(ctx, "update %s err: %s", webRoot, err)
+		result = UpdateResult{UpdateError, nil, err}
+		return
+	}
 
 	extractTar := func(ctx context.Context, reader io.Reader) (*Manifest, error) {
 		return ExtractTar(ctx, reader, oldManifest)
@@ -166,11 +196,9 @@ func UpdateFromArchive(
 		if repoURL != "" {
 			newManifest.RepoUrl = &repoURL
 		}
-
+		opts.Apply(newManifest)
 		result = Update(ctx, webRoot, oldManifest, newManifest, ModifyManifestOptions{})
 	}
-
-	observeUpdateResult(result)
 	return
 }
 
@@ -180,8 +208,11 @@ func PartialUpdateFromArchive(
 	contentType string,
 	reader io.Reader,
 	parents CreateParentsMode,
+	opts UpdateOptions,
 ) (result UpdateResult) {
-	var err error
+	span, ctx := ObserveFunction(ctx, "PartialUpdateFromArchive", "archive.type", contentType)
+	defer span.Finish()
+	defer observeUpdateResult(result)
 
 	// Here the old manifest is used both as a substrate to which a patch is applied, as well
 	// as a "load linked" operation for a future "store conditional" update which, taken together,
@@ -190,7 +221,8 @@ func PartialUpdateFromArchive(
 		GetManifestOptions{BypassCache: true})
 	if err != nil {
 		logc.Printf(ctx, "patch %s err: %s", webRoot, err)
-		return UpdateResult{UpdateError, nil, err}
+		result = UpdateResult{UpdateError, nil, err}
+		return
 	}
 
 	applyTarPatch := func(ctx context.Context, reader io.Reader) (*Manifest, error) {
@@ -227,6 +259,7 @@ func PartialUpdateFromArchive(
 		logc.Printf(ctx, "patch %s err: %s", webRoot, err)
 		result = UpdateResult{UpdateError, nil, err}
 	} else {
+		opts.Apply(newManifest)
 		result = Update(ctx, webRoot, oldManifest, newManifest,
 			ModifyManifestOptions{
 				IfUnmodifiedSince: oldMetadata.LastModified,
@@ -240,7 +273,6 @@ func PartialUpdateFromArchive(
 		}
 	}
 
-	observeUpdateResult(result)
 	return
 }
 

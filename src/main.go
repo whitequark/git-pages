@@ -44,7 +44,7 @@ func configureFeatures(ctx context.Context) (err error) {
 	for _, feature := range config.Features {
 		switch feature {
 		// Work-in-progress features:
-		case "preview":
+		case "preview", "expiration":
 		// Permanently unstable features:
 		case "codeberg-pages-compat", "relaxed-idna":
 		// Stabilized features:
@@ -217,6 +217,8 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "(audit)  "+
 		"git-pages  -audit-server <endpoint> <program> [args...]\n")
 	fmt.Fprintf(os.Stderr, "(maint)  "+
+		"git-pages  -site-expire [-dry-run]\n")
+	fmt.Fprintf(os.Stderr, "(maint)  "+
 		"git-pages {-run-migration <name>|-trace-garbage|-size-histogram {original|stored}}\n")
 	flag.PrintDefaults()
 }
@@ -263,12 +265,16 @@ func Main(versionInfo string) {
 		"detach all blobs of audit records for a single `site` (or the entire domain with 'domain.tld/*')")
 	auditServer := flag.String("audit-server", "",
 		"listen for notifications on `endpoint` and spawn a process for each audit event")
+	siteExpire := flag.Bool("site-expire", false,
+		"expire sites according to their manifest")
 	runMigration := flag.String("run-migration", "",
 		"run a store `migration` (one of: create-domain-markers)")
 	sizeHistogram := flag.String("size-histogram", "",
 		"display histogram of `size-type` (original or stored) per domain")
 	traceGarbage := flag.Bool("trace-garbage", false,
 		"estimate total size of unreachable blobs")
+	dryRun := flag.Bool("dry-run", false,
+		"print what would be performed instead of executing it")
 	version := flag.Bool("version", false,
 		"display version")
 	flag.Parse()
@@ -294,6 +300,7 @@ func Main(versionInfo string) {
 		*auditExpire != "",
 		*auditDetach != "",
 		*auditServer != "",
+		*siteExpire,
 		*runMigration != "",
 		*sizeHistogram != "",
 		*traceGarbage,
@@ -305,8 +312,11 @@ func Main(versionInfo string) {
 	if cliOperations > 1 {
 		logc.Fatalln(ctx, "-list-blobs, -list-manifests, -get-blob, -get-manifest, -get-archive, "+
 			"-update-site, -freeze-domain, -unfreeze-domain, -audit-log, -audit-read, "+
-			"-audit-rollback, -audit-expire, -audit-detach, -audit-server, -run-migration, "+
-			"-size-histogram, and -trace-garbage are mutually exclusive")
+			"-audit-rollback, -audit-expire, -audit-detach, -audit-server, -site-expire, "+
+			"-run-migration, -size-histogram, and -trace-garbage are mutually exclusive")
+	}
+	if *dryRun && !(*siteExpire) {
+		logc.Fatalln(ctx, "-dry-run is not applicable in this context")
 	}
 
 	if *configTomlPath != "" && *noConfig {
@@ -455,7 +465,7 @@ func Main(versionInfo string) {
 			}
 
 			webRoot := webRootArg(*updateSite)
-			result = UpdateFromArchive(ctx, webRoot, "", contentType, file)
+			result = UpdateFromArchive(ctx, webRoot, "", contentType, file, UpdateOptions{})
 		} else {
 			branch := "pages"
 			if sourceURL.Fragment != "" {
@@ -463,7 +473,7 @@ func Main(versionInfo string) {
 			}
 
 			webRoot := webRootArg(*updateSite)
-			result = UpdateFromRepository(ctx, webRoot, sourceURL.String(), branch)
+			result = UpdateFromRepository(ctx, webRoot, sourceURL.String(), branch, UpdateOptions{})
 		}
 
 		switch result.outcome {
@@ -647,7 +657,6 @@ func Main(versionInfo string) {
 		for id, err := range ids {
 			if err != nil {
 				logc.Fatalln(ctx, err)
-				continue
 			}
 
 			err = backend.ExpireAuditRecord(ctx, id)
@@ -660,6 +669,44 @@ func Main(versionInfo string) {
 		}
 
 		logc.Printf(ctx, "audit: expired %d records\n", count)
+
+	case *siteExpire:
+		ctx = WithPrincipal(ctx)
+		GetPrincipal(ctx).CliAdmin = proto.Bool(true)
+
+		if !config.Feature("expiration") {
+			logc.Fatalf(ctx, "expire: feature disabled")
+		}
+
+		countExpired, countTransient := 0, 0
+		for item, err := range backend.GetAllManifests(ctx) {
+			metadata, manifest := item.Splat()
+			if err != nil {
+				logc.Fatalln(ctx, err)
+			}
+			if manifest.ExpiresAt != nil {
+				countTransient += 1
+				if manifest.ExpiresAt.AsTime().Before(time.Now()) {
+					if !*dryRun {
+						err = backend.ExpireManifest(ctx, metadata.Name)
+						if err != nil {
+							logc.Fatalln(ctx, err)
+						}
+					}
+					logc.Printf(ctx, "expire: site %s expired at %s",
+						metadata.Name, manifest.ExpiresAt.AsTime())
+					countExpired += 1
+				}
+			}
+		}
+
+		if *dryRun {
+			logc.Printf(ctx, "expire: would expire %d out of %d transient sites (dry run)\n",
+				countExpired, countTransient)
+		} else {
+			logc.Printf(ctx, "expire: expired %d out of %d transient sites\n",
+				countExpired, countTransient)
+		}
 
 	case *runMigration != "":
 		if err = RunMigration(ctx, *runMigration); err != nil {

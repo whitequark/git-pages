@@ -121,8 +121,11 @@ type Backend interface {
 	// the old version or the new version of the manifest, never anything else.
 	CommitManifest(ctx context.Context, name string, manifest *Manifest, opts ModifyManifestOptions) error
 
-	// Delete a manifest.
+	// Delete a manifest. This operation is initiated via the API.
 	DeleteManifest(ctx context.Context, name string, opts ModifyManifestOptions) error
+
+	// Expire a manifest. This operation is initiated via a scheduled job.
+	ExpireManifest(ctx context.Context, name string) error
 
 	// Iterate through metadata of all manifests. Whether manifests that are newly added during
 	// iteration will appear in the results is unspecified.

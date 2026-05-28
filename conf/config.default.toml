@@ -27,6 +27,7 @@ forbidden-domains = []
 allowed-repository-url-prefixes = []
 allowed-custom-headers = ['X-Clacks-Overhead']
 allow-basic-auth = false
+allow-expiration = false
 
 [audit]
 node-id = 0

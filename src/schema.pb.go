@@ -140,6 +140,8 @@ const (
 	AuditEvent_CommitManifest AuditEvent = 1
 	// A manifest was deleted (a site was deleted).
 	AuditEvent_DeleteManifest AuditEvent = 2
+	// A manifest was deleted (a site has expired).
+	AuditEvent_ExpireManifest AuditEvent = 5
 	// A domain was frozen.
 	AuditEvent_FreezeDomain AuditEvent = 3
 	// A domain was thawed.
@@ -152,6 +154,7 @@ var (
 		0: "InvalidEvent",
 		1: "CommitManifest",
 		2: "DeleteManifest",
+		5: "ExpireManifest",
 		3: "FreezeDomain",
 		4: "UnfreezeDomain",
 	}
@@ -159,6 +162,7 @@ var (
 		"InvalidEvent":   0,
 		"CommitManifest": 1,
 		"DeleteManifest": 2,
+		"ExpireManifest": 5,
 		"FreezeDomain":   3,
 		"UnfreezeDomain": 4,
 	}
@@ -650,6 +654,8 @@ type Manifest struct {
 	Redirects []*RedirectRule  `protobuf:"bytes,6,rep,name=redirects" json:"redirects,omitempty"`
 	Headers   []*HeaderRule    `protobuf:"bytes,9,rep,name=headers" json:"headers,omitempty"`
 	BasicAuth []*BasicAuthRule `protobuf:"bytes,11,rep,name=basic_auth,json=basicAuth" json:"basic_auth,omitempty"`
+	// Site expiration.
+	ExpiresAt *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
 	// Diagnostics for non-fatal errors.
 	Problems      []*Problem `protobuf:"bytes,7,rep,name=problems" json:"problems,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -752,6 +758,13 @@ func (x *Manifest) GetHeaders() []*HeaderRule {
 func (x *Manifest) GetBasicAuth() []*BasicAuthRule {
 	if x != nil {
 		return x.BasicAuth
+	}
+	return nil
+}
+
+func (x *Manifest) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
 	}
 	return nil
 }
@@ -1021,7 +1034,7 @@ const file_schema_proto_rawDesc = "" +
 	"\vcredentials\x18\x02 \x03(\v2\x10.BasicCredentialR\vcredentials\"3\n" +
 	"\aProblem\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x14\n" +
-	"\x05cause\x18\x02 \x01(\tR\x05cause\"\xe7\x03\n" +
+	"\x05cause\x18\x02 \x01(\tR\x05cause\"\xa2\x04\n" +
 	"\bManifest\x12\x19\n" +
 	"\brepo_url\x18\x01 \x01(\tR\arepoUrl\x12\x16\n" +
 	"\x06branch\x18\x02 \x01(\tR\x06branch\x12\x16\n" +
@@ -1035,7 +1048,9 @@ const file_schema_proto_rawDesc = "" +
 	"\tredirects\x18\x06 \x03(\v2\r.RedirectRuleR\tredirects\x12%\n" +
 	"\aheaders\x18\t \x03(\v2\v.HeaderRuleR\aheaders\x12-\n" +
 	"\n" +
-	"basic_auth\x18\v \x03(\v2\x0e.BasicAuthRuleR\tbasicAuth\x12$\n" +
+	"basic_auth\x18\v \x03(\v2\x0e.BasicAuthRuleR\tbasicAuth\x129\n" +
+	"\n" +
+	"expires_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12$\n" +
 	"\bproblems\x18\a \x03(\v2\b.ProblemR\bproblems\x1aC\n" +
 	"\rContentsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x1c\n" +
@@ -1071,12 +1086,13 @@ const file_schema_proto_rawDesc = "" +
 	"\aSymlink\x10\x04*#\n" +
 	"\tTransform\x12\f\n" +
 	"\bIdentity\x10\x00\x12\b\n" +
-	"\x04Zstd\x10\x01*l\n" +
+	"\x04Zstd\x10\x01*\x80\x01\n" +
 	"\n" +
 	"AuditEvent\x12\x10\n" +
 	"\fInvalidEvent\x10\x00\x12\x12\n" +
 	"\x0eCommitManifest\x10\x01\x12\x12\n" +
-	"\x0eDeleteManifest\x10\x02\x12\x10\n" +
+	"\x0eDeleteManifest\x10\x02\x12\x12\n" +
+	"\x0eExpireManifest\x10\x05\x12\x10\n" +
 	"\fFreezeDomain\x10\x03\x12\x12\n" +
 	"\x0eUnfreezeDomain\x10\x04B,Z*codeberg.org/git-pages/git-pages/git_pagesb\beditionsp\xe8\a"
 
@@ -1121,18 +1137,19 @@ var file_schema_proto_depIdxs = []int32{
 	4,  // 5: Manifest.redirects:type_name -> RedirectRule
 	6,  // 6: Manifest.headers:type_name -> HeaderRule
 	8,  // 7: Manifest.basic_auth:type_name -> BasicAuthRule
-	9,  // 8: Manifest.problems:type_name -> Problem
-	15, // 9: AuditRecord.timestamp:type_name -> google.protobuf.Timestamp
-	2,  // 10: AuditRecord.event:type_name -> AuditEvent
-	12, // 11: AuditRecord.principal:type_name -> Principal
-	10, // 12: AuditRecord.manifest:type_name -> Manifest
-	13, // 13: Principal.forge_user:type_name -> ForgeUser
-	3,  // 14: Manifest.ContentsEntry.value:type_name -> Entry
-	15, // [15:15] is the sub-list for method output_type
-	15, // [15:15] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	15, // 8: Manifest.expires_at:type_name -> google.protobuf.Timestamp
+	9,  // 9: Manifest.problems:type_name -> Problem
+	15, // 10: AuditRecord.timestamp:type_name -> google.protobuf.Timestamp
+	2,  // 11: AuditRecord.event:type_name -> AuditEvent
+	12, // 12: AuditRecord.principal:type_name -> Principal
+	10, // 13: AuditRecord.manifest:type_name -> Manifest
+	13, // 14: Principal.forge_user:type_name -> ForgeUser
+	3,  // 15: Manifest.ContentsEntry.value:type_name -> Entry
+	16, // [16:16] is the sub-list for method output_type
+	16, // [16:16] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_schema_proto_init() }

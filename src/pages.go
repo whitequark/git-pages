@@ -492,6 +492,27 @@ func checkDryRun(w http.ResponseWriter, r *http.Request) bool {
 	return false
 }
 
+func getUpdateOptions(w http.ResponseWriter, r *http.Request) (opts UpdateOptions, ok bool) {
+	var err error
+
+	if config.Feature("expiration") {
+		if expires := r.Header.Get("Expires"); expires != "" {
+			opts.expiresAt, err = time.Parse(http.TimeFormat, expires)
+			if err != nil {
+				http.Error(w, "malformed Expires: header", http.StatusBadRequest)
+				return
+			}
+			if !config.Limits.AllowExpiration {
+				http.Error(w, "expiration forbidden by policy", http.StatusBadRequest)
+				return
+			}
+		}
+	}
+
+	ok = true
+	return
+}
+
 func putPage(w http.ResponseWriter, r *http.Request) error {
 	var result UpdateResult
 
@@ -507,6 +528,11 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 	webRoot, err := getWebRoot(r)
 	if err != nil {
 		return err
+	}
+
+	opts, ok := getUpdateOptions(w, r)
+	if !ok {
+		return nil
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(config.Limits.UpdateTimeout))
@@ -543,7 +569,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 			return nil
 		}
 
-		result = UpdateFromRepository(ctx, webRoot, repoURL, branch)
+		result = UpdateFromRepository(ctx, webRoot, repoURL, branch, opts)
 
 	default:
 		auth, err := AuthorizeUpdateFromArchive(r)
@@ -562,7 +588,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 
 		// request body contains archive
 		reader := http.MaxBytesReader(w, r.Body, int64(config.Limits.MaxSiteSize.Bytes()))
-		result = UpdateFromArchive(ctx, webRoot, repoURL, contentType, reader)
+		result = UpdateFromArchive(ctx, webRoot, repoURL, contentType, reader, opts)
 	}
 
 	return reportUpdateResult(w, r, result)
@@ -581,6 +607,11 @@ func patchPage(w http.ResponseWriter, r *http.Request) error {
 	webRoot, err := getWebRoot(r)
 	if err != nil {
 		return err
+	}
+
+	opts, ok := getUpdateOptions(w, r)
+	if !ok {
+		return nil
 	}
 
 	auth, err := AuthorizeUpdateFromArchive(r)
@@ -631,7 +662,7 @@ func patchPage(w http.ResponseWriter, r *http.Request) error {
 
 	contentType := getMediaType(r.Header.Get("Content-Type"))
 	reader := http.MaxBytesReader(w, r.Body, int64(config.Limits.MaxSiteSize.Bytes()))
-	result := PartialUpdateFromArchive(ctx, webRoot, contentType, reader, parents)
+	result := PartialUpdateFromArchive(ctx, webRoot, contentType, reader, parents, opts)
 	return reportUpdateResult(w, r, result)
 }
 
@@ -830,7 +861,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		ctx, cancel := context.WithTimeout(ctx, time.Duration(config.Limits.UpdateTimeout))
 		defer cancel()
 
-		result := UpdateFromRepository(ctx, webRoot, repoURL, auth.branch)
+		result := UpdateFromRepository(ctx, webRoot, repoURL, auth.branch, UpdateOptions{})
 		resultChan <- result
 		observeSiteUpdate("webhook", &result)
 	}(context.WithoutCancel(r.Context()))

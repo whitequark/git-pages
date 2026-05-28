@@ -59,8 +59,12 @@ func IsManifestEmpty(manifest *Manifest) bool {
 	panic(fmt.Errorf("malformed manifest %v", manifest))
 }
 
-// Returns `true` if `left` and `right` contain the same files with the same types and data.
+// Returns `true` if `left` and `right` contain the same files with the same types and data,
+// and use the same options.
 func CompareManifest(left *Manifest, right *Manifest) bool {
+	if left.ExpiresAt.AsTime() != right.ExpiresAt.AsTime() {
+		return false
+	}
 	if len(left.Contents) != len(right.Contents) {
 		return false
 	}
@@ -80,6 +84,9 @@ func CompareManifest(left *Manifest, right *Manifest) bool {
 }
 
 func EncodeManifest(manifest *Manifest) (data []byte) {
+	if manifest.ExpiresAt != nil && manifest.ExpiresAt.AsTime().IsZero() {
+		panic("invalid expires_at value") // ambiguous and shouldn't happen
+	}
 	data, err := proto.MarshalOptions{Deterministic: true}.Marshal(manifest)
 	if err != nil {
 		panic(err)

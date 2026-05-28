@@ -405,6 +405,12 @@ func (fs *FSBackend) DeleteManifest(
 	}
 }
 
+func (fs *FSBackend) ExpireManifest(
+	ctx context.Context, name string,
+) error {
+	return fs.DeleteManifest(ctx, name, ModifyManifestOptions{})
+}
+
 func (fs *FSBackend) EnumerateManifests(ctx context.Context) iter.Seq2[*ManifestMetadata, error] {
 	return func(yield func(*ManifestMetadata, error) bool) {
 		iofs.WalkDir(fs.siteRoot.FS(), ".",

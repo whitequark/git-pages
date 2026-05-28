@@ -668,6 +668,12 @@ func (s3 *S3Backend) DeleteManifest(
 	return nil
 }
 
+func (s3 *S3Backend) ExpireManifest(
+	ctx context.Context, name string,
+) error {
+	return s3.DeleteManifest(ctx, name, ModifyManifestOptions{})
+}
+
 func (s3 *S3Backend) EnumerateManifests(ctx context.Context) iter.Seq2[*ManifestMetadata, error] {
 	return func(yield func(*ManifestMetadata, error) bool) {
 		logc.Println(ctx, "s3: enumerate manifests")

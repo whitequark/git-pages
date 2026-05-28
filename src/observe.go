@@ -294,6 +294,13 @@ func (backend *observedBackend) DeleteManifest(ctx context.Context, name string,
 	return
 }
 
+func (backend *observedBackend) ExpireManifest(ctx context.Context, name string) (err error) {
+	span, ctx := ObserveFunction(ctx, "ExpireManifest", "manifest.name", name)
+	err = backend.inner.ExpireManifest(ctx, name)
+	span.Finish()
+	return
+}
+
 func (backend *observedBackend) EnumerateManifests(ctx context.Context) iter.Seq2[*ManifestMetadata, error] {
 	return func(yield func(*ManifestMetadata, error) bool) {
 		span, ctx := ObserveFunction(ctx, "EnumerateManifests")

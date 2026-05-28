@@ -108,6 +108,9 @@ message Manifest {
 	repeated HeaderRule headers = 9;
 	repeated BasicAuthRule basic_auth = 11;
 
+	// Site expiration.
+	google.protobuf.Timestamp expires_at = 12;
+
 	// Diagnostics for non-fatal errors.
 	repeated Problem problems = 7;
 }
@@ -119,6 +122,8 @@ enum AuditEvent {
 	CommitManifest = 1;
 	// A manifest was deleted (a site was deleted).
 	DeleteManifest = 2;
+	// A manifest was deleted (a site has expired).
+	ExpireManifest = 5;
 	// A domain was frozen.
 	FreezeDomain = 3;
 	// A domain was thawed.
