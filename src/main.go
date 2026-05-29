@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -219,7 +220,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "(maint)  "+
 		"git-pages  -site-expire [-dry-run]\n")
 	fmt.Fprintf(os.Stderr, "(maint)  "+
-		"git-pages {-run-migration <name>|-trace-garbage|-size-histogram {original|stored}}\n")
+		"git-pages {-run-migration <name>|-trace-garbage|-analyze-storage}\n")
 	flag.PrintDefaults()
 }
 
@@ -269,8 +270,8 @@ func Main(versionInfo string) {
 		"expire sites according to their manifest")
 	runMigration := flag.String("run-migration", "",
 		"run a store `migration` (one of: create-domain-markers)")
-	sizeHistogram := flag.String("size-histogram", "",
-		"display histogram of `size-type` (original or stored) per domain")
+	analyzeStorage := flag.String("analyze-storage", "",
+		"display aggregate storage used per domain")
 	traceGarbage := flag.Bool("trace-garbage", false,
 		"estimate total size of unreachable blobs")
 	dryRun := flag.Bool("dry-run", false,
@@ -302,7 +303,7 @@ func Main(versionInfo string) {
 		*auditServer != "",
 		*siteExpire,
 		*runMigration != "",
-		*sizeHistogram != "",
+		*analyzeStorage != "",
 		*traceGarbage,
 	} {
 		if selected {
@@ -313,7 +314,7 @@ func Main(versionInfo string) {
 		logc.Fatalln(ctx, "-list-blobs, -list-manifests, -get-blob, -get-manifest, -get-archive, "+
 			"-update-site, -freeze-domain, -unfreeze-domain, -audit-log, -audit-read, "+
 			"-audit-rollback, -audit-expire, -audit-detach, -audit-server, -site-expire, "+
-			"-run-migration, -size-histogram, and -trace-garbage are mutually exclusive")
+			"-run-migration, -analyze-storage, and -trace-garbage are mutually exclusive")
 	}
 	if *dryRun && !(*siteExpire) {
 		logc.Fatalln(ctx, "-dry-run is not applicable in this context")
@@ -536,10 +537,10 @@ func Main(versionInfo string) {
 		for _, record := range records {
 			parts := []string{
 				record.GetAuditID().String(),
-				color.HiWhiteString(record.GetTimestamp().AsTime().UTC().Format(time.RFC3339)),
+				color.HiWhiteString("%s", record.GetTimestamp().AsTime().UTC().Format(time.RFC3339)),
 				fmt.Sprint(record.GetEvent()),
-				color.HiGreenString(record.DescribeResource()),
-				color.HiMagentaString(record.DescribePrincipal()),
+				color.HiMagentaString("%s", record.DescribeResource()),
+				color.HiGreenString("%s", record.DescribePrincipal()),
 			}
 			if record.IsDetached() {
 				parts = append(parts,
@@ -713,47 +714,73 @@ func Main(versionInfo string) {
 			logc.Fatalln(ctx, err)
 		}
 
-	case *sizeHistogram != "":
-		extractSize := func(s *DomainStatistics) int64 { return 0 }
-		switch *sizeHistogram {
-		case "original":
-			// Displays a size histogram using the `manifest.OriginalSize`, which is useful to see
-			// which site is the closest to hitting the size limit (checked against apparent size).
-			// This apparent size does not have any direct relationship with used storage.
-			extractSize = func(s *DomainStatistics) int64 { return s.OriginalSize }
-		case "stored":
-			// Displays a size histogram using the `manifest.StoredSize`, which is useful to see
-			// which site consumes the most resources. The site is keeping at least this many
-			// bytes worth of blobs alive, but removing it may not free any space because
-			// deduplication is global.
-			extractSize = func(s *DomainStatistics) int64 { return s.StoredSize }
-		default:
-			logc.Fatalln(ctx, "unknown histogram type")
+	case *analyzeStorage == "text":
+		// datasize.ByteSize.HR() is a little too wide for the 8-char column.
+		formatSize := func(b datasize.ByteSize) string {
+			switch {
+			case b > datasize.GB:
+				return fmt.Sprintf("%.1fG", b.GBytes())
+			case b > datasize.MB:
+				return fmt.Sprintf("%.1fM", b.MBytes())
+			case b > datasize.KB:
+				return fmt.Sprintf("%.1fK", b.KBytes())
+			default:
+				return fmt.Sprintf("%dB", b)
+			}
 		}
 
-		histogram, err := SizeHistogram(ctx)
+		analysis, err := AnalyzeStorage(ctx)
 		if err != nil {
 			logc.Fatalln(ctx, err)
 		}
-		slices.SortFunc(histogram, func(a *DomainStatistics, b *DomainStatistics) int {
-			return cmp.Compare(extractSize(a), extractSize(b))
+		slices.SortFunc(analysis, func(a *StorageSize, b *StorageSize) int {
+			return cmp.Compare(a.TotalSize, b.TotalSize)
 		})
 
-		if len(histogram) > 0 {
-			fullScaleSize := max(extractSize(histogram[len(histogram)-1]), 1)
-			fullScaleWidth := int64(40)
-			for _, statistics := range histogram {
-				size := extractSize(statistics)
-				barWidth := size * fullScaleWidth / fullScaleSize
-				spaceWidth := fullScaleWidth - barWidth
-				bar := strings.Repeat("*", int(barWidth)) + strings.Repeat(" ", int(spaceWidth))
-				fmt.Fprintf(color.Output, "%s %s %s\n",
-					color.HiBlackString(fmt.Sprint("|", bar, "|")),
-					statistics.Domain,
-					color.HiGreenString(datasize.ByteSize(extractSize(statistics)).HR()),
+		for _, sizes := range analysis {
+			var colorize func(string, ...interface{}) string
+			fractionSize :=
+				float32(sizes.CurrentBlobSize) / float32(config.Limits.MaxSiteSize.Bytes())
+			switch {
+			case fractionSize > 0.9:
+				colorize = color.HiRedString
+			case fractionSize > 0.7:
+				colorize = color.HiYellowString
+			case fractionSize > 0.1:
+				colorize = color.HiGreenString
+			default:
+				colorize = color.HiWhiteString
+			}
+			if sizes.Domain != "*" {
+				fmt.Fprintf(color.Output, "%s\t%s\t%s\t%s\t%s\n",
+					colorize("%.0f%%", fractionSize*100.0),
+					colorize("%s", formatSize(datasize.ByteSize(sizes.CurrentSize))),
+					formatSize(datasize.ByteSize(sizes.NonCurrentSize)),
+					formatSize(datasize.ByteSize(sizes.TotalSize)),
+					color.HiMagentaString("%s", sizes.Domain),
+				)
+			} else {
+				fmt.Fprintf(color.Output, "---\t%s\t%s\t%s\t%s\n",
+					color.HiCyanString("%s", formatSize(datasize.ByteSize(sizes.CurrentSize))),
+					formatSize(datasize.ByteSize(sizes.NonCurrentSize)),
+					formatSize(datasize.ByteSize(sizes.TotalSize)),
+					color.HiMagentaString("%s", sizes.Domain),
 				)
 			}
 		}
+		fmt.Fprintf(color.Output, "Quota%%\tCurrent\tNonCurr\tTotal\tDomain\n")
+
+	case *analyzeStorage == "json":
+		analysis, err := AnalyzeStorage(ctx)
+		if err != nil {
+			logc.Fatalln(ctx, err)
+		}
+
+		encoder := json.NewEncoder(os.Stdout)
+		encoder.Encode(analysis)
+
+	case *analyzeStorage != "":
+		logc.Fatalf(ctx, "unsupported -analyze-storage mode")
 
 	case *traceGarbage:
 		if err = TraceGarbage(ctx); err != nil {
