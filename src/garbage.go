@@ -19,26 +19,25 @@ func TraceGarbage(ctx context.Context) error {
 		return
 	}
 
-	traceManifest := func(manifestKind string, manifestName string, manifest *Manifest) error {
+	traceManifest := func(manifestKind string, manifestName string, manifest *Manifest) {
 		for _, entry := range manifest.GetContents() {
 			if entry.GetType() == Type_ExternalFile {
 				blobName := string(entry.Data)
 				if size, ok := allBlobs[blobName]; ok {
 					liveBlobs[blobName] = size
 				} else {
-					logc.Printf(ctx, "trace manifest: %s/%s: dangling reference %s",
+					logc.Printf(ctx, "trace err: %s/%s: dangling reference %s",
 						manifestKind, manifestName, blobName)
 				}
 			}
 		}
-		return nil
 	}
 
 	// Enumerate all blobs.
 	logc.Printf(ctx, "trace: enumerating blobs")
 	for metadata, err := range backend.EnumerateBlobs(ctx) {
 		if err != nil {
-			return fmt.Errorf("trace blobs err: %w", err)
+			return fmt.Errorf("trace err: %w", err)
 		}
 		allBlobs[metadata.Name] = metadata.Size
 	}
@@ -48,12 +47,9 @@ func TraceGarbage(ctx context.Context) error {
 	for item, err := range backend.GetAllManifests(ctx) {
 		metadata, manifest := item.Splat()
 		if err != nil {
-			return fmt.Errorf("trace sites err: %w", err)
+			return fmt.Errorf("trace err: %w", err)
 		}
-		err = traceManifest("site", metadata.Name, manifest)
-		if err != nil {
-			return fmt.Errorf("trace sites err: %w", err)
-		}
+		traceManifest("site", metadata.Name, manifest)
 	}
 
 	// Enumerate blobs live via audit records.
@@ -61,13 +57,10 @@ func TraceGarbage(ctx context.Context) error {
 	auditIDs := backend.SearchAuditLog(ctx, SearchAuditLogOptions{})
 	for record, err := range backend.GetAuditLogRecords(ctx, auditIDs) {
 		if err != nil {
-			return fmt.Errorf("trace audit err: %w", err)
+			return fmt.Errorf("trace err: %w", err)
 		}
 		if record.Manifest != nil {
-			err = traceManifest("audit", record.GetAuditID().String(), record.Manifest)
-			if err != nil {
-				return fmt.Errorf("trace audit err: %w", err)
-			}
+			traceManifest("audit", record.GetAuditID().String(), record.Manifest)
 		}
 	}
 
