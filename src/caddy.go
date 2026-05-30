@@ -81,7 +81,8 @@ func tryDialWithSNI(ctx context.Context, domain string) (bool, error) {
 	}
 
 	logc.Printf(ctx, "caddy: check TLS %s", fallbackURL)
-	connection, err := tls.Dial("tcp", connectHost, &tls.Config{ServerName: domain})
+	dialer := tls.Dialer{Config: &tls.Config{ServerName: domain}}
+	connection, err := dialer.DialContext(ctx, "tcp", connectHost)
 	if err != nil {
 		return false, err
 	}
