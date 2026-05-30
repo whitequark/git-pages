@@ -10,6 +10,10 @@ import (
 	"time"
 )
 
+const maxForgeResponseSize = 65536
+
+var errResponseTooLong = errors.New("forge response too long")
+
 func makeGogsAPIRequest(
 	baseURL *url.URL, authorization string, endpoint string,
 ) (*http.Request, *http.Response, error) {
@@ -53,7 +57,7 @@ func FetchGogsAuthorizedUser(baseURL *url.URL, authorization string) (*ForgeUser
 		ID    int64  `json:"id"`
 		Login string `json:"login"`
 	}
-	decoder := json.NewDecoder(response.Body)
+	decoder := json.NewDecoder(ReadAtMost(response.Body, maxForgeResponseSize, errResponseTooLong))
 	if err := decoder.Decode(&userInfo); err != nil {
 		return nil, errors.Join(AuthError{
 			http.StatusServiceUnavailable,
@@ -111,7 +115,7 @@ func CheckGogsRepositoryPushPermission(baseURL *url.URL, authorization string) e
 			Push bool `json:"push"`
 		} `json:"permissions"`
 	}
-	decoder := json.NewDecoder(response.Body)
+	decoder := json.NewDecoder(ReadAtMost(response.Body, maxForgeResponseSize, errResponseTooLong))
 	if err := decoder.Decode(&repositoryInfo); err != nil {
 		return errors.Join(AuthError{
 			http.StatusServiceUnavailable,
@@ -183,7 +187,7 @@ func FetchForgejoActionRun(baseURL *url.URL, authorization string) (*ForgeAction
 			Username string `json:"username"`
 		} `json:"trigger_user"`
 	}
-	decoder := json.NewDecoder(response.Body)
+	decoder := json.NewDecoder(ReadAtMost(response.Body, maxForgeResponseSize, errResponseTooLong))
 	if err := decoder.Decode(&runInfo); err != nil {
 		return nil, errors.Join(AuthError{
 			http.StatusServiceUnavailable,
