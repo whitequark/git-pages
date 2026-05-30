@@ -363,51 +363,61 @@ func notifyAudit(ctx context.Context, id AuditID) {
 
 func (audited *auditedBackend) CommitManifest(
 	ctx context.Context, name string, manifest *Manifest, opts ModifyManifestOptions,
-) (err error) {
+) error {
 	domain, project, ok := strings.Cut(name, "/")
 	if !ok {
 		panic("malformed manifest name")
 	}
-	audited.appendNewAuditRecord(ctx, &AuditRecord{
+
+	if err := audited.appendNewAuditRecord(ctx, &AuditRecord{
 		Event:    AuditEvent_CommitManifest.Enum(),
 		Domain:   proto.String(domain),
 		Project:  proto.String(project),
 		Manifest: manifest,
-	})
+	}); err != nil {
+		return err
+	}
 
 	return audited.Backend.CommitManifest(ctx, name, manifest, opts)
 }
 
 func (audited *auditedBackend) DeleteManifest(
 	ctx context.Context, name string, opts ModifyManifestOptions,
-) (err error) {
+) error {
 	domain, project, ok := strings.Cut(name, "/")
 	if !ok {
 		panic("malformed manifest name")
 	}
-	audited.appendNewAuditRecord(ctx, &AuditRecord{
+
+	if err := audited.appendNewAuditRecord(ctx, &AuditRecord{
 		Event:   AuditEvent_DeleteManifest.Enum(),
 		Domain:  proto.String(domain),
 		Project: proto.String(project),
-	})
+	}); err != nil {
+		return err
+	}
 
 	return audited.Backend.DeleteManifest(ctx, name, opts)
 }
 
-func (audited *auditedBackend) FreezeDomain(ctx context.Context, domain string) (err error) {
-	audited.appendNewAuditRecord(ctx, &AuditRecord{
+func (audited *auditedBackend) FreezeDomain(ctx context.Context, domain string) error {
+	if err := audited.appendNewAuditRecord(ctx, &AuditRecord{
 		Event:  AuditEvent_FreezeDomain.Enum(),
 		Domain: proto.String(domain),
-	})
+	}); err != nil {
+		return err
+	}
 
 	return audited.Backend.FreezeDomain(ctx, domain)
 }
 
-func (audited *auditedBackend) UnfreezeDomain(ctx context.Context, domain string) (err error) {
-	audited.appendNewAuditRecord(ctx, &AuditRecord{
+func (audited *auditedBackend) UnfreezeDomain(ctx context.Context, domain string) error {
+	if err := audited.appendNewAuditRecord(ctx, &AuditRecord{
 		Event:  AuditEvent_UnfreezeDomain.Enum(),
 		Domain: proto.String(domain),
-	})
+	}); err != nil {
+		return err
+	}
 
 	return audited.Backend.UnfreezeDomain(ctx, domain)
 }
