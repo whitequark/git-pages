@@ -52,12 +52,15 @@ func ApplyTarPatch(manifest *Manifest, reader io.Reader, parents CreateParentsMo
 			iter := root
 			for _, segment := range segments[:len(segments)-1] {
 				if iter.children == nil {
-					panic("malformed manifest (not a directory)")
+					break // error handled below
 				} else if _, exists := iter.children[segment]; !exists {
 					panic("malformed manifest (node does not exist)")
 				} else {
 					iter = iter.children[segment]
 				}
+			}
+			if iter.children == nil {
+				panic("malformed manifest (not a directory)")
 			}
 			iter.children[fileName] = node
 		}
