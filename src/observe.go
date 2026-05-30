@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"runtime/debug"
+	"slices"
 	"sync"
 	"time"
 
@@ -130,11 +131,15 @@ func ObserveHTTPHandler(handler http.Handler) http.Handler {
 			next.ServeHTTP(&ow, r)
 			duration := time.Since(start)
 
+			method := r.Method
+			if !slices.Contains([]string{"HEAD", "GET", "PUT", "PATCH", "DELETE", "POST"}, method) {
+				method = "!OTHER"
+			}
 			httpRequestCount.
-				With(prometheus.Labels{"method": r.Method, "code": fmt.Sprintf("%d", ow.status)}).
+				With(prometheus.Labels{"method": method, "code": fmt.Sprintf("%d", ow.status)}).
 				Inc()
 			httpRequestDurationSeconds.
-				With(prometheus.Labels{"method": r.Method}).
+				With(prometheus.Labels{"method": method}).
 				Observe(duration.Seconds())
 		})
 	}(handler)
