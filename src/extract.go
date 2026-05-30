@@ -124,10 +124,10 @@ func ExtractTar(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 				dataBytesTransferred += int64(len(header.Linkname)) // actual symlink
 			}
 		case tar.TypeLink:
-			if entry, found := hardLinks[header.Linkname]; found {
+			if entry, found := hardLinks[header.Linkname]; found && entry != nil {
 				manifest.Contents[fileName] = entry
 			} else {
-				AddProblem(manifest, fileName, "tar: invalid hardlink %q", header.Linkname)
+				AddProblem(manifest, fileName, "tar: invalid hardlink to %q", header.Linkname)
 			}
 		case tar.TypeDir:
 			AddDirectory(manifest, fileName)
