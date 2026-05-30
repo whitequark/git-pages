@@ -868,7 +868,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 
-	resultChan := make(chan UpdateResult)
+	resultChan := make(chan UpdateResult, 1)
 	go func(ctx context.Context) {
 		ctx, cancel := context.WithTimeout(ctx, time.Duration(config.Limits.UpdateTimeout))
 		defer cancel()
