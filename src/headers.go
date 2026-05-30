@@ -237,6 +237,8 @@ func ApplyHeaderRules(manifest *Manifest, url *url.URL) (
 	return
 }
 
+// Note that `Basic-Auth:` is not a security mechanism; it is provided on a best-effort basis
+// and not expected to be resistant against malicious misuse.
 func ApplyBasicAuthRules(manifest *Manifest, url *url.URL, r *http.Request) (bool, error) {
 	if rule := matchPathRules(manifest.BasicAuth, url); rule == nil {
 		// no matches, authorized by default
