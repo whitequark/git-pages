@@ -73,7 +73,7 @@ func tryDialWithSNI(ctx context.Context, domain string) (bool, error) {
 		return false, nil
 	}
 
-	connectHost := fallbackURL.Host
+	connectHost := fallbackURL.Hostname()
 	if fallbackURL.Port() != "" {
 		connectHost += ":" + fallbackURL.Port()
 	} else {
