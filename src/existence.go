@@ -114,8 +114,8 @@ func (c *bloomExistenceCache) refresh(ctx context.Context) error {
 	}
 
 	// Create two 256 KiB Bloom filters that will fit ~150K entries each with 0.1% false positive rate.
-	sites := bloom.New(256*1024, 10)
-	domains := bloom.New(256*1024, 10)
+	sites := bloom.New(256*1024*8, 10)
+	domains := bloom.New(256*1024*8, 10)
 
 	logc.Printf(ctx, "existence: refreshing")
 	siteCount := 0
