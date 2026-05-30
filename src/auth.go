@@ -83,7 +83,7 @@ func ValidateProjectName(name string) error {
 		return fmt.Errorf("must not start with %q", ".")
 	}
 
-	forbiddenChars := "%*"
+	forbiddenChars := "%*\\"
 	if strings.ContainsAny(name, forbiddenChars) {
 		return fmt.Errorf("must not contain any of %q", forbiddenChars)
 	}
