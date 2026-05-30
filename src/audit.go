@@ -337,8 +337,8 @@ func notifyAudit(ctx context.Context, id AuditID) {
 				resp, err := http.Get(notifyURL.String())
 				var body []byte
 				if err == nil {
-					defer resp.Body.Close()
 					body, _ = io.ReadAll(resp.Body)
+					resp.Body.Close()
 				}
 				if err == nil && resp.StatusCode == http.StatusOK {
 					logc.Printf(ctx, "audit notify %s ok: %s\n", id, string(body))
