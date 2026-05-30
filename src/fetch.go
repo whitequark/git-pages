@@ -214,6 +214,14 @@ func readGitBlob(
 		return fmt.Errorf("git blob %s: %w", hash, err)
 	}
 
+	*bytesTransferred += blob.Size
+	if uint64(*bytesTransferred) > config.Limits.MaxSiteSize.Bytes() {
+		return fmt.Errorf("%w: fetch exceeds %s limit",
+			ErrRepositoryTooLarge,
+			config.Limits.MaxSiteSize.HR(),
+		)
+	}
+
 	reader, err := blob.Reader()
 	if err != nil {
 		return fmt.Errorf("git blob open: %w", err)
@@ -237,14 +245,6 @@ func readGitBlob(
 	entry.Transform = Transform_Identity.Enum()
 	entry.OriginalSize = proto.Int64(blob.Size)
 	entry.CompressedSize = proto.Int64(blob.Size)
-
-	*bytesTransferred += blob.Size
-	if uint64(*bytesTransferred) > config.Limits.MaxSiteSize.Bytes() {
-		return fmt.Errorf("%w: fetch exceeds %s limit",
-			ErrRepositoryTooLarge,
-			config.Limits.MaxSiteSize.HR(),
-		)
-	}
 
 	return nil
 }
