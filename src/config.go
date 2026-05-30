@@ -357,7 +357,7 @@ func Configure(tomlPaths ...string) (config *Config, err error) {
 
 	// inject values from the environment, overriding everything else
 	err = walkConfig(config, func(envName string, reflValue reflect.Value) error {
-		if envValue, found := os.LookupEnv(envName); found {
+		if envValue, found := os.LookupEnv(envName); found && envValue != "" {
 			return setConfigValue(reflValue, envValue)
 		}
 		return nil
