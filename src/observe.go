@@ -358,9 +358,9 @@ func (backend *observedBackend) UnfreezeDomain(ctx context.Context, domain strin
 	return
 }
 
-func (backend *observedBackend) HasSiteListChanged(ctx context.Context, since time.Time) (changed bool, err error) {
+func (backend *observedBackend) HasSiteListChanged(ctx context.Context, since time.Time) (changed bool, lastChanged time.Time, err error) {
 	span, ctx := ObserveFunction(ctx, "HasSiteListChanged", "since", since)
-	changed, err = backend.inner.HasSiteListChanged(ctx, since)
+	changed, lastChanged, err = backend.inner.HasSiteListChanged(ctx, since)
 	span.Finish()
 	return
 }

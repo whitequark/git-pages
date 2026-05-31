@@ -488,8 +488,8 @@ func (fs *FSBackend) UnfreezeDomain(ctx context.Context, domain string) error {
 	}
 }
 
-func (fs *FSBackend) HasSiteListChanged(ctx context.Context, since time.Time) (bool, error) {
-	return true, nil // not implemented
+func (fs *FSBackend) HasSiteListChanged(ctx context.Context, since time.Time) (bool, time.Time, error) {
+	return true, time.Time{}, nil // not implemented
 }
 
 func auditDetachedName(id AuditID) string {

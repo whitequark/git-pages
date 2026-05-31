@@ -136,7 +136,7 @@ type Backend interface {
 	GetAllManifests(ctx context.Context) iter.Seq2[tuple[*ManifestMetadata, *Manifest], error]
 
 	// Check whether the set of sites we serve has changed since the time passed to this method.
-	HasSiteListChanged(ctx context.Context, since time.Time) (changed bool, err error)
+	HasSiteListChanged(ctx context.Context, since time.Time) (changed bool, lastChanged time.Time, err error)
 
 	// Check whether a domain has any deployments.
 	CheckDomain(ctx context.Context, domain string) (found bool, err error)

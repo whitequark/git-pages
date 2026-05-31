@@ -818,17 +818,28 @@ func (s3 *S3Backend) UnfreezeDomain(ctx context.Context, domain string) error {
 
 const lastSiteUpdateObjectName = "meta/last-site-update"
 
-func (s3 *S3Backend) HasSiteListChanged(ctx context.Context, since time.Time) (bool, error) {
-	info, err := s3.client.StatObject(ctx, s3.bucket, lastSiteUpdateObjectName,
-		minio.GetObjectOptions{})
-	if err != nil {
-		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
-			return true, nil
+func (s3 *S3Backend) HasSiteListChanged(ctx context.Context, since time.Time) (bool, time.Time, error) {
+	opts := minio.GetObjectOptions{}
+	if !since.IsZero() {
+		if err := opts.SetModified(since); err != nil {
+			return false, time.Time{}, err
 		}
-		return false, err
 	}
 
-	return info.LastModified.After(since), nil
+	info, err := s3.client.StatObject(ctx, s3.bucket, lastSiteUpdateObjectName, opts)
+	if err != nil {
+		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
+			// The marker has not been written yet, meaning no mutations have occurred.
+			return false, time.Time{}, nil
+		} else if errResp.StatusCode == http.StatusNotModified {
+			// The marker has not changed.
+			return false, time.Time{}, nil
+		}
+
+		return false, time.Time{}, err
+	}
+
+	return true, info.LastModified, nil
 }
 
 func (s3 *S3Backend) bumpLastSiteUpdateTimestamp(ctx context.Context) error {
