@@ -20,15 +20,39 @@ The included Docker container provides everything needed to deploy a Pages servi
 [grebedoc]: https://grebedoc.dev
 
 
-Quickstart
-----------
+Installation
+------------
 
-You will need [Go](https://go.dev/) 1.25 or newer. Run:
+You can install _git-pages_ using one of the following methods:
+
+1. **Downloading a binary**. You can download the [latest build][latest] or pick a [release][releases].
+
+1. **Installing a package**.
+
+   [![Packaging status](https://repology.org/badge/vertical-allrepos/git-pages.svg)](https://repology.org/project/git-pages/versions)
+
+1. **Using a Docker container**. Choose between the latest build or a [release tag][containers], then refer to the [container options](#container-options) section.
+
+1. **Installing from source**. First, install [Go](https://go.dev/) 1.25 or newer. Then run:
+
+   ```console
+   $ go install codeberg.org/git-pages/git-pages@latest
+   ```
+
+[latest]: https://codeberg.org/git-pages/git-pages/releases/tag/latest
+[releases]: https://codeberg.org/git-pages/git-pages/releases
+[containers]: https://codeberg.org/git-pages/-/packages/container/git-pages/versions
+
+
+Usage
+-----
+
+First, [install the software](#installation). Then run:
 
 ```console
 $ mkdir -p data
 $ cp conf/config.example.toml config.toml
-$ PAGES_INSECURE=1 go run .
+$ PAGES_INSECURE=1 git-pages
 ```
 
 These commands starts an HTTP server on `0.0.0.0:3000` and use the `data` directory for persistence. **Authentication is disabled via `PAGES_INSECURE=1`** to avoid the need to set up a DNS server as well; never enable `PAGES_INSECURE=1` in production.
@@ -43,8 +67,7 @@ b70644b523c4aaf4efd206a588087a1d406cb047
 The `pages` branch of the repository is now available at http://localhost:3000/!
 
 
-Deployment
-----------
+### Container options
 
 The first-party container supports running _git-pages_ either standalone or together with [Caddy][].
 
