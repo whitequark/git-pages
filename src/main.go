@@ -788,39 +788,6 @@ func Main(versionInfo string) {
 		}
 
 	default:
-		// Hook a signal (SIGHUP on *nix, nothing on Windows) for reloading the configuration
-		// at runtime. This is useful because it preserves S3 backend cache contents. Failed
-		// configuration reloads will not crash the process; you may want to check the syntax
-		// first with `git-pages -config ... -print-config` since there is no other feedback.
-		//
-		// Note that not all of the configuration is updated on reload. Listeners are kept as-is.
-		// The backend is not recreated (this is intentional as it allows preserving the cache).
-		sys.OnReload(func() {
-			if newConfig, err := Configure(*configTomlPath, *secretTomlPath); err != nil {
-				logc.Println(ctx, "config: reload err:", err)
-			} else {
-				// From https://go.dev/ref/mem:
-				// > A read r of a memory location x holding a value that is not larger than
-				// > a machine word must observe some write w such that r does not happen before
-				// > w and there is no write w' such that w happens before w' and w' happens
-				// > before r. That is, each read must observe a value written by a preceding or
-				// > concurrent write.
-				config = newConfig
-				if err = errors.Join(
-					configureFeatures(ctx),
-					configureMemLimit(ctx),
-					configureWildcards(ctx),
-					configureFallback(ctx),
-				); err != nil {
-					// At this point the configuration is in an in-between, corrupted state, so
-					// the only reasonable choice is to crash.
-					logc.Fatalln(ctx, "config: reload fail:", err)
-				} else {
-					logc.Println(ctx, "config: reload ok")
-				}
-			}
-		})
-
 		// Start listening on all ports before initializing the backend, otherwise if the backend
 		// spends some time initializing (which the S3 backend does) a proxy like Caddy can race
 		// with git-pages on startup and return errors for requests that would have been served
