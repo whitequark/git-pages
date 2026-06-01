@@ -73,7 +73,7 @@ func CollectTar(
 			}
 			blobData, err = io.ReadAll(blobReader)
 			if closer, ok := blobReader.(io.Closer); ok {
-				defer closer.Close()
+				closer.Close()
 			}
 			if err != nil {
 				return
