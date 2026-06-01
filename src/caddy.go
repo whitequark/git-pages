@@ -73,16 +73,14 @@ func tryDialWithSNI(ctx context.Context, domain string) (bool, error) {
 		return false, nil
 	}
 
-	connectHost := fallbackURL.Hostname()
-	if fallbackURL.Port() != "" {
-		connectHost += ":" + fallbackURL.Port()
-	} else {
-		connectHost += ":443"
+	connectHost, connectPort := fallbackURL.Hostname(), fallbackURL.Port()
+	if connectPort == "" {
+		connectPort = "443"
 	}
 
 	logc.Printf(ctx, "caddy: check TLS %s", fallbackURL)
 	dialer := tls.Dialer{Config: &tls.Config{ServerName: domain}}
-	connection, err := dialer.DialContext(ctx, "tcp", connectHost)
+	connection, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(connectHost, connectPort))
 	if err != nil {
 		return false, err
 	}
