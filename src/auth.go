@@ -620,7 +620,7 @@ func authorizeForgejoActionRun(repoURL string, forgeToken string, prNumber strin
 		return nil, AuthError{http.StatusUnauthorized, "workflow run not triggered by pull request"}
 	}
 	prOwner, prRepository := actionRun.PullRequest.OwnerName, actionRun.PullRequest.RepositoryName
-	if fmt.Sprintf("%s/%s.git", prOwner, prRepository) != parsedRepoURL.Path {
+	if fmt.Sprintf("/%s/%s.git", prOwner, prRepository) != parsedRepoURL.Path {
 		return nil, AuthError{http.StatusUnauthorized, "pull request repository does not match"}
 	}
 	if fmt.Sprintf("%d", actionRun.PullRequest.Number) != prNumber {
