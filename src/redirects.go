@@ -104,6 +104,7 @@ func ProcessRedirectsFile(ctx context.Context, manifest *Manifest) error {
 	if redirectsEntry == nil {
 		return nil
 	}
+	manifest.Redirects = []*RedirectRule{}
 
 	data, err := GetEntryContents(ctx, redirectsEntry)
 	if errors.Is(err, ErrNotRegularFile) {

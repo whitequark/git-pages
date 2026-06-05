@@ -100,6 +100,7 @@ func ProcessHeadersFile(ctx context.Context, manifest *Manifest) error {
 	if headersEntry == nil {
 		return nil
 	}
+	manifest.Headers = []*HeaderRule{}
 
 	data, err := GetEntryContents(ctx, headersEntry)
 	if errors.Is(err, ErrNotRegularFile) {
