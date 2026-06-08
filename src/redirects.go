@@ -220,6 +220,7 @@ next:
 			Host:     toOrFromComponent(ruleToURL.Host, fromURL.Host),
 			Path:     "/" + strings.Join(toSegments, "/"),
 			RawQuery: fromURL.RawQuery,
+			Fragment: toOrFromComponent(ruleToURL.Fragment, fromURL.Fragment),
 		}
 		status = int(*rule.Status)
 		return
