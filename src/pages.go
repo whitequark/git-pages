@@ -431,8 +431,10 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	if !negotiatedEncoding {
 		w.Header().Set("Accept-Encoding", strings.Join(offeredEncodings, ", "))
 		w.WriteHeader(http.StatusNotAcceptable)
-		return fmt.Errorf("no supported content encodings (Accept-Encoding: %s)",
+		err := fmt.Errorf("no supported content encodings (Accept-Encoding: %s)",
 			r.Header.Get("Accept-Encoding"))
+		fmt.Fprintf(w, "%s", err)
+		return err
 	}
 
 	if entry != nil && entry.ContentType != nil {

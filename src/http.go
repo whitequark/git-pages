@@ -105,18 +105,10 @@ func ParseAcceptEncodingHeader(headerValue string) (result HTTPEncodings) {
 // Negotiate returns the most preferred encoding that is acceptable by the
 // client, or an empty string if no encodings are acceptable.
 func (e *HTTPEncodings) Negotiate(offers ...string) string {
-	prefs := make(map[string]float64, len(offers))
-	for _, code := range offers {
-		prefs[code] = 0
-	}
+	prefs := make(map[string]float64, len(offers)+1)
 	implicitIdentity := true
 	for _, enc := range e.encodings {
-		if enc.code == "*" {
-			for code := range prefs {
-				prefs[code] = enc.qval
-			}
-			implicitIdentity = false
-		} else if _, ok := prefs[enc.code]; ok {
+		if slices.Contains(offers, enc.code) || enc.code == "*" {
 			prefs[enc.code] = enc.qval
 		}
 		if enc.code == "*" || enc.code == "identity" {
@@ -128,7 +120,11 @@ func (e *HTTPEncodings) Negotiate(offers ...string) string {
 	}
 	encs := make([]httpAcceptOffer, len(offers))
 	for idx, code := range offers {
-		encs[idx] = httpAcceptOffer{code, prefs[code]}
+		pref, ok := prefs[code]
+		if !ok {
+			pref = prefs["*"]
+		}
+		encs[idx] = httpAcceptOffer{code, pref}
 	}
 	return preferredAcceptOffer(encs)
 }
