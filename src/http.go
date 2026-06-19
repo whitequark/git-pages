@@ -115,7 +115,7 @@ func (e *HTTPEncodings) Negotiate(offers ...string) string {
 			implicitIdentity = false
 		}
 	}
-	if _, ok := prefs["identity"]; ok && implicitIdentity {
+	if implicitIdentity {
 		prefs["identity"] = -1 // sort last
 	}
 	encs := make([]httpAcceptOffer, len(offers))
