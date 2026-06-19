@@ -298,7 +298,8 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	reader := io.ReadSeeker(nil)
 	mtime := time.Time{}
 	for {
-		entryPath, _ = strings.CutSuffix(entryPath, "/")
+		endsInSlash := false
+		entryPath, endsInSlash = strings.CutSuffix(entryPath, "/")
 		entryPath, err = ExpandSymlinks(manifest, entryPath)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -306,6 +307,9 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 		entry = manifest.Contents[entryPath]
+		if entry != nil && IsEntryRegularFile(entry) && endsInSlash {
+			entry = nil
+		}
 		if !appliedRedirect {
 			redirectKind := RedirectAny
 			if entry != nil && entry.GetType() != Type_InvalidEntry {
