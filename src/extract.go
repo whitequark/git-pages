@@ -244,3 +244,41 @@ func ExtractZip(ctx context.Context, reader io.Reader, oldManifest *Manifest) (*
 
 	return manifest, nil
 }
+
+func IsArchiveParseError(err error) bool {
+	targets := []error{
+		tar.ErrHeader,
+		tar.ErrWriteTooLong,
+		tar.ErrFieldTooLong,
+		tar.ErrWriteAfterClose,
+		tar.ErrInsecurePath,
+
+		zip.ErrFormat,
+		zip.ErrAlgorithm,
+		zip.ErrChecksum,
+		zip.ErrInsecurePath,
+
+		gzip.ErrChecksum,
+		gzip.ErrHeader,
+
+		zstd.ErrReservedBlockType,
+		zstd.ErrCompressedSizeTooBig,
+		zstd.ErrBlockTooSmall,
+		zstd.ErrUnexpectedBlockSize,
+		zstd.ErrMagicMismatch,
+		zstd.ErrWindowSizeExceeded,
+		zstd.ErrWindowSizeTooSmall,
+		zstd.ErrDecoderSizeExceeded,
+		zstd.ErrUnknownDictionary,
+		zstd.ErrFrameSizeExceeded,
+		zstd.ErrFrameSizeMismatch,
+		zstd.ErrCRCMismatch,
+	}
+
+	for _, target := range targets {
+		if errors.Is(err, target) {
+			return true
+		}
+	}
+	return false
+}
