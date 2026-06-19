@@ -45,7 +45,7 @@ func configureFeatures(ctx context.Context) (err error) {
 	for _, feature := range config.Features {
 		switch feature {
 		// Work-in-progress features:
-		case "preview", "expiration":
+		case "preview", "expiration", "absolute-headers":
 		// Permanently unstable features:
 		case "codeberg-pages-compat", "relaxed-idna":
 		// Stabilized features:
