@@ -557,9 +557,19 @@ func Main(versionInfo string) {
 				record.GetAuditID().String(),
 				color.HiWhiteString("%s", record.GetTimestamp().AsTime().UTC().Format(time.RFC3339)),
 				fmt.Sprint(record.GetEvent()),
-				color.HiMagentaString("%s", record.DescribeResource()),
-				color.HiGreenString("%s", record.DescribePrincipal()),
 			}
+			if record.Manifest != nil && record.Manifest.ExpiresAt != nil {
+				parts = append(parts,
+					color.HiYellowString("%s", record.DescribeResource()),
+				)
+			} else {
+				parts = append(parts,
+					color.HiMagentaString("%s", record.DescribeResource()),
+				)
+			}
+			parts = append(parts,
+				color.HiGreenString("%s", record.DescribePrincipal()),
+			)
 			if record.IsDetached() {
 				parts = append(parts,
 					color.HiYellowString("(detached)"),
