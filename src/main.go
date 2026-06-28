@@ -208,7 +208,9 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "(debug)  "+
 		"git-pages {-list-blobs|-list-manifests}\n")
 	fmt.Fprintf(os.Stderr, "(debug)  "+
-		"git-pages {-get-blob|-get-manifest|-get-archive|-update-site} <ref> [file]\n")
+		"git-pages {-get-blob|-get-manifest|-get-archive} <ref> [file]\n")
+	fmt.Fprintf(os.Stderr, "(admin)  "+
+		"git-pages {-update-site <ref> <file>|-delete-site <ref>}\n")
 	fmt.Fprintf(os.Stderr, "(admin)  "+
 		"git-pages {-freeze-domain|-unfreeze-domain} <domain>\n")
 	fmt.Fprintf(os.Stderr, "(audit)  "+
@@ -250,6 +252,8 @@ func Main(versionInfo string) {
 		"write archive for `site` (either 'domain.tld' or 'domain.tld/dir') in tar format")
 	updateSite := flag.String("update-site", "",
 		"update `site` (either 'domain.tld' or 'domain.tld/dir') from archive or repository URL")
+	deleteSite := flag.String("delete-site", "",
+		"delete `site` (either 'domain.tld' or 'domain.tld/dir')")
 	freezeDomain := flag.String("freeze-domain", "",
 		"prevent any site uploads to a given `domain`")
 	unfreezeDomain := flag.String("unfreeze-domain", "",
@@ -293,6 +297,7 @@ func Main(versionInfo string) {
 		*getManifest != "",
 		*getArchive != "",
 		*updateSite != "",
+		*deleteSite != "",
 		*freezeDomain != "",
 		*unfreezeDomain != "",
 		*auditLog,
@@ -311,10 +316,11 @@ func Main(versionInfo string) {
 		}
 	}
 	if cliOperations > 1 {
-		logc.Fatalln(ctx, "-list-blobs, -list-manifests, -get-blob, -get-manifest, -get-archive, "+
-			"-update-site, -freeze-domain, -unfreeze-domain, -audit-log, -audit-read, "+
-			"-audit-rollback, -audit-expire, -audit-detach, -audit-server, -site-expire, "+
-			"-run-migration, -analyze-storage, and -trace-garbage are mutually exclusive")
+		logc.Fatalln(ctx, "-list-blobs, -list-manifests, -get-blob, -get-manifest, "+
+			"-get-archive, -update-site, -delete-site, -freeze-domain, -unfreeze-domain, "+
+			"-audit-log, -audit-read, -audit-rollback, -audit-expire, -audit-detach, "+
+			"-audit-server, -site-expire, -run-migration, -analyze-storage, "+
+			"and -trace-garbage are mutually exclusive")
 	}
 	if *dryRun && !(*siteExpire) {
 		logc.Fatalln(ctx, "-dry-run is not applicable in this context")
@@ -493,6 +499,18 @@ func Main(versionInfo string) {
 		case UpdateNoChange:
 			logc.Println(ctx, "no-change")
 		}
+
+	case *deleteSite != "":
+		ctx = WithPrincipal(ctx)
+		GetPrincipal(ctx).CliAdmin = proto.Bool(true)
+
+		webRoot := webRootArg(*deleteSite)
+		err := backend.DeleteManifest(ctx, webRoot, ModifyManifestOptions{})
+		if err != nil {
+			logc.Fatalf(ctx, "error: %s\n", err)
+		}
+
+		logc.Println(ctx, "deleted")
 
 	case *freezeDomain != "" || *unfreezeDomain != "":
 		ctx = WithPrincipal(ctx)
