@@ -112,6 +112,7 @@ type FSConfig struct {
 type S3Config struct {
 	Endpoint        string      `toml:"endpoint"`
 	Insecure        bool        `toml:"insecure"`
+	BucketLookup    string      `toml:"bucket-lookup" default:"auto"`
 	AccessKeyID     string      `toml:"access-key-id"`
 	SecretAccessKey string      `toml:"secret-access-key"`
 	Region          string      `toml:"region"`

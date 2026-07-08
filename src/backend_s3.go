@@ -155,13 +155,27 @@ func makeCacheOptions[K comparable, V any](
 }
 
 func NewS3Backend(ctx context.Context, config *S3Config) (*S3Backend, error) {
+	var bucketLookup minio.BucketLookupType
+
+	switch config.BucketLookup {
+	case "auto":
+		bucketLookup = minio.BucketLookupAuto
+	case "path":
+		bucketLookup = minio.BucketLookupPath
+	case "dns":
+		bucketLookup = minio.BucketLookupDNS
+	default:
+		return nil, fmt.Errorf("unknown bucket lookup type: %s", config.BucketLookup)
+	}
+
 	client, err := minio.New(config.Endpoint, &minio.Options{
 		Creds: credentials.NewStaticV4(
 			config.AccessKeyID,
 			config.SecretAccessKey,
 			"",
 		),
-		Secure: !config.Insecure,
+		Secure:       !config.Insecure,
+		BucketLookup: bucketLookup,
 	})
 	if err != nil {
 		return nil, err
