@@ -67,11 +67,13 @@ jobs:
           build linux   amd64
           build linux   arm64
           build darwin  arm64
+          git archive -o assets/git-pages-src.zip --prefix git-pages/ HEAD
       - name: Create release
         uses: https://code.forgejo.org/actions/forgejo-release@6a9510a9ea01b8b9b435933bf3c0fa45597ad530 # v2.11.3
         with:
           tag: ${{ startsWith(forge.event.ref, 'refs/tags/v') && forge.ref_name || 'latest' }}
           release-dir: assets
+          hide-archive-link: true
           direction: upload
           override: true
           prerelease: ${{ !startsWith(forge.event.ref, 'refs/tags/v') }}
