@@ -5,7 +5,7 @@ schema = 3
     version = "v1.1.1"
     hash = "sha256-qgL7l1FHXxcBWhBnBLEI0yENd6P+frvwlKxEAXLA3VY="
   [mod."codeberg.org/git-pages/go-slog-syslog"]
-    version = "v0.0.0-20251207093707-892f654e80b7"
+    version = "v0.1.0"
     hash = "sha256-ye+DBIyxqTEOViYRrQPWyGJCaLmyKSDwH5btlqDPizM="
   [mod."github.com/BurntSushi/toml"]
     version = "v1.6.0"

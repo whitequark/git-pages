@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	codeberg.org/git-pages/go-headers v1.1.1
-	codeberg.org/git-pages/go-slog-syslog v0.0.0-20251207093707-892f654e80b7
+	codeberg.org/git-pages/go-slog-syslog v0.1.0
 	github.com/BurntSushi/toml v1.6.0
 	github.com/KimMachineGun/automemlimit v0.7.5
 	github.com/bits-and-blooms/bloom/v3 v3.7.1
