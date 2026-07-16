@@ -399,15 +399,26 @@ func Main(versionInfo string) {
 		}
 
 	case *listManifests:
-		for metadata, err := range backend.EnumerateManifests(ctx) {
+		for item, err := range backend.GetAllManifests(ctx) {
+			metadata, manifest := item.Splat()
 			if err != nil {
 				logc.Fatalln(ctx, err)
 			}
-			fmt.Fprintf(color.Output, "%s %s %s\n",
-				metadata.Name,
+			parts := []string{}
+			if manifest.ExpiresAt != nil {
+				parts = append(parts,
+					color.HiYellowString("%s", metadata.Name),
+				)
+			} else {
+				parts = append(parts,
+					color.HiMagentaString("%s", metadata.Name),
+				)
+			}
+			parts = append(parts,
 				color.HiWhiteString(metadata.LastModified.UTC().Format(time.RFC3339)),
 				color.HiGreenString(fmt.Sprint(metadata.Size)),
 			)
+			fmt.Fprintln(color.Output, strings.Join(parts, " "))
 		}
 
 	case *getBlob != "":
