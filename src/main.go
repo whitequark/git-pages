@@ -220,7 +220,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "(audit)  "+
 		"git-pages  -audit-server <endpoint> <program> [args...]\n")
 	fmt.Fprintf(os.Stderr, "(maint)  "+
-		"git-pages  -site-expire [-dry-run]\n")
+		"git-pages  -expire-sites [-dry-run]\n")
 	fmt.Fprintf(os.Stderr, "(maint)  "+
 		"git-pages {-run-migration <name>|-trace-garbage|-analyze-storage}\n")
 	flag.PrintDefaults()
@@ -270,7 +270,7 @@ func Main(versionInfo string) {
 		"detach all blobs of audit records for a single `site` (or the entire domain with 'domain.tld/*')")
 	auditServer := flag.String("audit-server", "",
 		"listen for notifications on `endpoint` and spawn a process for each audit event")
-	siteExpire := flag.Bool("site-expire", false,
+	expireSites := flag.Bool("expire-sites", false,
 		"expire sites according to their manifest")
 	runMigration := flag.String("run-migration", "",
 		"run a store `migration` (one of: create-domain-markers)")
@@ -306,7 +306,7 @@ func Main(versionInfo string) {
 		*auditExpire != "",
 		*auditDetach != "",
 		*auditServer != "",
-		*siteExpire,
+		*expireSites,
 		*runMigration != "",
 		*analyzeStorage != "",
 		*traceGarbage,
@@ -319,10 +319,10 @@ func Main(versionInfo string) {
 		logc.Fatalln(ctx, "-list-blobs, -list-manifests, -get-blob, -get-manifest, "+
 			"-get-archive, -update-site, -delete-site, -freeze-domain, -unfreeze-domain, "+
 			"-audit-log, -audit-read, -audit-rollback, -audit-expire, -audit-detach, "+
-			"-audit-server, -site-expire, -run-migration, -analyze-storage, "+
+			"-audit-server, -expire-sites, -run-migration, -analyze-storage, "+
 			"and -trace-garbage are mutually exclusive")
 	}
-	if *dryRun && !(*siteExpire) {
+	if *dryRun && !(*expireSites) {
 		logc.Fatalln(ctx, "-dry-run is not applicable in this context")
 	}
 
@@ -699,7 +699,7 @@ func Main(versionInfo string) {
 
 		logc.Printf(ctx, "audit: expired %d records\n", count)
 
-	case *siteExpire:
+	case *expireSites:
 		ctx = WithPrincipal(ctx)
 		GetPrincipal(ctx).CliAdmin = proto.Bool(true)
 
