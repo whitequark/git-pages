@@ -12,12 +12,12 @@ jobs:
   check:
     runs-on: debian-trixie
     container:
-      image: docker.io/library/node:24-trixie-slim@sha256:28fd420825d8e922eab0fd91740c7cf88ddbdc8116a2b20a82049f0c946feb03
+      image: docker.io/library/node:24-trixie-slim@sha256:ae91dcc111a68c9d2d81ff2a17bda61be126426176fde6fe7d08ab13b7f50573
     steps:
       - name: Check out source code
-        uses: https://code.forgejo.org/actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: https://code.forgejo.org/actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Set up toolchain
-        uses: https://code.forgejo.org/actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        uses: https://code.forgejo.org/actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: '>=1.25.6'
       - name: Install dependencies
@@ -42,7 +42,7 @@ jobs:
     needs: [check]
     runs-on: debian-trixie
     container:
-      image: docker.io/library/node:24-trixie-slim@sha256:28fd420825d8e922eab0fd91740c7cf88ddbdc8116a2b20a82049f0c946feb03
+      image: docker.io/library/node:24-trixie-slim@sha256:ae91dcc111a68c9d2d81ff2a17bda61be126426176fde6fe7d08ab13b7f50573
     steps:
       - name: Install dependencies
         run: |
@@ -50,12 +50,12 @@ jobs:
           apt-get -y install ca-certificates git
           # git needs to be installed for build information embedding to work
       - name: Check out source code
-        uses: https://code.forgejo.org/actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: https://code.forgejo.org/actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
           fetch-tags: true
       - name: Set up toolchain
-        uses: https://code.forgejo.org/actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        uses: https://code.forgejo.org/actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: '>=1.25.6'
       - name: Build release assets
@@ -69,7 +69,7 @@ jobs:
           build darwin  arm64
           git archive -o assets/git-pages-src.zip --prefix git-pages/ HEAD
       - name: Create release
-        uses: https://code.forgejo.org/actions/forgejo-release@6a9510a9ea01b8b9b435933bf3c0fa45597ad530 # v2.11.3
+        uses: https://code.forgejo.org/actions/forgejo-release@98265452477dafb3f0f27ba9c462c90b18cb44fd # v2.13.4
         with:
           tag: ${{ startsWith(forge.event.ref, 'refs/tags/v') && forge.ref_name || 'latest' }}
           release-dir: assets
@@ -83,14 +83,14 @@ jobs:
     needs: [check]
     runs-on: debian-trixie
     container:
-      image: docker.io/library/node:24-trixie-slim@sha256:28fd420825d8e922eab0fd91740c7cf88ddbdc8116a2b20a82049f0c946feb03
+      image: docker.io/library/node:24-trixie-slim@sha256:ae91dcc111a68c9d2d81ff2a17bda61be126426176fde6fe7d08ab13b7f50573
     steps:
       - name: Install dependencies
         run: |
           apt-get -y update
           apt-get -y install ca-certificates buildah qemu-user-binfmt
       - name: Check out source code
-        uses: https://code.forgejo.org/actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: https://code.forgejo.org/actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Authenticate with Docker
         run: |
           buildah login --authfile=/tmp/authfile-${FORGE}.json \
