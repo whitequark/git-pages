@@ -950,6 +950,11 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.Header().Add("Server", "git-pages")
 	}
+	if !slices.Contains([]string{"GET", "HEAD"}, r.Method) {
+		// Expose a header for git-pages-cli (which only cares about one for mutating requests)
+		// to work around proxying CDNs like Cloudflare &co.
+		w.Header()["X-Server"] = append(w.Header()["X-Server"], w.Header()["Server"]...)
+	}
 	allowedMethods := []string{"OPTIONS", "HEAD", "GET", "PUT", "PATCH", "DELETE", "POST"}
 	if r.Method == "OPTIONS" || !slices.Contains(allowedMethods, r.Method) {
 		w.Header().Add("Allow", strings.Join(allowedMethods, ", "))
