@@ -77,6 +77,8 @@
           packages = with pkgs; [
             caddy
             gomod2nix
+            protobuf_30
+            protoc-gen-go
           ];
         };
 
