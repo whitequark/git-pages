@@ -885,6 +885,9 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		ctx, cancel := context.WithTimeout(ctx, time.Duration(config.Limits.UpdateTimeout))
 		defer cancel()
 
+		principal := GetPrincipal(r.Context())
+		principal.RepoUrl = &repoURL
+
 		result := UpdateFromRepository(ctx, webRoot, repoURL, auth.branch, UpdateOptions{})
 		resultChan <- result
 		observeSiteUpdate("webhook", &result)
