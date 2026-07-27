@@ -222,7 +222,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "(maint)  "+
 		"git-pages  -expire-sites [-dry-run]\n")
 	fmt.Fprintf(os.Stderr, "(maint)  "+
-		"git-pages {-run-migration <name>|-trace-garbage|-analyze-storage}\n")
+		"git-pages {-run-migration <name>|-trace-garbage|-analyze-storage {text|json}}\n")
 	flag.PrintDefaults()
 }
 
@@ -275,7 +275,7 @@ func Main(versionInfo string) {
 	runMigration := flag.String("run-migration", "",
 		"run a store `migration` (one of: create-domain-markers)")
 	analyzeStorage := flag.String("analyze-storage", "",
-		"display aggregate storage used per domain")
+		"display aggregate storage used per domain (argument is output mode and one of: text, json)")
 	traceGarbage := flag.Bool("trace-garbage", false,
 		"estimate total size of unreachable blobs")
 	dryRun := flag.Bool("dry-run", false,
@@ -819,7 +819,7 @@ func Main(versionInfo string) {
 		encoder.Encode(analysis)
 
 	case *analyzeStorage != "":
-		logc.Fatalf(ctx, "unsupported -analyze-storage mode")
+		logc.Fatalf(ctx, "unsupported -analyze-storage mode (must be text or json)")
 
 	case *traceGarbage:
 		if err = TraceGarbage(ctx); err != nil {
