@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"golang.org/x/net/publicsuffix"
 )
 
 type StorageSize struct {
@@ -30,6 +32,10 @@ func AnalyzeStorage(ctx context.Context) ([]*StorageSize, error) {
 	thinStats := []*StorageSize{}
 
 	getStats := func(domain string) *storageData {
+		eTLDPlusOne, err := publicsuffix.EffectiveTLDPlusOne(domain)
+		if err == nil {
+			domain = eTLDPlusOne
+		}
 		if _, found := thickStats[domain]; !found {
 			thickStats[domain] = &storageData{
 				siteBlobs:  map[string]int64{},
