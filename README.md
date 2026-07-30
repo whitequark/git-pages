@@ -47,15 +47,28 @@ You can install _git-pages_ using one of the following methods:
 Usage
 -----
 
-First, [install the software](#installation). Then run:
+First, [install the software](#installation).
+
+If you installed from a cloned repository or from a tarball, copy the sample config file:
+
+```console
+$ cp config/config.example.toml config.toml
+```
+
+If you are using the binary, a package, or the Docker install, you need to retrieve a sample config file separately:
+
+```console
+$ curl -o config.toml https://codeberg.org/git-pages/git-pages/raw/branch/main/conf/config.example.toml
+```
+
+Then run:
 
 ```console
 $ mkdir -p data
-$ cp conf/config.example.toml config.toml
 $ PAGES_INSECURE=1 git-pages
 ```
 
-These commands starts an HTTP server on `0.0.0.0:3000` and use the `data` directory for persistence. **Authentication is disabled via `PAGES_INSECURE=1`** to avoid the need to set up a DNS server as well; never enable `PAGES_INSECURE=1` in production.
+These commands start an HTTP server on `0.0.0.0:3000` and use the `data` directory for persistence. **Authentication is disabled via `PAGES_INSECURE=1`** to avoid the need to set up a DNS server as well; never enable `PAGES_INSECURE=1` in production.
 
 To publish a site, run the following commands (consider also using the [git-pages-cli] tool):
 
