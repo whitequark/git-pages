@@ -164,7 +164,9 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			)
 			if err == nil {
 				if !hasProjectSlash {
-					writeRedirect(w, http.StatusFound, r.URL.Path+"/")
+					newURL := *r.URL
+					newURL.Path += "/"
+					writeRedirect(w, http.StatusFound, newURL.String())
 					return nil
 				}
 				sitePath, manifest, metadata = projectPath, projectManifest, projectMetadata
@@ -364,8 +366,9 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 			} else {
 				// redirect from `dir` to `dir/`, otherwise when `dir/index.html` is served,
 				// links in it will have the wrong base URL
-				newPath := r.URL.Path + "/"
-				writeRedirect(w, http.StatusFound, newPath)
+				newURL := *r.URL
+				newURL.Path += "/"
+				writeRedirect(w, http.StatusFound, newURL.String())
 				return nil
 			}
 		} else if entry.GetType() == Type_Symlink {
