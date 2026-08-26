@@ -455,6 +455,8 @@ func Main(versionInfo string) {
 			logc.Fatalln(ctx, "update source must be provided as the argument")
 		}
 
+		webRoot := webRootArg(*updateSite)
+
 		sourceURL, err := url.Parse(flag.Arg(0))
 		if err != nil {
 			logc.Fatalln(ctx, err)
@@ -482,7 +484,6 @@ func Main(versionInfo string) {
 				log.Fatalf("cannot determine content type from filename %q\n", sourceURL)
 			}
 
-			webRoot := webRootArg(*updateSite)
 			result = UpdateFromArchive(ctx, webRoot, "", contentType, file, UpdateOptions{})
 		} else {
 			branch := "pages"
@@ -490,25 +491,24 @@ func Main(versionInfo string) {
 				branch, sourceURL.Fragment = sourceURL.Fragment, ""
 			}
 
-			webRoot := webRootArg(*updateSite)
 			result = UpdateFromRepository(ctx, webRoot, sourceURL.String(), branch, UpdateOptions{})
 		}
 
 		switch result.outcome {
 		case UpdateError:
-			logc.Printf(ctx, "error: %s\n", result.err)
+			logc.Println(ctx, result.err)
 			os.Exit(2)
 		case UpdateTimeout:
-			logc.Println(ctx, "timeout")
+			logc.Printf(ctx, "admin: timeout %s\n", webRoot)
 			os.Exit(1)
 		case UpdateCreated:
-			logc.Println(ctx, "created")
+			logc.Printf(ctx, "admin: created %s\n", webRoot)
 		case UpdateReplaced:
-			logc.Println(ctx, "replaced")
+			logc.Printf(ctx, "admin: replaced %s\n", webRoot)
 		case UpdateDeleted:
-			logc.Println(ctx, "deleted")
+			logc.Printf(ctx, "admin: deleted %s\n", webRoot)
 		case UpdateNoChange:
-			logc.Println(ctx, "no-change")
+			logc.Printf(ctx, "admin: no-change %s\n", webRoot)
 		}
 
 	case *deleteSite != "":
@@ -518,7 +518,7 @@ func Main(versionInfo string) {
 		webRoot := webRootArg(*deleteSite)
 		err := backend.DeleteManifest(ctx, webRoot, ModifyManifestOptions{})
 		if err != nil {
-			logc.Fatalf(ctx, "error: %s\n", err)
+			logc.Fatalln(ctx, err)
 		}
 
 		logc.Println(ctx, "deleted")
@@ -541,12 +541,12 @@ func Main(versionInfo string) {
 			if err = backend.FreezeDomain(ctx, domain); err != nil {
 				logc.Fatalln(ctx, err)
 			}
-			logc.Println(ctx, "frozen")
+			logc.Printf(ctx, "admin: frozen %s\n", domain)
 		} else {
 			if err = backend.UnfreezeDomain(ctx, domain); err != nil {
 				logc.Fatalln(ctx, err)
 			}
-			logc.Println(ctx, "thawed")
+			logc.Printf(ctx, "admin: thawed %s\n", domain)
 		}
 
 	case *auditLog:
