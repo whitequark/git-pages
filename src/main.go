@@ -212,7 +212,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "(admin)  "+
 		"git-pages {-update-site <ref> <file>|-delete-site <ref>}\n")
 	fmt.Fprintf(os.Stderr, "(admin)  "+
-		"git-pages {-freeze-domain|-unfreeze-domain} <domain>\n")
+		"git-pages {-freeze-domain|-unfreeze-domain|-purge-domain} <domain>\n")
 	fmt.Fprintf(os.Stderr, "(audit)  "+
 		"git-pages {-audit-log|-audit-read <id>|-audit-rollback <id>}\n")
 	fmt.Fprintf(os.Stderr, "(audit)  "+
@@ -258,6 +258,8 @@ func Main(versionInfo string) {
 		"prevent any site uploads to a given `domain`")
 	unfreezeDomain := flag.String("unfreeze-domain", "",
 		"allow site uploads to a `domain` again after it has been frozen")
+	purgeDomain := flag.String("purge-domain", "",
+		"delete all sites under `domain` (but not its subdomains)")
 	auditLog := flag.Bool("audit-log", false,
 		"display audit log")
 	auditRead := flag.String("audit-read", "",
@@ -300,6 +302,7 @@ func Main(versionInfo string) {
 		*deleteSite != "",
 		*freezeDomain != "",
 		*unfreezeDomain != "",
+		*purgeDomain != "",
 		*auditLog,
 		*auditRead != "",
 		*auditRollback != "",
@@ -318,8 +321,8 @@ func Main(versionInfo string) {
 	if cliOperations > 1 {
 		logc.Fatalln(ctx, "-list-blobs, -list-manifests, -get-blob, -get-manifest, "+
 			"-get-archive, -update-site, -delete-site, -freeze-domain, -unfreeze-domain, "+
-			"-audit-log, -audit-read, -audit-rollback, -audit-expire, -audit-detach, "+
-			"-audit-server, -expire-sites, -run-migration, -analyze-storage, "+
+			"-purge-domain, -audit-log, -audit-read, -audit-rollback, -audit-expire, "+
+			"-audit-detach, -audit-server, -expire-sites, -run-migration, -analyze-storage, "+
 			"and -trace-garbage are mutually exclusive")
 	}
 	if *dryRun && !(*expireSites) {
@@ -548,6 +551,28 @@ func Main(versionInfo string) {
 			}
 			logc.Printf(ctx, "admin: thawed %s\n", domain)
 		}
+
+	case *purgeDomain != "":
+		ctx = WithPrincipal(ctx)
+		GetPrincipal(ctx).CliAdmin = proto.Bool(true)
+
+		purgeCount := 0
+		for metadata, err := range backend.EnumerateManifests(ctx) {
+			if err != nil {
+				logc.Fatalln(ctx, err)
+			}
+
+			domain, _, _ := strings.Cut(metadata.Name, "/")
+			if domain == *purgeDomain {
+				err := backend.DeleteManifest(ctx, metadata.Name, ModifyManifestOptions{})
+				if err != nil {
+					logc.Fatalln(ctx, err)
+				}
+				purgeCount += 1
+			}
+		}
+
+		logc.Printf(ctx, "admin: purged %s (%d sites)\n", *purgeDomain, purgeCount)
 
 	case *auditLog:
 		records := []*AuditRecord{}
