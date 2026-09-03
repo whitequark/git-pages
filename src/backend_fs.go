@@ -28,7 +28,7 @@ var _ Backend = (*FSBackend)(nil)
 func maybeCreateOpenRoot(dir string, name string) (*os.Root, error) {
 	dirName := filepath.Join(dir, name)
 
-	if err := os.Mkdir(dirName, 0o755); err != nil && !errors.Is(err, os.ErrExist) {
+	if err := os.MkdirAll(dirName, 0o755); err != nil && !errors.Is(err, os.ErrExist) {
 		return nil, fmt.Errorf("mkdir: %w", err)
 	}
 
