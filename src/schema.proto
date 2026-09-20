@@ -136,6 +136,7 @@ message AuditRecord {
 	google.protobuf.Timestamp timestamp = 2;
 	AuditEvent event = 3;
 	Principal principal = 4;
+	string reason = 13;
 
 	// Affected resource.
 	string domain = 10;

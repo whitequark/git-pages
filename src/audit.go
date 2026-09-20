@@ -50,6 +50,22 @@ func GetPrincipal(ctx context.Context) *Principal {
 	return nil
 }
 
+type reasonKey struct{}
+
+var ReasonKey = reasonKey{}
+
+func WithReason(ctx context.Context) context.Context {
+	reason := new(string)
+	return context.WithValue(ctx, ReasonKey, reason)
+}
+
+func GetReason(ctx context.Context) *string {
+	if reason, ok := ctx.Value(ReasonKey).(*string); ok {
+		return reason
+	}
+	return nil
+}
+
 var AuditSnowflakeStartTime = time.Date(2025, 12, 1, 0, 0, 0, 0, time.UTC)
 
 type AuditID int64
@@ -300,6 +316,9 @@ func (audited *auditedBackend) appendNewAuditRecord(ctx context.Context, record 
 		record.Id = proto.Int64(int64(id))
 		record.Timestamp = timestamppb.Now()
 		record.Principal = GetPrincipal(ctx)
+		if reason := GetReason(ctx); reason != nil && *reason != "" {
+			record.Reason = GetReason(ctx)
+		}
 
 		err = audited.Backend.AppendAuditLog(ctx, id, record)
 		if err != nil {

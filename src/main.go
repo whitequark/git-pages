@@ -280,6 +280,8 @@ func Main(versionInfo string) {
 		"display aggregate storage used per domain (argument is output mode and one of: text, json)")
 	traceGarbage := flag.Bool("trace-garbage", false,
 		"estimate total size of unreachable blobs")
+	reason := flag.String("reason", "",
+		"specify a reason for administrative operations in the audit log")
 	dryRun := flag.Bool("dry-run", false,
 		"print what would be performed instead of executing it")
 	version := flag.Bool("version", false,
@@ -386,6 +388,12 @@ func Main(versionInfo string) {
 		if existenceCache, err = CreateExistenceCache(ctx); err != nil {
 			logc.Fatalln(ctx, err)
 		}
+
+		ctx = WithPrincipal(ctx)
+		GetPrincipal(ctx).CliAdmin = proto.Bool(true)
+
+		ctx = WithReason(ctx)
+		*GetReason(ctx) = *reason
 	}
 
 	switch {
@@ -451,9 +459,6 @@ func Main(versionInfo string) {
 		}
 
 	case *updateSite != "":
-		ctx = WithPrincipal(ctx)
-		GetPrincipal(ctx).CliAdmin = proto.Bool(true)
-
 		if flag.NArg() != 1 {
 			logc.Fatalln(ctx, "update source must be provided as the argument")
 		}
@@ -515,9 +520,6 @@ func Main(versionInfo string) {
 		}
 
 	case *deleteSite != "":
-		ctx = WithPrincipal(ctx)
-		GetPrincipal(ctx).CliAdmin = proto.Bool(true)
-
 		webRoot := webRootArg(*deleteSite)
 		err := backend.DeleteManifest(ctx, webRoot, ModifyManifestOptions{})
 		if err != nil {
@@ -527,9 +529,6 @@ func Main(versionInfo string) {
 		logc.Println(ctx, "deleted")
 
 	case *freezeDomain != "" || *unfreezeDomain != "":
-		ctx = WithPrincipal(ctx)
-		GetPrincipal(ctx).CliAdmin = proto.Bool(true)
-
 		var domain string
 		var freeze bool
 		if *freezeDomain != "" {
@@ -553,9 +552,6 @@ func Main(versionInfo string) {
 		}
 
 	case *purgeDomain != "":
-		ctx = WithPrincipal(ctx)
-		GetPrincipal(ctx).CliAdmin = proto.Bool(true)
-
 		purgeCount := 0
 		for metadata, err := range backend.EnumerateManifests(ctx) {
 			if err != nil {
@@ -606,6 +602,11 @@ func Main(versionInfo string) {
 			parts = append(parts,
 				color.HiGreenString("%s", record.DescribePrincipal()),
 			)
+			if record.GetReason() != "" {
+				parts = append(parts,
+					color.HiCyanString("%q", record.GetReason()),
+				)
+			}
 			if record.IsDetached() {
 				parts = append(parts,
 					color.HiYellowString("(detached)"),
@@ -630,9 +631,6 @@ func Main(versionInfo string) {
 		}
 
 	case *auditRollback != "":
-		ctx = WithPrincipal(ctx)
-		GetPrincipal(ctx).CliAdmin = proto.Bool(true)
-
 		id, err := ParseAuditID(*auditRollback)
 		if err != nil {
 			logc.Fatalln(ctx, err)
@@ -736,9 +734,6 @@ func Main(versionInfo string) {
 		logc.Printf(ctx, "audit: expired %d records\n", count)
 
 	case *expireSites:
-		ctx = WithPrincipal(ctx)
-		GetPrincipal(ctx).CliAdmin = proto.Bool(true)
-
 		if !config.Feature("expiration") {
 			logc.Fatalf(ctx, "expire: feature disabled")
 		}
