@@ -220,7 +220,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "(audit)  "+
 		"git-pages  -audit-server <endpoint> <program> [args...]\n")
 	fmt.Fprintf(os.Stderr, "(maint)  "+
-		"git-pages  -expire-sites [-dry-run]\n")
+		"git-pages {-expire-sites|-repair-storage} [-dry-run]\n")
 	fmt.Fprintf(os.Stderr, "(maint)  "+
 		"git-pages {-run-migration <name>|-trace-garbage|-analyze-storage {text|json}}\n")
 	flag.PrintDefaults()
@@ -274,6 +274,8 @@ func Main(versionInfo string) {
 		"listen for notifications on `endpoint` and spawn a process for each audit event")
 	expireSites := flag.Bool("expire-sites", false,
 		"expire sites according to their manifest")
+	repairStorage := flag.Bool("repair-storage", false,
+		"repair data storage by replacing corrupt manifests with placeholders")
 	runMigration := flag.String("run-migration", "",
 		"run a store `migration` (one of: create-domain-markers)")
 	analyzeStorage := flag.String("analyze-storage", "",
@@ -312,6 +314,7 @@ func Main(versionInfo string) {
 		*auditDetach != "",
 		*auditServer != "",
 		*expireSites,
+		*repairStorage,
 		*runMigration != "",
 		*analyzeStorage != "",
 		*traceGarbage,
@@ -324,10 +327,10 @@ func Main(versionInfo string) {
 		logc.Fatalln(ctx, "-list-blobs, -list-manifests, -get-blob, -get-manifest, "+
 			"-get-archive, -update-site, -delete-site, -freeze-domain, -unfreeze-domain, "+
 			"-purge-domain, -audit-log, -audit-read, -audit-rollback, -audit-expire, "+
-			"-audit-detach, -audit-server, -expire-sites, -run-migration, -analyze-storage, "+
-			"and -trace-garbage are mutually exclusive")
+			"-audit-detach, -audit-server, -expire-sites, -repair-storage, -run-migration, "+
+			"-analyze-storage, and -trace-garbage are mutually exclusive")
 	}
-	if *dryRun && !(*expireSites) {
+	if *dryRun && !(*expireSites || *repairStorage) {
 		logc.Fatalln(ctx, "-dry-run is not applicable in this context")
 	}
 
@@ -429,6 +432,11 @@ func Main(versionInfo string) {
 				color.HiWhiteString(metadata.LastModified.UTC().Format(time.RFC3339)),
 				color.HiGreenString(fmt.Sprint(metadata.Size)),
 			)
+			if manifest.GetCorrupted() {
+				parts = append(parts,
+					color.HiRedString("(corrupted)"),
+				)
+			}
 			fmt.Fprintln(color.Output, strings.Join(parts, " "))
 		}
 
@@ -588,7 +596,15 @@ func Main(versionInfo string) {
 			parts := []string{
 				record.GetAuditID().String(),
 				color.HiWhiteString("%s", record.GetTimestamp().AsTime().UTC().Format(time.RFC3339)),
-				fmt.Sprint(record.GetEvent()),
+			}
+			if record.GetEvent() == AuditEvent_CorruptedEvent {
+				parts = append(parts,
+					color.HiRedString("%s", fmt.Sprint(record.GetEvent())),
+				)
+			} else {
+				parts = append(parts,
+					fmt.Sprint(record.GetEvent()),
+				)
 			}
 			if record.Manifest != nil && record.Manifest.ExpiresAt != nil {
 				parts = append(parts,
@@ -766,6 +782,21 @@ func Main(versionInfo string) {
 		} else {
 			logc.Printf(ctx, "expire: expired %d out of %d transient sites\n",
 				countExpired, countTransient)
+		}
+
+	case *repairStorage:
+		if *GetReason(ctx) == "" {
+			*GetReason(ctx) = "-repair-storage"
+		}
+
+		allGood, err := RepairStorage(ctx, *dryRun)
+		if err != nil {
+			logc.Fatalln(ctx, err)
+		}
+		if !allGood {
+			// Exit code 1 indicates an error during the repair process; exit code 2 indicates
+			// that repair was successful, or that there is data to repair (for -dry-run).
+			os.Exit(2)
 		}
 
 	case *runMigration != "":

@@ -113,6 +113,9 @@ message Manifest {
 
 	// Diagnostics for non-fatal errors.
 	repeated Problem problems = 7;
+
+	// Indicator of data corruption.
+	bool corrupted = 13;
 }
 
 enum AuditEvent {
@@ -128,6 +131,8 @@ enum AuditEvent {
 	FreezeDomain = 3;
 	// A domain was thawed.
 	UnfreezeDomain = 4;
+	// Event lost due to data corruption.
+	CorruptedEvent = 6;
 }
 
 message AuditRecord {
