@@ -236,6 +236,7 @@ func (fs *FSBackend) GetManifest(
 	}
 	manifest, err = DecodeManifest(data)
 	if err != nil {
+		err = fmt.Errorf("decode %s: %w", name, err)
 		return
 	}
 	return manifest, ManifestMetadata{
@@ -508,7 +509,7 @@ func (fs *FSBackend) QueryAuditLog(ctx context.Context, id AuditID) (*AuditRecor
 	if data, err := fs.auditRoot.ReadFile(id.String()); err != nil {
 		return nil, fmt.Errorf("read: %w", err)
 	} else if record, err := DecodeAuditRecord(data); err != nil {
-		return nil, fmt.Errorf("decode: %w", err)
+		return nil, fmt.Errorf("decode %s: %w", id, err)
 	} else {
 		if _, err := fs.auditRoot.Stat(auditDetachedName(id)); err == nil {
 			record.Manifest = nil

@@ -469,6 +469,7 @@ func (l s3ManifestLoader) load(
 
 		manifest, err := DecodeManifest(data)
 		if err != nil {
+			err = fmt.Errorf("decode %s: %w", name, err)
 			return nil, err
 		}
 
@@ -904,6 +905,7 @@ func (s3 *S3Backend) QueryAuditLog(ctx context.Context, id AuditID) (*AuditRecor
 
 	record, err := DecodeAuditRecord(data)
 	if err != nil {
+		err = fmt.Errorf("decode %s: %w", id, err)
 		return nil, err
 	}
 
