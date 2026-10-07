@@ -202,6 +202,8 @@ func (fs *FSBackend) EnumerateBlobs(ctx context.Context) iter.Seq2[BlobMetadata,
 					return nil
 				} else if info, err := entry.Info(); err != nil {
 					// report error
+				} else if strings.HasPrefix(path, ".tmp") {
+					// temporary
 				} else {
 					// report blob
 					metadata.Name = joinBlobName(strings.Split(path, "/"))
@@ -423,6 +425,8 @@ func (fs *FSBackend) EnumerateManifests(ctx context.Context) iter.Seq2[*Manifest
 				} else if entry.IsDir() {
 					// skip directory
 					return nil
+				} else if strings.HasPrefix(path, ".tmp") {
+					// temporary
 				} else if project == "" || strings.HasPrefix(project, ".") && project != ".index" {
 					// skip internal
 					return nil
