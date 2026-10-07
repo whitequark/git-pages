@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -345,6 +346,20 @@ func notifyAudit(ctx context.Context, id AuditID) {
 		notifyURL := config.Audit.NotifyURL.URL
 		notifyURL.RawQuery = id.String()
 
+		client := http.Client{}
+		if notifyURL.Scheme == "http+unix" {
+			socketPath := fmt.Sprintf("/%s/%s", notifyURL.Host, notifyURL.Path)
+			client.Transport = &http.Transport{
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					var dialer net.Dialer
+					return dialer.DialContext(ctx, "unix", socketPath)
+				},
+			}
+			notifyURL.Scheme = "http"
+			notifyURL.Host = "localhost"
+			notifyURL.Path = ""
+		}
+
 		// See also the explanation in `AuditEventProcessor` above.
 		go func() {
 			backoff := exponential.Backoff{
@@ -353,7 +368,7 @@ func notifyAudit(ctx context.Context, id AuditID) {
 				Max:    time.Second * 60,
 			}
 			for {
-				resp, err := http.Get(notifyURL.String())
+				resp, err := client.Get(notifyURL.String())
 				var body []byte
 				if err == nil {
 					body, _ = io.ReadAll(resp.Body)
