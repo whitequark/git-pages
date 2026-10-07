@@ -68,7 +68,7 @@ func createBlobIndex() *blobIndex {
 }
 
 func (index *blobIndex) IsFresh(lastModified time.Time) bool {
-	return lastModified.Add(clockSkewTolerance).Before(index.refTime)
+	return lastModified.After(index.refTime.Add(-clockSkewTolerance))
 }
 
 func (index *blobIndex) Add(metadata BlobMetadata) {
@@ -80,27 +80,27 @@ func (index *blobIndex) Has(name string) bool {
 	return found
 }
 
-type repairObject struct {
+type scrubObject struct {
 	Manifest     *Manifest
 	LastModified time.Time
 	ObjectName   string
 }
 
 func hasDanglingBlobReferences(
-	ctx context.Context, blobIndex *blobIndex, repairManifest *repairObject,
+	ctx context.Context, blobIndex *blobIndex, scrubManifest *scrubObject,
 ) bool {
-	if !blobIndex.IsFresh(repairManifest.LastModified) {
+	if blobIndex.IsFresh(scrubManifest.LastModified) {
 		// We can't evaluate this manifest, it is too recent.
 		return false
 	}
 
 	hasDangling := false
-	for _, entry := range repairManifest.Manifest.GetContents() {
+	for _, entry := range scrubManifest.Manifest.GetContents() {
 		if entry.GetType() == Type_ExternalFile {
 			blobName := string(entry.GetData())
 			if !blobIndex.Has(blobName) {
-				logc.Printf(ctx, "repair fix: %s: dangling reference %s",
-					repairManifest.ObjectName, blobName)
+				logc.Printf(ctx, "scrub fix: %s: dangling reference %s\n",
+					scrubManifest.ObjectName, blobName)
 				hasDangling = true
 				// Continue printing dangling reference names.
 			}
@@ -109,7 +109,7 @@ func hasDanglingBlobReferences(
 	return hasDangling
 }
 
-func RepairStorage(ctx context.Context, dryRun bool) (bool, error) {
+func ScrubStorage(ctx context.Context, dryRun bool) (bool, error) {
 	dryRunSuffix := ""
 	if dryRun {
 		dryRunSuffix = " (dry run)"
@@ -118,17 +118,17 @@ func RepairStorage(ctx context.Context, dryRun bool) (bool, error) {
 	var corruptedBlobs, corruptedManifests, corruptedAuditRecords uint
 	blobIndex := createBlobIndex() // captures `time.Now()` as reference time
 
-	logc.Println(ctx, "repair: checking blobs"+dryRunSuffix)
+	logc.Println(ctx, "scrub: checking blobs"+dryRunSuffix)
 	for metadata, err := range backend.EnumerateBlobs(ctx) {
 		if err != nil {
-			// Error fetching metadata, can't repair that.
-			return false, fmt.Errorf("repair err: %w", err)
+			// Error fetching metadata, can't scrub that.
+			return false, fmt.Errorf("scrub err: %w", err)
 		}
 
 		blobReader, _, err := backend.GetBlob(ctx, metadata.Name)
 		if err != nil {
-			// Error fetching data, can't repair that.
-			return false, fmt.Errorf("repair err: %w", err)
+			// Error fetching data, can't scrub that.
+			return false, fmt.Errorf("scrub err: %w", err)
 		}
 
 		blobData, err := io.ReadAll(blobReader)
@@ -137,40 +137,40 @@ func RepairStorage(ctx context.Context, dryRun bool) (bool, error) {
 		}
 		if err != nil {
 			// As above.
-			return false, fmt.Errorf("repair err: %w", err)
+			return false, fmt.Errorf("scrub err: %w", err)
 		}
 
 		if blobHash, ok := strings.CutPrefix(metadata.Name, "sha256-"); ok {
 			if blobHash != fmt.Sprintf("%x", sha256.Sum256(blobData)) {
-				logc.Printf(ctx, "repair fix: blob hash mismatch: %s\n", metadata.Name)
+				logc.Printf(ctx, "scrub fix: blob hash mismatch: %s\n", metadata.Name)
 				corruptedBlobs += 1
 
 				if !dryRun {
 					err = backend.DeleteBlob(ctx, metadata.Name)
 					if err != nil {
-						return false, fmt.Errorf("repair err: delete blob: %w", err)
+						return false, fmt.Errorf("scrub err: delete blob: %w", err)
 					}
 				}
 			} else {
 				blobIndex.Add(metadata)
 			}
 		} else {
-			return false, fmt.Errorf("repair err: invalid blob name: %s", metadata.Name)
+			return false, fmt.Errorf("scrub err: invalid blob name: %s", metadata.Name)
 		}
 	}
 
-	logc.Println(ctx, "repair: checking manifests"+dryRunSuffix)
+	logc.Println(ctx, "scrub: checking manifests"+dryRunSuffix)
 	for metadata, err := range backend.EnumerateManifests(ctx) {
 		if err != nil {
-			// Error fetching metadata, can't repair that.
-			return false, fmt.Errorf("repair err: %w", err)
+			// Error fetching metadata, can't scrub that.
+			return false, fmt.Errorf("scrub err: %w", err)
 		}
 
 		manifest, _, err := backend.GetManifest(ctx, metadata.Name, GetManifestOptions{})
 		if errors.Is(err, proto.Error) {
-			logc.Printf(ctx, "repair fix: %s\n", err)
+			logc.Printf(ctx, "scrub fix: %s\n", err)
 			corruptedManifests += 1
-		} else if hasDanglingBlobReferences(ctx, blobIndex, &repairObject{
+		} else if hasDanglingBlobReferences(ctx, blobIndex, &scrubObject{
 			Manifest:     manifest,
 			LastModified: metadata.LastModified,
 			ObjectName:   fmt.Sprintf("site/%s", metadata.Name),
@@ -184,41 +184,41 @@ func RepairStorage(ctx context.Context, dryRun bool) (bool, error) {
 			manifest := createPlaceholderManifest(ctx, metadata.Name)
 			err = backend.StageManifest(ctx, manifest)
 			if err != nil {
-				return false, fmt.Errorf("repair err: stage manifest: %w", err)
+				return false, fmt.Errorf("scrub err: stage manifest: %w", err)
 			}
 			err = backend.CommitManifest(ctx, metadata.Name, manifest, ModifyManifestOptions{})
 			if err != nil {
-				return false, fmt.Errorf("repair err: commit manifest: %w", err)
+				return false, fmt.Errorf("scrub err: commit manifest: %w", err)
 			}
 		}
 	}
 
 	// Enumerate blobs live via audit records.
-	logc.Println(ctx, "repair: checking audit records"+dryRunSuffix)
+	logc.Println(ctx, "scrub: checking audit records"+dryRunSuffix)
 	for auditID, err := range backend.SearchAuditLog(ctx, SearchAuditLogOptions{}) {
 		if err != nil {
-			// Error fetching metadata, can't repair that.
-			return false, fmt.Errorf("repair err: %w", err)
+			// Error fetching metadata, can't scrub that.
+			return false, fmt.Errorf("scrub err: %w", err)
 		}
 
 		auditRecord, err := backend.QueryAuditLog(ctx, auditID)
 		if errors.Is(err, proto.Error) {
-			logc.Printf(ctx, "repair fix: %s\n", err)
+			logc.Printf(ctx, "scrub fix: %s\n", err)
 			corruptedAuditRecords += 1
 
 			if !dryRun {
-				// In general, you're not supposed to do this, but repair is an exception.
+				// In general, you're not supposed to do this, but scrub is an exception.
 				auditRecord := createPlaceholderAuditRecord(ctx, auditID)
 				err = backend.ExpireAuditRecord(ctx, auditID)
 				if err != nil {
-					return false, fmt.Errorf("repair err: expire audit: %w", err)
+					return false, fmt.Errorf("scrub err: expire audit: %w", err)
 				}
 				err = backend.AppendAuditLog(ctx, auditID, auditRecord)
 				if err != nil {
-					return false, fmt.Errorf("repair err: append audit: %w", err)
+					return false, fmt.Errorf("scrub err: append audit: %w", err)
 				}
 			}
-		} else if hasDanglingBlobReferences(ctx, blobIndex, &repairObject{
+		} else if hasDanglingBlobReferences(ctx, blobIndex, &scrubObject{
 			Manifest:     auditRecord.GetManifest(),
 			LastModified: auditRecord.GetTimestamp().AsTime(),
 			ObjectName:   fmt.Sprintf("audit/%s", auditID),
@@ -228,21 +228,15 @@ func RepairStorage(ctx context.Context, dryRun bool) (bool, error) {
 			if !dryRun {
 				err = backend.DetachAuditRecord(ctx, auditID)
 				if err != nil {
-					return false, fmt.Errorf("repair err: detach audit: %w", err)
+					return false, fmt.Errorf("scrub err: detach audit: %w", err)
 				}
 			}
 		}
 	}
 
-	if dryRun {
-		logc.Printf(ctx, "repair: %d blobs corrupt", corruptedManifests)
-		logc.Printf(ctx, "repair: %d manifests corrupt", corruptedManifests)
-		logc.Printf(ctx, "repair: %d audit records corrupt", corruptedAuditRecords)
-	} else {
-		logc.Printf(ctx, "repair: %d blobs repaired", corruptedBlobs)
-		logc.Printf(ctx, "repair: %d manifests repaired", corruptedManifests)
-		logc.Printf(ctx, "repair: %d audit records repaired", corruptedAuditRecords)
-	}
+	logc.Printf(ctx, "scrub: %d blobs corrupt%s\n", corruptedBlobs, dryRunSuffix)
+	logc.Printf(ctx, "scrub: %d manifests corrupt%s\n", corruptedManifests, dryRunSuffix)
+	logc.Printf(ctx, "scrub: %d audit records corrupt%s\n", corruptedAuditRecords, dryRunSuffix)
 
 	allGood := corruptedManifests == 0 && corruptedAuditRecords == 0
 	return allGood, nil

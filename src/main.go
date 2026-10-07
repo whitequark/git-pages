@@ -220,7 +220,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "(audit)  "+
 		"git-pages  -audit-server <endpoint> <program> [args...]\n")
 	fmt.Fprintf(os.Stderr, "(maint)  "+
-		"git-pages {-expire-sites|-repair-storage} [-dry-run]\n")
+		"git-pages {-expire-sites|-scrub-storage} [-dry-run]\n")
 	fmt.Fprintf(os.Stderr, "(maint)  "+
 		"git-pages {-run-migration <name>|-trace-garbage|-analyze-storage {text|json}}\n")
 	flag.PrintDefaults()
@@ -274,8 +274,8 @@ func Main(versionInfo string) {
 		"listen for notifications on `endpoint` and spawn a process for each audit event")
 	expireSites := flag.Bool("expire-sites", false,
 		"expire sites according to their manifest")
-	repairStorage := flag.Bool("repair-storage", false,
-		"repair data storage by replacing corrupt manifests with placeholders")
+	scrubStorage := flag.Bool("scrub-storage", false,
+		"verify well-formedness of all data (CAUTION: will take offline sites with integrity issues)")
 	runMigration := flag.String("run-migration", "",
 		"run a store `migration` (one of: create-domain-markers)")
 	analyzeStorage := flag.String("analyze-storage", "",
@@ -314,7 +314,7 @@ func Main(versionInfo string) {
 		*auditDetach != "",
 		*auditServer != "",
 		*expireSites,
-		*repairStorage,
+		*scrubStorage,
 		*runMigration != "",
 		*analyzeStorage != "",
 		*traceGarbage,
@@ -327,10 +327,10 @@ func Main(versionInfo string) {
 		logc.Fatalln(ctx, "-list-blobs, -list-manifests, -get-blob, -get-manifest, "+
 			"-get-archive, -update-site, -delete-site, -freeze-domain, -unfreeze-domain, "+
 			"-purge-domain, -audit-log, -audit-read, -audit-rollback, -audit-expire, "+
-			"-audit-detach, -audit-server, -expire-sites, -repair-storage, -run-migration, "+
+			"-audit-detach, -audit-server, -expire-sites, -scrub-storage, -run-migration, "+
 			"-analyze-storage, and -trace-garbage are mutually exclusive")
 	}
-	if *dryRun && !(*expireSites || *repairStorage) {
+	if *dryRun && !(*expireSites || *scrubStorage) {
 		logc.Fatalln(ctx, "-dry-run is not applicable in this context")
 	}
 
@@ -787,18 +787,18 @@ func Main(versionInfo string) {
 				countExpired, countTransient)
 		}
 
-	case *repairStorage:
+	case *scrubStorage:
 		if *GetReason(ctx) == "" {
-			*GetReason(ctx) = "-repair-storage"
+			*GetReason(ctx) = "-scrub-storage"
 		}
 
-		allGood, err := RepairStorage(ctx, *dryRun)
+		allGood, err := ScrubStorage(ctx, *dryRun)
 		if err != nil {
 			logc.Fatalln(ctx, err)
 		}
 		if !allGood {
-			// Exit code 1 indicates an error during the repair process; exit code 2 indicates
-			// that repair was successful, or that there is data to repair (for -dry-run).
+			// Exit code 1 indicates an error during the scrubbing process; exit code 2 indicates
+			// either that repair was successful, or that there is data to repair (if -dry-run).
 			os.Exit(2)
 		}
 
