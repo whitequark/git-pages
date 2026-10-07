@@ -149,7 +149,7 @@ func (fs *FSBackend) PutBlob(ctx context.Context, name string, data []byte) erro
 		return nil
 	}
 
-	tempPath, err := createTempInRoot(fs.blobRoot, name, data)
+	tempPath, err := createTempInRoot(fs.blobRoot, ".tmp", data)
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func stagedManifestName(manifestData []byte) string {
 func (fs *FSBackend) StageManifest(ctx context.Context, manifest *Manifest) error {
 	manifestData := EncodeManifest(manifest)
 
-	tempPath, err := createTempInRoot(fs.siteRoot, ".manifest", manifestData)
+	tempPath, err := createTempInRoot(fs.siteRoot, ".tmp", manifestData)
 	if err != nil {
 		return err
 	}
