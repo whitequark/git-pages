@@ -720,7 +720,10 @@ func Main(versionInfo string) {
 			logc.Fatalln(ctx, err)
 		}
 
-		serve(ctx, listen(ctx, "audit", *auditServer), ObserveHTTPHandler(processor))
+		go serve(ctx, listen(ctx, "audit", *auditServer), ObserveHTTPHandler(processor))
+
+		sys.WaitForInterrupt()
+		logc.Println(ctx, "audit: exiting")
 
 	case *auditExpire != "":
 		days, err := strconv.ParseInt(*auditExpire, 10, 0)
