@@ -19,7 +19,7 @@ jobs:
       - name: Set up toolchain
         uses: https://code.forgejo.org/actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: '>=1.25.6 <1.27.2' # upper limit for staticcheck at 2026-10-09
+          go-version: '>=1.26.0 <1.27.2' # upper limit for staticcheck at 2026-10-09
       - name: Install dependencies
         run: |
           apt-get -y update
@@ -57,7 +57,7 @@ jobs:
       - name: Set up toolchain
         uses: https://code.forgejo.org/actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: '>=1.25.6'
+          go-version: '>=1.26.0'
       - name: Build release assets
         # If you want more platforms to be represented, send a pull request.
         run: |

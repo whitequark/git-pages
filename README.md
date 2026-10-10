@@ -33,7 +33,7 @@ You can install _git-pages_ using one of the following methods:
 
 1. **Using a Docker container**. Choose between the latest build or a [release tag][containers], then refer to the [container options](#container-options) section.
 
-1. **Installing from source**. First, install [Go](https://go.dev/) 1.25 or newer. Then run:
+1. **Installing from source**. First, install [Go](https://go.dev/) 1.26 or newer. Then run:
 
    ```console
    $ go install codeberg.org/git-pages/git-pages@latest
