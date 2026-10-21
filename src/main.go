@@ -175,17 +175,28 @@ func serve(ctx context.Context, listener net.Listener, handler http.Handler) {
 	}
 }
 
-func webRootArg(arg string) string {
+func domainArg(arg string) (domain names.Domain) {
+	var err error
+	if domain, err = names.ParseDomain(arg, names.ParseDomainRelaxed); err != nil {
+		logc.Fatalf(context.Background(), "invalid site argument: %s\n", err)
+	}
+	return
+}
+
+func siteArg(arg string) (site names.Site) {
+	var err error
 	switch strings.Count(arg, "/") {
 	case 0:
-		return arg + "/.index"
+		site.Domain = domainArg(arg)
 	case 1:
-		return arg
+		if site, err = names.ParseSite(arg); err != nil {
+			logc.Fatalf(context.Background(), "invalid site argument: %s\n", err)
+		}
 	default:
 		logc.Fatalln(context.Background(),
-			"webroot argument must be either 'domain.tld' or 'domain.tld/dir")
-		return ""
+			"site argument must be either 'domain.tld' or 'domain.tld/dir")
 	}
+	return
 }
 
 func fileOutputArg() (writer io.WriteCloser) {
@@ -450,7 +461,7 @@ func Main(versionInfo string) {
 		io.Copy(fileOutputArg(), reader)
 
 	case *getManifest != "":
-		webRoot := webRootArg(*getManifest)
+		webRoot := siteArg(*getManifest)
 		manifest, _, err := backend.GetManifest(ctx, webRoot, GetManifestOptions{})
 		if err != nil {
 			logc.Fatalln(ctx, err)
@@ -458,7 +469,7 @@ func Main(versionInfo string) {
 		fmt.Fprintln(fileOutputArg(), string(ManifestJSON(manifest)))
 
 	case *getArchive != "":
-		webRoot := webRootArg(*getArchive)
+		webRoot := siteArg(*getArchive)
 		manifest, metadata, err :=
 			backend.GetManifest(ctx, webRoot, GetManifestOptions{})
 		if err != nil {
@@ -473,7 +484,7 @@ func Main(versionInfo string) {
 			logc.Fatalln(ctx, "update source must be provided as the argument")
 		}
 
-		webRoot := webRootArg(*updateSite)
+		webRoot := siteArg(*updateSite)
 
 		sourceURL, err := url.Parse(flag.Arg(0))
 		if err != nil {
@@ -530,7 +541,7 @@ func Main(versionInfo string) {
 		}
 
 	case *deleteSite != "":
-		webRoot := webRootArg(*deleteSite)
+		webRoot := siteArg(*deleteSite)
 		err := backend.DeleteManifest(ctx, webRoot, ModifyManifestOptions{})
 		if err != nil {
 			logc.Fatalln(ctx, err)
@@ -539,13 +550,13 @@ func Main(versionInfo string) {
 		logc.Println(ctx, "deleted")
 
 	case *freezeDomain != "" || *unfreezeDomain != "":
-		var domain string
+		var domain names.Domain
 		var freeze bool
 		if *freezeDomain != "" {
-			domain = *freezeDomain
+			domain = domainArg(*freezeDomain)
 			freeze = true
 		} else {
-			domain = *unfreezeDomain
+			domain = domainArg(*unfreezeDomain)
 			freeze = false
 		}
 
@@ -562,14 +573,15 @@ func Main(versionInfo string) {
 		}
 
 	case *purgeDomain != "":
+		domain := domainArg(*freezeDomain)
+
 		purgeCount := 0
 		for metadata, err := range backend.EnumerateManifests(ctx) {
 			if err != nil {
 				logc.Fatalln(ctx, err)
 			}
 
-			domain, _, _ := strings.Cut(metadata.Name, "/")
-			if domain == *purgeDomain {
+			if metadata.Name.Domain == domain {
 				err := backend.DeleteManifest(ctx, metadata.Name, ModifyManifestOptions{})
 				if err != nil {
 					logc.Fatalln(ctx, err)
@@ -578,7 +590,7 @@ func Main(versionInfo string) {
 			}
 		}
 
-		logc.Printf(ctx, "admin: purged %s (%d sites)\n", *purgeDomain, purgeCount)
+		logc.Printf(ctx, "admin: purged %s (%d sites)\n", domain, purgeCount)
 
 	case *auditLog:
 		records := []*AuditRecord{}
@@ -663,12 +675,12 @@ func Main(versionInfo string) {
 			logc.Fatalln(ctx, "no manifest in audit record")
 		}
 
-		webRoot := path.Join(record.GetDomain(), record.GetProject())
+		site := Must(names.ParseSite(fmt.Sprintf("%s/%s", record.GetDomain(), record.GetProject())))
 		err = backend.StageManifest(ctx, record.GetManifest())
 		if err != nil {
 			logc.Fatalln(ctx, err)
 		}
-		err = backend.CommitManifest(ctx, webRoot, record.GetManifest(), ModifyManifestOptions{})
+		err = backend.CommitManifest(ctx, site, record.GetManifest(), ModifyManifestOptions{})
 		if err != nil {
 			logc.Fatalln(ctx, err)
 		}
@@ -681,7 +693,7 @@ func Main(versionInfo string) {
 		}
 
 		if project != "*" {
-			if _, err := names.ParseProjectName(project); err != nil {
+			if _, err := names.ParseProject(project); err != nil {
 				logc.Fatalf(ctx, "audit detach: project name: %v\n", err)
 			}
 		}

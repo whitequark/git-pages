@@ -17,6 +17,7 @@ import (
 
 	slogmulti "github.com/samber/slog-multi"
 
+	"codeberg.org/git-pages/git-pages/src/names"
 	syslog "codeberg.org/git-pages/go-slog-syslog"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -259,15 +260,15 @@ func (backend *observedBackend) EnumerateBlobs(ctx context.Context) iter.Seq2[Bl
 }
 
 func (backend *observedBackend) GetManifest(
-	ctx context.Context, name string, opts GetManifestOptions,
+	ctx context.Context, site names.Site, opts GetManifestOptions,
 ) (
 	manifest *Manifest, metadata ManifestMetadata, err error,
 ) {
 	span, ctx := ObserveFunction(ctx, "GetManifest",
-		"manifest.name", name,
+		"manifest.name", site,
 		"manifest.bypass_cache", opts.BypassCache,
 	)
-	if manifest, metadata, err = backend.inner.GetManifest(ctx, name, opts); err == nil {
+	if manifest, metadata, err = backend.inner.GetManifest(ctx, site, opts); err == nil {
 		manifestsRetrievedCount.Inc()
 	}
 	span.Finish()
@@ -285,23 +286,23 @@ func (backend *observedBackend) HasAtomicCAS(ctx context.Context) bool {
 	return backend.inner.HasAtomicCAS(ctx)
 }
 
-func (backend *observedBackend) CommitManifest(ctx context.Context, name string, manifest *Manifest, opts ModifyManifestOptions) (err error) {
-	span, ctx := ObserveFunction(ctx, "CommitManifest", "manifest.name", name)
-	err = backend.inner.CommitManifest(ctx, name, manifest, opts)
+func (backend *observedBackend) CommitManifest(ctx context.Context, site names.Site, manifest *Manifest, opts ModifyManifestOptions) (err error) {
+	span, ctx := ObserveFunction(ctx, "CommitManifest", "manifest.name", site)
+	err = backend.inner.CommitManifest(ctx, site, manifest, opts)
 	span.Finish()
 	return
 }
 
-func (backend *observedBackend) DeleteManifest(ctx context.Context, name string, opts ModifyManifestOptions) (err error) {
-	span, ctx := ObserveFunction(ctx, "DeleteManifest", "manifest.name", name)
-	err = backend.inner.DeleteManifest(ctx, name, opts)
+func (backend *observedBackend) DeleteManifest(ctx context.Context, site names.Site, opts ModifyManifestOptions) (err error) {
+	span, ctx := ObserveFunction(ctx, "DeleteManifest", "manifest.name", site)
+	err = backend.inner.DeleteManifest(ctx, site, opts)
 	span.Finish()
 	return
 }
 
-func (backend *observedBackend) ExpireManifest(ctx context.Context, name string) (err error) {
-	span, ctx := ObserveFunction(ctx, "ExpireManifest", "manifest.name", name)
-	err = backend.inner.ExpireManifest(ctx, name)
+func (backend *observedBackend) ExpireManifest(ctx context.Context, site names.Site) (err error) {
+	span, ctx := ObserveFunction(ctx, "ExpireManifest", "manifest.name", site)
+	err = backend.inner.ExpireManifest(ctx, site)
 	span.Finish()
 	return
 }
@@ -330,28 +331,28 @@ func (backend *observedBackend) GetAllManifests(ctx context.Context) iter.Seq2[t
 	}
 }
 
-func (backend *observedBackend) CheckDomain(ctx context.Context, domain string) (found bool, err error) {
+func (backend *observedBackend) CheckDomain(ctx context.Context, domain names.Domain) (found bool, err error) {
 	span, ctx := ObserveFunction(ctx, "CheckDomain", "domain.name", domain)
 	found, err = backend.inner.CheckDomain(ctx, domain)
 	span.Finish()
 	return
 }
 
-func (backend *observedBackend) CreateDomain(ctx context.Context, domain string) (err error) {
+func (backend *observedBackend) CreateDomain(ctx context.Context, domain names.Domain) (err error) {
 	span, ctx := ObserveFunction(ctx, "CreateDomain", "domain.name", domain)
 	err = backend.inner.CreateDomain(ctx, domain)
 	span.Finish()
 	return
 }
 
-func (backend *observedBackend) FreezeDomain(ctx context.Context, domain string) (err error) {
+func (backend *observedBackend) FreezeDomain(ctx context.Context, domain names.Domain) (err error) {
 	span, ctx := ObserveFunction(ctx, "FreezeDomain", "domain.name", domain)
 	err = backend.inner.FreezeDomain(ctx, domain)
 	span.Finish()
 	return
 }
 
-func (backend *observedBackend) UnfreezeDomain(ctx context.Context, domain string) (err error) {
+func (backend *observedBackend) UnfreezeDomain(ctx context.Context, domain names.Domain) (err error) {
 	span, ctx := ObserveFunction(ctx, "UnfreezeDomain", "domain.name", domain)
 	err = backend.inner.UnfreezeDomain(ctx, domain)
 	span.Finish()

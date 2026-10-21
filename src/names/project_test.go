@@ -1,63 +1,20 @@
 package names
 
 import (
-	"errors"
 	"net/url"
 	"testing"
 )
 
-func must[T any](value T, err error) T {
-	if err != nil {
-		panic(err)
-	}
-	return value
-}
-
-func checkEq[T comparable](t *testing.T, value T, expect T) {
-	t.Helper()
-	if value != expect {
-		t.Errorf("unexpected: %v != %v", value, expect)
-	}
-}
-
-func checkPanic[T any](t *testing.T, f func() T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("function did not panic")
-		}
-	}()
-
-	f()
-}
-
-func checkOk[T any](t *testing.T, parse func(T) (Project, error), value T, expect Project) {
-	t.Helper()
-	actual, err := parse(value)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	} else if actual != expect {
-		t.Errorf("unexpected result: %v, expected %v", actual, expect)
-	}
-}
-
-func checkErr[T any](t *testing.T, parse func(T) (Project, error), value T, expect error) {
-	t.Helper()
-	_, err := parse(value)
-	if !errors.Is(err, expect) {
-		t.Errorf("unexpected error: %v, expected %v", err, expect)
-	}
-}
-
 func TestParseProjectName(t *testing.T) {
-	checkOk(t, ParseProjectName, ".index", Project{".index"})
-	checkOk(t, ParseProjectName, "foo", Project{"foo"})
-	checkOk(t, ParseProjectName, "foo@10", Project{"foo@10"})
+	checkOk(t, ParseProject, ".index", Project{".index"})
+	checkOk(t, ParseProject, "foo", Project{"foo"})
+	checkOk(t, ParseProject, "foo@10", Project{"foo@10"})
 
-	checkErr(t, ParseProjectName, ".foo", ErrInvalidProjectName)
-	checkErr(t, ParseProjectName, "meow/miau", ErrInvalidProjectName)
-	checkErr(t, ParseProjectName, "meow\\miau", ErrInvalidProjectName)
-	checkErr(t, ParseProjectName, "meow%miau", ErrInvalidProjectName)
-	checkErr(t, ParseProjectName, "meow*", ErrInvalidProjectName)
+	checkErr(t, ParseProject, ".foo", ErrInvalidProjectName)
+	checkErr(t, ParseProject, "meow/miau", ErrInvalidProjectName)
+	checkErr(t, ParseProject, "meow\\miau", ErrInvalidProjectName)
+	checkErr(t, ParseProject, "meow%miau", ErrInvalidProjectName)
+	checkErr(t, ParseProject, "meow*", ErrInvalidProjectName)
 }
 
 func TestParseProjectURL(t *testing.T) {

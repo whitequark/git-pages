@@ -9,10 +9,10 @@ package git_pages
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
+	"codeberg.org/git-pages/git-pages/src/names"
 	"github.com/bits-and-blooms/bloom/v3"
 	exponential "github.com/jpillora/backoff"
 )
@@ -45,13 +45,13 @@ func (value Existence) String() string {
 
 type ExistenceCache interface {
 	// Check if we might be serving the site.
-	CheckSite(ctx context.Context, site string) (result Existence)
+	CheckSite(ctx context.Context, site names.Site) (result Existence)
 
 	// Check if we might be serving the domain.
-	CheckDomain(ctx context.Context, domain string) (result Existence)
+	CheckDomain(ctx context.Context, domain names.Domain) (result Existence)
 
 	// Add the site to the cache.
-	AddSite(ctx context.Context, site string)
+	AddSite(ctx context.Context, site names.Site)
 }
 
 func CreateExistenceCache(ctx context.Context) (ExistenceCache, error) {
@@ -149,10 +149,8 @@ func (c *bloomExistenceCache) refresh(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("enum manifests: %w", err)
 		}
-		site := metadata.Name
-		domain, _, _ := strings.Cut(site, "/")
-		sites.AddString(site)
-		domains.AddString(domain)
+		sites.AddString(metadata.Name.String())
+		domains.AddString(metadata.Name.Domain.String())
 		siteCount++
 	}
 
@@ -165,14 +163,14 @@ func (c *bloomExistenceCache) refresh(ctx context.Context) error {
 	return nil
 }
 
-func (c *bloomExistenceCache) CheckSite(ctx context.Context, site string) (result Existence) {
+func (c *bloomExistenceCache) CheckSite(ctx context.Context, site names.Site) (result Existence) {
 	select {
 	case c.accessCh <- struct{}{}:
 	default:
 	}
 
 	c.filterMu.Lock()
-	if c.sites.TestString(site) {
+	if c.sites.TestString(site.String()) {
 		result = ExistencePossible
 	} else {
 		result = ExistenceImpossible
@@ -183,14 +181,14 @@ func (c *bloomExistenceCache) CheckSite(ctx context.Context, site string) (resul
 	return
 }
 
-func (c *bloomExistenceCache) CheckDomain(ctx context.Context, domain string) (result Existence) {
+func (c *bloomExistenceCache) CheckDomain(ctx context.Context, domain names.Domain) (result Existence) {
 	select {
 	case c.accessCh <- struct{}{}:
 	default:
 	}
 
 	c.filterMu.Lock()
-	if c.domains.TestString(domain) {
+	if c.domains.TestString(domain.String()) {
 		result = ExistencePossible
 	} else {
 		result = ExistenceImpossible
@@ -201,15 +199,13 @@ func (c *bloomExistenceCache) CheckDomain(ctx context.Context, domain string) (r
 	return
 }
 
-func (c *bloomExistenceCache) AddSite(ctx context.Context, site string) {
+func (c *bloomExistenceCache) AddSite(ctx context.Context, site names.Site) {
 	c.refreshMu.Lock()
 	defer c.refreshMu.Unlock()
 
-	domain, _, _ := strings.Cut(site, "/")
-
 	c.filterMu.Lock()
-	c.sites.AddString(site)
-	c.domains.AddString(domain)
+	c.sites.AddString(site.String())
+	c.domains.AddString(site.Domain.String())
 	c.filterMu.Unlock()
 
 	logc.Printf(ctx, "existence: added site %s", site)
@@ -217,12 +213,12 @@ func (c *bloomExistenceCache) AddSite(ctx context.Context, site string) {
 
 type dummyExistenceCache struct{}
 
-func (d dummyExistenceCache) CheckSite(context.Context, string) Existence {
+func (d dummyExistenceCache) CheckSite(context.Context, names.Site) Existence {
 	return ExistencePossible
 }
 
-func (d dummyExistenceCache) CheckDomain(context.Context, string) Existence {
+func (d dummyExistenceCache) CheckDomain(context.Context, names.Domain) Existence {
 	return ExistencePossible
 }
 
-func (d dummyExistenceCache) AddSite(context.Context, string) {}
+func (d dummyExistenceCache) AddSite(context.Context, names.Site) {}

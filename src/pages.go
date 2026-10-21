@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -77,26 +78,33 @@ func copyForgeAuthToPrincipal(principal *Principal, auth *Authorization) {
 	}
 }
 
-func normalizeHost(host string) string {
-	return strings.ToLower(host)
-}
-
-func makeWebRoot(host string, projectName string) string {
-	return path.Join(normalizeHost(host), projectName)
-}
-
-func getWebRoot(r *http.Request) (string, error) {
-	host, err := GetHost(r)
+func GetDomain(r *http.Request) (domain names.Domain, err error) {
+	host, _, err := net.SplitHostPort(r.Host)
 	if err != nil {
-		return "", err
+		host = r.Host
 	}
 
-	projectName, err := names.ParseProjectURL(r.URL)
-	if err != nil {
-		return "", err
+	mode := names.ParseDomainStrict
+	if config.Feature("relaxed-idna") {
+		mode = names.ParseDomainRelaxed
 	}
 
-	return makeWebRoot(host, projectName.String()), nil
+	return names.ParseDomain(host, mode)
+}
+
+func GetSite(r *http.Request) (site names.Site, err error) {
+	domain, err := GetDomain(r)
+	if err != nil {
+		return
+	}
+
+	project, err := names.ParseProjectURL(r.URL)
+	if err != nil {
+		return
+	}
+
+	site = names.Site{Domain: domain, Project: project}
+	return
 }
 
 func writeRedirect(w http.ResponseWriter, code int, path string) {
@@ -126,11 +134,10 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 
 	bypassCache := cacheControl.NoCache || cacheControl.MaxAge == 0
 
-	host, err := GetHost(r)
+	domain, err := GetDomain(r)
 	if err != nil {
 		return err
 	}
-	host = normalizeHost(host)
 
 	type indexManifestResult struct {
 		manifest *Manifest
@@ -139,14 +146,13 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	}
 	indexManifestCh := make(chan indexManifestResult, 1)
 	go func() {
-		webRoot := makeWebRoot(host, ".index")
-		if existenceCache.CheckSite(r.Context(), webRoot).IsImpossible() {
+		site := names.Site{Domain: domain, Project: names.IndexProject}
+		if existenceCache.CheckSite(r.Context(), site).IsImpossible() {
 			close(indexManifestCh)
 			return
 		}
 		manifest, metadata, err := backend.GetManifest(
-			r.Context(), webRoot,
-			GetManifestOptions{BypassCache: bypassCache},
+			r.Context(), site, GetManifestOptions{BypassCache: bypassCache},
 		)
 		indexManifestCh <- (indexManifestResult{manifest, metadata, err})
 	}()
@@ -155,24 +161,25 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	sitePath = strings.TrimPrefix(r.URL.Path, "/")
 	projectPathPrefix := "/" // 2xx and 4xx redirect target URLs must start with this prefix
 	if projectName, projectPath, hasProjectSlash := strings.Cut(sitePath, "/"); projectName != "" {
-		webRoot := makeWebRoot(host, projectName)
-		if _, err = names.ParseProjectName(projectName); err == nil &&
-			existenceCache.CheckSite(r.Context(), webRoot).IsPossible() {
-			var projectManifest *Manifest
-			var projectMetadata ManifestMetadata
-			projectManifest, projectMetadata, err = backend.GetManifest(
-				r.Context(), webRoot,
-				GetManifestOptions{BypassCache: bypassCache},
-			)
-			if err == nil {
-				if !hasProjectSlash {
-					newURL := *r.URL
-					newURL.Path += "/"
-					writeRedirect(w, http.StatusFound, newURL.String())
-					return nil
+		var project names.Project
+		if project, err = names.ParseProject(projectName); err == nil {
+			site := names.Site{Domain: domain, Project: project}
+			if existenceCache.CheckSite(r.Context(), site).IsPossible() {
+				var projectManifest *Manifest
+				var projectMetadata ManifestMetadata
+				projectManifest, projectMetadata, err = backend.GetManifest(
+					r.Context(), site, GetManifestOptions{BypassCache: bypassCache},
+				)
+				if err == nil {
+					if !hasProjectSlash {
+						newURL := *r.URL
+						newURL.Path += "/"
+						writeRedirect(w, http.StatusFound, newURL.String())
+						return nil
+					}
+					sitePath, manifest, metadata = projectPath, projectManifest, projectMetadata
+					projectPathPrefix = fmt.Sprintf("/%s/", projectName)
 				}
-				sitePath, manifest, metadata = projectPath, projectManifest, projectMetadata
-				projectPathPrefix = fmt.Sprintf("/%s/", projectName)
 			}
 		}
 	}
@@ -181,7 +188,7 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 		manifest, metadata, err = result.manifest, result.metadata, result.err
 		if manifest == nil && (err == nil || errors.Is(err, ErrObjectNotFound)) {
 			if fallback != nil {
-				logc.Printf(r.Context(), "fallback: %s via %s", host, config.Fallback.ProxyTo)
+				logc.Printf(r.Context(), "fallback: %s via %s", domain, config.Fallback.ProxyTo)
 				fallback.ServeHTTP(w, r)
 				return nil
 			} else {
@@ -552,7 +559,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	webRoot, err := getWebRoot(r)
+	site, err := GetSite(r)
 	if err != nil {
 		return err
 	}
@@ -596,7 +603,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 			return nil
 		}
 
-		result = UpdateFromRepository(ctx, webRoot, repoURL, branch, opts)
+		result = UpdateFromRepository(ctx, site, repoURL, branch, opts)
 
 	default:
 		auth, err := AuthorizeUpdateFromArchive(r)
@@ -620,7 +627,7 @@ func putPage(w http.ResponseWriter, r *http.Request) error {
 
 		// request body contains archive
 		reader := http.MaxBytesReader(w, r.Body, int64(config.Limits.MaxSiteSize.Bytes()))
-		result = UpdateFromArchive(ctx, webRoot, repoURL, contentType, reader, opts)
+		result = UpdateFromArchive(ctx, site, repoURL, contentType, reader, opts)
 	}
 
 	return reportUpdateResult(w, r, result)
@@ -636,7 +643,7 @@ func patchPage(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	webRoot, err := getWebRoot(r)
+	site, err := GetSite(r)
 	if err != nil {
 		return err
 	}
@@ -694,7 +701,7 @@ func patchPage(w http.ResponseWriter, r *http.Request) error {
 
 	contentType := getMediaType(r.Header.Get("Content-Type"))
 	reader := http.MaxBytesReader(w, r.Body, int64(config.Limits.MaxSiteSize.Bytes()))
-	result := PartialUpdateFromArchive(ctx, webRoot, contentType, reader, parents, opts)
+	result := PartialUpdateFromArchive(ctx, site, contentType, reader, parents, opts)
 	return reportUpdateResult(w, r, result)
 }
 
@@ -777,7 +784,7 @@ func reportUpdateResult(w http.ResponseWriter, r *http.Request, result UpdateRes
 }
 
 func deletePage(w http.ResponseWriter, r *http.Request) error {
-	webRoot, err := getWebRoot(r)
+	site, err := GetSite(r)
 	if err != nil {
 		return err
 	}
@@ -794,7 +801,7 @@ func deletePage(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 
-	if err = backend.DeleteManifest(r.Context(), webRoot, ModifyManifestOptions{}); err != nil {
+	if err = backend.DeleteManifest(r.Context(), site, ModifyManifestOptions{}); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintln(w, err)
 	} else {
@@ -811,7 +818,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 	requestTimeout := 3 * time.Second
 	requestTimer := time.NewTimer(requestTimeout)
 
-	webRoot, err := getWebRoot(r)
+	site, err := GetSite(r)
 	if err != nil {
 		return err
 	}
@@ -898,7 +905,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		principal := GetPrincipal(r.Context())
 		principal.RepoUrl = &repoURL
 
-		result := UpdateFromRepository(ctx, webRoot, repoURL, auth.branch, UpdateOptions{})
+		result := UpdateFromRepository(ctx, site, repoURL, auth.branch, UpdateOptions{})
 		resultChan <- result
 		observeSiteUpdate("webhook", &result)
 	}(context.WithoutCancel(r.Context()))
@@ -993,7 +1000,7 @@ func ServePages(w http.ResponseWriter, r *http.Request) {
 		err = fmt.Errorf("method %s not allowed", r.Method)
 	}
 	if err != nil {
-		if errors.Is(err, names.ErrInvalidProjectURL) {
+		if _, ok := errors.AsType[names.NameError](err); ok {
 			http.Error(w, prettyErrMsg(err), http.StatusBadRequest)
 		}
 		var authErr AuthError

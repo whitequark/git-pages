@@ -1,15 +1,14 @@
 package names
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
 )
 
-var ErrInvalidProjectName = errors.New("invalid project name")
-var ErrInvalidProjectURL = errors.New("invalid project URL")
+var ErrInvalidProjectName = NameError{"invalid project name"}
+var ErrInvalidProjectURL = NameError{"invalid project URL"}
 
 const indexProject = ".index"
 
@@ -20,6 +19,8 @@ const indexProject = ".index"
 type Project struct {
 	name string
 }
+
+var IndexProject = Project{".index"}
 
 // IsValid checks whether the project name is valid. The zero value is the only invalid value.
 func (p Project) IsValid() bool {
@@ -41,7 +42,7 @@ func (p Project) String() string {
 
 // IsIndex checks whether this name corresponds to the index project.
 func (p Project) IsIndex() bool {
-	return p.String() == indexProject
+	return p.MustValid() == IndexProject
 }
 
 // GetPullRequest returns (baseName, prNumber, isPreview), where isPreview is true if this is
@@ -73,11 +74,11 @@ func validateProjectName(name string) (proj Project, err error) {
 	return
 }
 
-// ParseProjectName parses the given string as a project name. The string must not be empty, and
+// ParseProject parses the given string as a project name. The string must not be empty, and
 // ".index" represents the index project.
-func ParseProjectName(name string) (Project, error) {
-	if name == indexProject {
-		return Project{indexProject}, nil
+func ParseProject(name string) (Project, error) {
+	if name == IndexProject.name {
+		return IndexProject, nil
 	}
 
 	return validateProjectName(name)
@@ -91,7 +92,7 @@ func ParseProjectURL(url *url.URL) (Project, error) {
 	if strings.Contains(path, "/") {
 		return Project{}, fmt.Errorf("%w: must contain zero or one path segments", ErrInvalidProjectURL)
 	} else if path == "" {
-		return Project{indexProject}, nil
+		return IndexProject, nil
 	} else if name, err := validateProjectName(path); err != nil {
 		return Project{}, fmt.Errorf("%w: %w", ErrInvalidProjectURL, err)
 	} else {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"codeberg.org/git-pages/git-pages/src/names"
 )
 
 type StorageSize struct {
@@ -26,11 +28,21 @@ func AnalyzeStorage(ctx context.Context) ([]*StorageSize, error) {
 		auditBlobs    map[string]int64
 	}
 
-	thickStats := map[string]*storageData{}
+	thickStats := map[names.Domain]*storageData{}
 	thinStats := []*StorageSize{}
 
-	getStats := func(domain string) *storageData {
-		domain = EffectiveTLDPlusOne(domain)
+	extraSuffixes := []names.Domain{}
+	for _, wildcard := range wildcards {
+		extraSuffixes = append(extraSuffixes,
+			Must(names.ParseDomain(strings.Join(wildcard.Domain, "."), names.ParseDomainRelaxed)))
+		if len(wildcard.PreviewDomain) > 0 {
+			extraSuffixes = append(extraSuffixes,
+				Must(names.ParseDomain(strings.Join(wildcard.PreviewDomain, "."), names.ParseDomainRelaxed)))
+		}
+	}
+
+	getStats := func(domain names.Domain) *storageData {
+		domain = domain.EffectiveTLDPlusOne(extraSuffixes) // FIXME
 		if _, found := thickStats[domain]; !found {
 			thickStats[domain] = &storageData{
 				siteBlobs:  map[string]int64{},
@@ -40,7 +52,7 @@ func AnalyzeStorage(ctx context.Context) ([]*StorageSize, error) {
 		return thickStats[domain]
 	}
 
-	totalStats := getStats("*")
+	totalStats := getStats(names.Domain{})
 
 	logc.Printf(ctx, "analyze: enumerating manifests")
 	for item, err := range backend.GetAllManifests(ctx) {
@@ -48,8 +60,7 @@ func AnalyzeStorage(ctx context.Context) ([]*StorageSize, error) {
 		if err != nil {
 			return nil, fmt.Errorf("analyze err: %w", err)
 		}
-		domain, _, _ := strings.Cut(metadata.Name, "/")
-		stats := getStats(domain)
+		stats := getStats(metadata.Name.Domain)
 		stats.siteManifests += metadata.Size
 		totalStats.siteManifests += metadata.Size
 		for _, entry := range manifest.GetContents() {
@@ -67,7 +78,7 @@ func AnalyzeStorage(ctx context.Context) ([]*StorageSize, error) {
 		if err != nil {
 			return nil, fmt.Errorf("analyze err: %w", err)
 		}
-		domain := record.GetDomain()
+		domain := Must(names.ParseDomain(record.GetDomain(), names.ParseDomainRelaxed))
 		stats := getStats(domain)
 		recordSize := int64(len(EncodeAuditRecord(record)))
 		stats.auditRecords += recordSize
@@ -89,7 +100,7 @@ func AnalyzeStorage(ctx context.Context) ([]*StorageSize, error) {
 
 	// Now aggregate the information.
 	for domain, stats := range thickStats {
-		sizes := StorageSize{Domain: domain}
+		sizes := StorageSize{Domain: domain.String()}
 		sizes.CurrentSize += stats.siteManifests
 		for _, size := range stats.siteBlobs {
 			sizes.CurrentSize += size

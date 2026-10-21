@@ -10,17 +10,18 @@ import (
 	"strings"
 	"time"
 
+	"codeberg.org/git-pages/git-pages/src/names"
 	"google.golang.org/protobuf/proto"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func createPlaceholderManifest(ctx context.Context, name string) *Manifest {
+func createPlaceholderManifest(ctx context.Context, site names.Site) *Manifest {
 	manifest := NewManifest()
 	manifest.Corrupted = proto.Bool(true)
 	AddFile(manifest, "index.html",
 		[]byte("<!DOCTYPE html>"+
 			"<h1>Data corruption</h1>"+
-			"<p>The site <code>"+name+"</code> has suffered data corruption and must be "+
+			"<p>The site <code>"+site.String()+"</code> has suffered data corruption and must be "+
 			"re-uploaded. Contact the server administrator for more information.</p>"),
 	)
 	manifest.Redirects = []*RedirectRule{

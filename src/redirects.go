@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"codeberg.org/git-pages/git-pages/src/names"
 	"codeberg.org/git-pages/go-redirects"
 	"google.golang.org/protobuf/proto"
 )
@@ -43,7 +44,7 @@ func Is3xxHTTPStatus(status int) bool {
 	return status >= 300 && status <= 399
 }
 
-func validateRedirectRule(project string, rule *redirects.Rule) error {
+func validateRedirectRule(project names.Project, rule *redirects.Rule) error {
 	if len(rule.Params) > 0 {
 		return fmt.Errorf("rules with parameters are not supported")
 	}
@@ -81,7 +82,7 @@ func validateRedirectRule(project string, rule *redirects.Rule) error {
 	// (which was the old, incorrect interpretation). This broke every SPA on git-pages that was
 	// deployed to a non-index project. Unfortunately, we can't do much more than diagnosing
 	// the problematic pattern at deploy time.
-	if rule.Status == http.StatusOK && project != ".index" && toURL.Host == "" &&
+	if rule.Status == http.StatusOK && !project.IsIndex() && toURL.Host == "" &&
 		!strings.HasPrefix(toURL.Path, fmt.Sprintf("/%s/", project)) {
 		return fmt.Errorf("'to' URL must start with '/%s/' for a 200 status rule", project)
 	}
@@ -89,7 +90,7 @@ func validateRedirectRule(project string, rule *redirects.Rule) error {
 }
 
 // Parses redirects file and injects rules into the manifest.
-func ProcessRedirectsFile(ctx context.Context, project string, manifest *Manifest) error {
+func ProcessRedirectsFile(ctx context.Context, project names.Project, manifest *Manifest) error {
 	redirectsEntry := manifest.Contents[RedirectsFileName]
 	delete(manifest.Contents, RedirectsFileName)
 	if redirectsEntry == nil {

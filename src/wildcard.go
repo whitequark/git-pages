@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"codeberg.org/git-pages/git-pages/src/names"
 	"github.com/valyala/fasttemplate"
 )
 
@@ -34,7 +35,7 @@ const (
 
 // Returns `subdomain, found` where if `found == true`, `subdomain` contains the part of `host`
 // corresponding to the * in the domain pattern.
-func (pattern *WildcardPattern) Matches(host string, kind WildcardDomainKind) (string, bool) {
+func (pattern *WildcardPattern) Matches(domain names.Domain, kind WildcardDomainKind) (string, bool) {
 	var suffixParts []string
 	switch kind {
 	case WildcardDomainPrimary:
@@ -42,9 +43,9 @@ func (pattern *WildcardPattern) Matches(host string, kind WildcardDomainKind) (s
 	case WildcardDomainPreview:
 		suffixParts = pattern.PreviewDomain
 	case WildcardDomainAny:
-		if userName, found := pattern.Matches(host, WildcardDomainPrimary); found {
+		if userName, found := pattern.Matches(domain, WildcardDomainPrimary); found {
 			return userName, found
-		} else if userName, found := pattern.Matches(host, WildcardDomainPreview); found {
+		} else if userName, found := pattern.Matches(domain, WildcardDomainPreview); found {
 			return userName, found
 		}
 		return "", false
@@ -52,7 +53,7 @@ func (pattern *WildcardPattern) Matches(host string, kind WildcardDomainKind) (s
 		panic("invalid wildcard domain kind")
 	}
 
-	hostParts := strings.Split(host, ".")
+	hostParts := strings.Split(domain.String(), ".")
 	if len(suffixParts) == 0 {
 		return "", false
 	} else if len(hostParts) != len(suffixParts)+1 {

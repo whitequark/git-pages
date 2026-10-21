@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"codeberg.org/git-pages/git-pages/src/names"
 	exponential "github.com/jpillora/backoff"
 	"github.com/kankanreno/go-snowflake"
 	"github.com/prometheus/client_golang/prometheus"
@@ -396,65 +397,50 @@ func notifyAudit(ctx context.Context, id AuditID) {
 }
 
 func (audited *auditedBackend) CommitManifest(
-	ctx context.Context, name string, manifest *Manifest, opts ModifyManifestOptions,
+	ctx context.Context, site names.Site, manifest *Manifest, opts ModifyManifestOptions,
 ) error {
-	domain, project, ok := strings.Cut(name, "/")
-	if !ok {
-		panic("malformed manifest name")
-	}
-
 	if err := audited.appendNewAuditRecord(ctx, &AuditRecord{
 		Event:    AuditEvent_CommitManifest.Enum(),
-		Domain:   proto.String(domain),
-		Project:  proto.String(project),
+		Domain:   proto.String(site.Domain.String()),
+		Project:  proto.String(site.Project.String()),
 		Manifest: manifest,
 	}); err != nil {
 		return err
 	}
 
-	return audited.Backend.CommitManifest(ctx, name, manifest, opts)
+	return audited.Backend.CommitManifest(ctx, site, manifest, opts)
 }
 
 func (audited *auditedBackend) DeleteManifest(
-	ctx context.Context, name string, opts ModifyManifestOptions,
+	ctx context.Context, site names.Site, opts ModifyManifestOptions,
 ) error {
-	domain, project, ok := strings.Cut(name, "/")
-	if !ok {
-		panic("malformed manifest name")
-	}
-
 	if err := audited.appendNewAuditRecord(ctx, &AuditRecord{
 		Event:   AuditEvent_DeleteManifest.Enum(),
-		Domain:  proto.String(domain),
-		Project: proto.String(project),
+		Domain:  proto.String(site.Domain.String()),
+		Project: proto.String(site.Project.String()),
 	}); err != nil {
 		return err
 	}
 
-	return audited.Backend.DeleteManifest(ctx, name, opts)
+	return audited.Backend.DeleteManifest(ctx, site, opts)
 }
 
-func (audited *auditedBackend) ExpireManifest(ctx context.Context, name string) error {
-	domain, project, ok := strings.Cut(name, "/")
-	if !ok {
-		panic("malformed manifest name")
-	}
-
+func (audited *auditedBackend) ExpireManifest(ctx context.Context, site names.Site) error {
 	if err := audited.appendNewAuditRecord(ctx, &AuditRecord{
 		Event:   AuditEvent_ExpireManifest.Enum(),
-		Domain:  proto.String(domain),
-		Project: proto.String(project),
+		Domain:  proto.String(site.Domain.String()),
+		Project: proto.String(site.Project.String()),
 	}); err != nil {
 		return err
 	}
 
-	return audited.Backend.ExpireManifest(ctx, name)
+	return audited.Backend.ExpireManifest(ctx, site)
 }
 
-func (audited *auditedBackend) FreezeDomain(ctx context.Context, domain string) error {
+func (audited *auditedBackend) FreezeDomain(ctx context.Context, domain names.Domain) error {
 	if err := audited.appendNewAuditRecord(ctx, &AuditRecord{
 		Event:  AuditEvent_FreezeDomain.Enum(),
-		Domain: proto.String(domain),
+		Domain: proto.String(domain.String()),
 	}); err != nil {
 		return err
 	}
@@ -462,10 +448,10 @@ func (audited *auditedBackend) FreezeDomain(ctx context.Context, domain string) 
 	return audited.Backend.FreezeDomain(ctx, domain)
 }
 
-func (audited *auditedBackend) UnfreezeDomain(ctx context.Context, domain string) error {
+func (audited *auditedBackend) UnfreezeDomain(ctx context.Context, domain names.Domain) error {
 	if err := audited.appendNewAuditRecord(ctx, &AuditRecord{
 		Event:  AuditEvent_UnfreezeDomain.Enum(),
-		Domain: proto.String(domain),
+		Domain: proto.String(domain.String()),
 	}); err != nil {
 		return err
 	}

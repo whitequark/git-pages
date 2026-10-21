@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"codeberg.org/git-pages/git-pages/src/names"
 	sys "codeberg.org/git-pages/git-pages/src/sys"
 )
 
@@ -219,11 +220,11 @@ func (fs *FSBackend) EnumerateBlobs(ctx context.Context) iter.Seq2[BlobMetadata,
 }
 
 func (fs *FSBackend) GetManifest(
-	ctx context.Context, name string, opts GetManifestOptions,
+	ctx context.Context, site names.Site, opts GetManifestOptions,
 ) (
 	manifest *Manifest, metadata ManifestMetadata, err error,
 ) {
-	stat, err := fs.siteRoot.Stat(name)
+	stat, err := fs.siteRoot.Stat(site.String())
 	if errors.Is(err, os.ErrNotExist) {
 		err = fmt.Errorf("%w: %s", ErrObjectNotFound, err.(*os.PathError).Path)
 		return
@@ -231,14 +232,14 @@ func (fs *FSBackend) GetManifest(
 		err = fmt.Errorf("stat: %w", err)
 		return
 	}
-	data, err := fs.siteRoot.ReadFile(name)
+	data, err := fs.siteRoot.ReadFile(site.String())
 	if err != nil {
 		err = fmt.Errorf("read: %w", err)
 		return
 	}
 	manifest, err = DecodeManifest(data)
 	if err != nil {
-		err = fmt.Errorf("decode %s: %w", name, err)
+		err = fmt.Errorf("decode %s: %w", site, err)
 		return
 	}
 	return manifest, ManifestMetadata{
@@ -266,11 +267,11 @@ func (fs *FSBackend) StageManifest(ctx context.Context, manifest *Manifest) erro
 	return nil
 }
 
-func domainFrozenMarkerName(domain string) string {
-	return filepath.Join(domain, ".frozen")
+func domainFrozenMarkerName(domain names.Domain) string {
+	return filepath.Join(domain.String(), ".frozen")
 }
 
-func (fs *FSBackend) checkDomainFrozen(ctx context.Context, domain string) error {
+func (fs *FSBackend) checkDomainFrozen(ctx context.Context, domain names.Domain) error {
 	if _, err := fs.siteRoot.Stat(domainFrozenMarkerName(domain)); err == nil {
 		return ErrDomainFrozen
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -293,8 +294,8 @@ type manifestLockGuard struct {
 	file *os.File
 }
 
-func lockManifest(fs *os.Root, name string) (*manifestLockGuard, error) {
-	file, err := fs.Open(name)
+func lockManifest(fs *os.Root, site names.Site) (*manifestLockGuard, error) {
+	file, err := fs.Open(site.String())
 	if errors.Is(err, os.ErrNotExist) {
 		return &manifestLockGuard{nil}, nil
 	} else if err != nil {
@@ -315,10 +316,10 @@ func (guard *manifestLockGuard) Unlock() {
 }
 
 func (fs *FSBackend) checkManifestPrecondition(
-	ctx context.Context, name string, opts ModifyManifestOptions,
+	ctx context.Context, site names.Site, opts ModifyManifestOptions,
 ) error {
 	if !opts.IfUnmodifiedSince.IsZero() {
-		stat, err := fs.siteRoot.Stat(name)
+		stat, err := fs.siteRoot.Stat(site.String())
 		if err != nil {
 			return fmt.Errorf("stat: %w", err)
 		}
@@ -329,7 +330,7 @@ func (fs *FSBackend) checkManifestPrecondition(
 	}
 
 	if opts.IfMatch != "" {
-		data, err := fs.siteRoot.ReadFile(name)
+		data, err := fs.siteRoot.ReadFile(site.String())
 		if err != nil {
 			return fmt.Errorf("read: %w", err)
 		}
@@ -343,22 +344,21 @@ func (fs *FSBackend) checkManifestPrecondition(
 }
 
 func (fs *FSBackend) CommitManifest(
-	ctx context.Context, name string, manifest *Manifest, opts ModifyManifestOptions,
+	ctx context.Context, site names.Site, manifest *Manifest, opts ModifyManifestOptions,
 ) error {
 	if fs.hasAtomicCAS {
-		if guard, err := lockManifest(fs.siteRoot, name); err != nil {
+		if guard, err := lockManifest(fs.siteRoot, site); err != nil {
 			return err
 		} else {
 			defer guard.Unlock()
 		}
 	}
 
-	domain := filepath.Dir(name)
-	if err := fs.checkDomainFrozen(ctx, domain); err != nil {
+	if err := fs.checkDomainFrozen(ctx, site.Domain); err != nil {
 		return err
 	}
 
-	if err := fs.checkManifestPrecondition(ctx, name, opts); err != nil {
+	if err := fs.checkManifestPrecondition(ctx, site, opts); err != nil {
 		return err
 	}
 
@@ -369,11 +369,11 @@ func (fs *FSBackend) CommitManifest(
 		return fmt.Errorf("manifest not staged")
 	}
 
-	if err := fs.siteRoot.MkdirAll(domain, 0o755); err != nil {
+	if err := fs.siteRoot.MkdirAll(site.Domain.String(), 0o755); err != nil {
 		return fmt.Errorf("mkdir: %w", err)
 	}
 
-	if err := fs.siteRoot.Rename(manifestHashName, name); err != nil {
+	if err := fs.siteRoot.Rename(manifestHashName, site.String()); err != nil {
 		return fmt.Errorf("rename: %w", err)
 	}
 
@@ -381,26 +381,25 @@ func (fs *FSBackend) CommitManifest(
 }
 
 func (fs *FSBackend) DeleteManifest(
-	ctx context.Context, name string, opts ModifyManifestOptions,
+	ctx context.Context, site names.Site, opts ModifyManifestOptions,
 ) error {
 	if fs.hasAtomicCAS {
-		if guard, err := lockManifest(fs.siteRoot, name); err != nil {
+		if guard, err := lockManifest(fs.siteRoot, site); err != nil {
 			return err
 		} else {
 			defer guard.Unlock()
 		}
 	}
 
-	domain := filepath.Dir(name)
-	if err := fs.checkDomainFrozen(ctx, domain); err != nil {
+	if err := fs.checkDomainFrozen(ctx, site.Domain); err != nil {
 		return err
 	}
 
-	if err := fs.checkManifestPrecondition(ctx, name, opts); err != nil {
+	if err := fs.checkManifestPrecondition(ctx, site, opts); err != nil {
 		return err
 	}
 
-	err := fs.siteRoot.Remove(name)
+	err := fs.siteRoot.Remove(site.String())
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
 	} else {
@@ -409,16 +408,15 @@ func (fs *FSBackend) DeleteManifest(
 }
 
 func (fs *FSBackend) ExpireManifest(
-	ctx context.Context, name string,
+	ctx context.Context, site names.Site,
 ) error {
-	return fs.DeleteManifest(ctx, name, ModifyManifestOptions{})
+	return fs.DeleteManifest(ctx, site, ModifyManifestOptions{})
 }
 
 func (fs *FSBackend) EnumerateManifests(ctx context.Context) iter.Seq2[*ManifestMetadata, error] {
 	return func(yield func(*ManifestMetadata, error) bool) {
 		iofs.WalkDir(fs.siteRoot.FS(), ".",
 			func(path string, entry iofs.DirEntry, err error) error {
-				_, project, _ := strings.Cut(path, "/")
 				var metadata *ManifestMetadata
 				if err != nil {
 					// report error
@@ -427,7 +425,7 @@ func (fs *FSBackend) EnumerateManifests(ctx context.Context) iter.Seq2[*Manifest
 					return nil
 				} else if strings.HasPrefix(path, ".tmp") {
 					// temporary
-				} else if project == "" || strings.HasPrefix(project, ".") && project != ".index" {
+				} else if site, err := names.ParseSite(path); err != nil {
 					// skip internal
 					return nil
 				} else if info, err := entry.Info(); err != nil {
@@ -435,7 +433,7 @@ func (fs *FSBackend) EnumerateManifests(ctx context.Context) iter.Seq2[*Manifest
 				} else {
 					// report blob
 					metadata = &ManifestMetadata{
-						Name:         path,
+						Name:         site,
 						Size:         info.Size(),
 						LastModified: info.ModTime(),
 					}
@@ -465,8 +463,8 @@ func (fs *FSBackend) GetAllManifests(ctx context.Context) iter.Seq2[tuple[*Manif
 	}
 }
 
-func (fs *FSBackend) CheckDomain(ctx context.Context, domain string) (bool, error) {
-	_, err := fs.siteRoot.Stat(domain)
+func (fs *FSBackend) CheckDomain(ctx context.Context, domain names.Domain) (bool, error) {
+	_, err := fs.siteRoot.Stat(domain.String())
 	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
 	} else if err == nil {
@@ -476,15 +474,15 @@ func (fs *FSBackend) CheckDomain(ctx context.Context, domain string) (bool, erro
 	}
 }
 
-func (fs *FSBackend) CreateDomain(ctx context.Context, domain string) error {
+func (fs *FSBackend) CreateDomain(ctx context.Context, domain names.Domain) error {
 	return nil // no-op
 }
 
-func (fs *FSBackend) FreezeDomain(ctx context.Context, domain string) error {
+func (fs *FSBackend) FreezeDomain(ctx context.Context, domain names.Domain) error {
 	return fs.siteRoot.WriteFile(domainFrozenMarkerName(domain), []byte{}, 0o644)
 }
 
-func (fs *FSBackend) UnfreezeDomain(ctx context.Context, domain string) error {
+func (fs *FSBackend) UnfreezeDomain(ctx context.Context, domain names.Domain) error {
 	err := fs.siteRoot.Remove(domainFrozenMarkerName(domain))
 	if errors.Is(err, os.ErrNotExist) {
 		return nil

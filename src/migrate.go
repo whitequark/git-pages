@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
+
+	"codeberg.org/git-pages/git-pages/src/names"
 )
 
 func RunMigration(ctx context.Context, name string) error {
@@ -22,19 +23,19 @@ func createDomainMarkers(ctx context.Context) error {
 		return nil
 	}
 
-	var manifests []string
+	var sites []names.Site
 	for metadata, err := range backend.EnumerateManifests(ctx) {
 		if err != nil {
 			return fmt.Errorf("enum manifests: %w", err)
 		}
-		manifests = append(manifests, metadata.Name)
+		sites = append(sites, metadata.Name)
 	}
-	slices.Sort(manifests)
-	var domains []string
-	for _, manifest := range manifests {
-		domain, _, _ := strings.Cut(manifest, "/")
-		if len(domains) == 0 || domains[len(domains)-1] != domain {
-			domains = append(domains, domain)
+	slices.SortFunc(sites, names.CompareSite)
+
+	var domains []names.Domain
+	for _, site := range sites {
+		if len(domains) == 0 || domains[len(domains)-1] != site.Domain {
+			domains = append(domains, site.Domain)
 		}
 	}
 	for idx, domain := range domains {
@@ -46,6 +47,7 @@ func createDomainMarkers(ctx context.Context) error {
 	if err := backend.EnableFeature(ctx, FeatureCheckDomainMarker); err != nil {
 		return err
 	}
+
 	logc.Printf(ctx, "created markers for %d domains", len(domains))
 	return nil
 }

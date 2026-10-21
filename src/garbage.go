@@ -49,7 +49,7 @@ func TraceGarbage(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("trace err: %w", err)
 		}
-		traceManifest("site", metadata.Name, manifest)
+		traceManifest("site", metadata.Name.String(), manifest)
 	}
 
 	// Enumerate blobs live via audit records.

@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
+	"codeberg.org/git-pages/git-pages/src/names"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -52,7 +52,7 @@ type UpdateResult struct {
 var errExpireExistingSite = fmt.Errorf("cannot expire an existing site")
 
 func Update(
-	ctx context.Context, webRoot string, oldManifest, newManifest *Manifest,
+	ctx context.Context, site names.Site, oldManifest, newManifest *Manifest,
 	opts ModifyManifestOptions,
 ) UpdateResult {
 	var err error
@@ -62,7 +62,7 @@ func Update(
 	if oldManifest != nil && oldManifest.ExpiresAt == nil && newManifest.ExpiresAt != nil {
 		err = errExpireExistingSite
 	} else if IsManifestEmpty(newManifest) {
-		storedManifest, err = newManifest, backend.DeleteManifest(ctx, webRoot, opts)
+		storedManifest, err = newManifest, backend.DeleteManifest(ctx, site, opts)
 		if err == nil {
 			if oldManifest == nil {
 				outcome = UpdateNoChange
@@ -70,12 +70,11 @@ func Update(
 				outcome = UpdateDeleted
 			}
 		}
-	} else if err = PrepareManifest(ctx, webRoot, newManifest); err == nil {
-		storedManifest, err = StoreManifest(ctx, webRoot, newManifest, opts)
+	} else if err = PrepareManifest(ctx, site, newManifest); err == nil {
+		storedManifest, err = StoreManifest(ctx, site, newManifest, opts)
 		if err == nil {
-			domain, _, _ := strings.Cut(webRoot, "/")
-			err = backend.CreateDomain(ctx, domain)
-			existenceCache.AddSite(ctx, webRoot)
+			err = backend.CreateDomain(ctx, site.Domain)
+			existenceCache.AddSite(ctx, site)
 		}
 		if err == nil {
 			if oldManifest == nil {
@@ -101,15 +100,15 @@ func Update(
 			status = "unchanged"
 		}
 		if newManifest.ExpiresAt != nil {
-			logc.Printf(ctx, "expire %s: at %s", webRoot, newManifest.ExpiresAt.AsTime())
+			logc.Printf(ctx, "expire %s: at %s", site, newManifest.ExpiresAt.AsTime())
 		}
 		if storedManifest.Commit != nil {
-			logc.Printf(ctx, "update %s ok: %s %s", webRoot, *storedManifest.Commit, status)
+			logc.Printf(ctx, "update %s ok: %s %s", site, *storedManifest.Commit, status)
 		} else {
-			logc.Printf(ctx, "update %s ok: %s", webRoot, status)
+			logc.Printf(ctx, "update %s ok: %s", site, status)
 		}
 	} else {
-		logc.Printf(ctx, "update %s err: %s", webRoot, err)
+		logc.Printf(ctx, "update %s err: %s", site, err)
 	}
 
 	return UpdateResult{outcome, storedManifest, err}
@@ -117,7 +116,7 @@ func Update(
 
 func UpdateFromRepository(
 	ctx context.Context,
-	webRoot string,
+	site names.Site,
 	repoURL string,
 	branch string,
 	opts UpdateOptions,
@@ -126,11 +125,11 @@ func UpdateFromRepository(
 	defer span.Finish()
 	defer observeUpdateResult(result)
 
-	logc.Printf(ctx, "update %s: %s %s\n", webRoot, repoURL, branch)
+	logc.Printf(ctx, "update %s: %s %s\n", site, repoURL, branch)
 
-	oldManifest, _, err := backend.GetManifest(ctx, webRoot, GetManifestOptions{})
+	oldManifest, _, err := backend.GetManifest(ctx, site, GetManifestOptions{})
 	if err != nil && !errors.Is(err, ErrObjectNotFound) {
-		logc.Printf(ctx, "update %s err: %s", webRoot, err)
+		logc.Printf(ctx, "update %s err: %s", site, err)
 		result = UpdateResult{UpdateError, nil, err}
 		return
 	}
@@ -142,7 +141,7 @@ func UpdateFromRepository(
 		result = UpdateResult{UpdateError, nil, err}
 	} else {
 		opts.Apply(newManifest)
-		result = Update(ctx, webRoot, oldManifest, newManifest, ModifyManifestOptions{})
+		result = Update(ctx, site, oldManifest, newManifest, ModifyManifestOptions{})
 	}
 
 	return
@@ -152,7 +151,7 @@ var errArchiveFormat = errors.New("unsupported archive format")
 
 func UpdateFromArchive(
 	ctx context.Context,
-	webRoot string,
+	site names.Site,
 	repoURL string,
 	contentType string,
 	reader io.Reader,
@@ -163,9 +162,9 @@ func UpdateFromArchive(
 	defer span.Finish()
 	defer observeUpdateResult(result)
 
-	oldManifest, _, err := backend.GetManifest(ctx, webRoot, GetManifestOptions{})
+	oldManifest, _, err := backend.GetManifest(ctx, site, GetManifestOptions{})
 	if err != nil && !errors.Is(err, ErrObjectNotFound) {
-		logc.Printf(ctx, "update %s err: %s", webRoot, err)
+		logc.Printf(ctx, "update %s err: %s", site, err)
 		result = UpdateResult{UpdateError, nil, err}
 		return
 	}
@@ -177,37 +176,37 @@ func UpdateFromArchive(
 	var newManifest *Manifest
 	switch contentType {
 	case "application/x-tar":
-		logc.Printf(ctx, "update %s: (tar)", webRoot)
+		logc.Printf(ctx, "update %s: (tar)", site)
 		newManifest, err = extractTar(ctx, reader) // yellow?
 	case "application/x-tar+gzip":
-		logc.Printf(ctx, "update %s: (tar.gz)", webRoot)
+		logc.Printf(ctx, "update %s: (tar.gz)", site)
 		newManifest, err = ExtractGzip(ctx, reader, extractTar) // definitely yellow.
 	case "application/x-tar+zstd":
-		logc.Printf(ctx, "update %s: (tar.zst)", webRoot)
+		logc.Printf(ctx, "update %s: (tar.zst)", site)
 		newManifest, err = ExtractZstd(ctx, reader, extractTar)
 	case "application/zip":
-		logc.Printf(ctx, "update %s: (zip)", webRoot)
+		logc.Printf(ctx, "update %s: (zip)", site)
 		newManifest, err = ExtractZip(ctx, reader, oldManifest)
 	default:
 		err = errArchiveFormat
 	}
 
 	if err != nil {
-		logc.Printf(ctx, "update %s err: %s", webRoot, err)
+		logc.Printf(ctx, "update %s err: %s", site, err)
 		result = UpdateResult{UpdateError, nil, err}
 	} else {
 		if repoURL != "" {
 			newManifest.RepoUrl = &repoURL
 		}
 		opts.Apply(newManifest)
-		result = Update(ctx, webRoot, oldManifest, newManifest, ModifyManifestOptions{})
+		result = Update(ctx, site, oldManifest, newManifest, ModifyManifestOptions{})
 	}
 	return
 }
 
 func PartialUpdateFromArchive(
 	ctx context.Context,
-	webRoot string,
+	site names.Site,
 	contentType string,
 	reader io.Reader,
 	parents CreateParentsMode,
@@ -220,10 +219,10 @@ func PartialUpdateFromArchive(
 	// Here the old manifest is used both as a substrate to which a patch is applied, as well
 	// as a "load linked" operation for a future "store conditional" update which, taken together,
 	// create an atomic compare-and-swap operation.
-	oldManifest, oldMetadata, err := backend.GetManifest(ctx, webRoot,
+	oldManifest, oldMetadata, err := backend.GetManifest(ctx, site,
 		GetManifestOptions{BypassCache: true})
 	if err != nil {
-		logc.Printf(ctx, "patch %s err: %s", webRoot, err)
+		logc.Printf(ctx, "patch %s err: %s", site, err)
 		result = UpdateResult{UpdateError, nil, err}
 		return
 	}
@@ -246,24 +245,24 @@ func PartialUpdateFromArchive(
 	var newManifest *Manifest
 	switch contentType {
 	case "application/x-tar":
-		logc.Printf(ctx, "patch %s: (tar)", webRoot)
+		logc.Printf(ctx, "patch %s: (tar)", site)
 		newManifest, err = applyTarPatch(ctx, reader)
 	case "application/x-tar+gzip":
-		logc.Printf(ctx, "patch %s: (tar.gz)", webRoot)
+		logc.Printf(ctx, "patch %s: (tar.gz)", site)
 		newManifest, err = ExtractGzip(ctx, reader, applyTarPatch)
 	case "application/x-tar+zstd":
-		logc.Printf(ctx, "patch %s: (tar.zst)", webRoot)
+		logc.Printf(ctx, "patch %s: (tar.zst)", site)
 		newManifest, err = ExtractZstd(ctx, reader, applyTarPatch)
 	default:
 		err = errArchiveFormat
 	}
 
 	if err != nil {
-		logc.Printf(ctx, "patch %s err: %s", webRoot, err)
+		logc.Printf(ctx, "patch %s err: %s", site, err)
 		result = UpdateResult{UpdateError, nil, err}
 	} else {
 		opts.Apply(newManifest)
-		result = Update(ctx, webRoot, oldManifest, newManifest,
+		result = Update(ctx, site, oldManifest, newManifest,
 			ModifyManifestOptions{
 				IfUnmodifiedSince: oldMetadata.LastModified,
 				IfMatch:           oldMetadata.ETag,

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"codeberg.org/git-pages/git-pages/src/names"
-	"golang.org/x/net/idna"
 )
 
 type AuthError struct {
@@ -45,40 +44,6 @@ func authorizeInsecure(r *http.Request) *Authorization {
 	return nil
 }
 
-var idnaProfile = idna.New(idna.MapForLookup(), idna.BidiRule())
-
-func GetHost(r *http.Request) (string, error) {
-	host, _, err := net.SplitHostPort(r.Host)
-	if err != nil {
-		host = r.Host
-	}
-	// this also rejects invalid characters and labels
-	host, err = idnaProfile.ToASCII(host)
-	if err != nil {
-		if config.Feature("relaxed-idna") {
-			// unfortunately, the go IDNA library has some significant issues around its
-			// Unicode TR46 implementation: https://github.com/golang/go/issues/76804
-			// we would like to allow *just* the _ here, but adding `idna.StrictDomainName(false)`
-			// would also accept domains like `*.foo.bar` which should clearly be disallowed.
-			// as a workaround, accept a domain name if it is valid with all `_` characters
-			// replaced with an alphanumeric character (we use `a`); this allows e.g. `foo_bar.xxx`
-			// and `foo__bar.xxx`, as well as `_foo.xxx` and `foo_.xxx`. labels starting with
-			// an underscore are explicitly rejected below.
-			_, err = idnaProfile.ToASCII(strings.ReplaceAll(host, "_", "a"))
-		}
-		if err != nil {
-			return "", AuthError{http.StatusBadRequest,
-				fmt.Sprintf("malformed host name %q", host)}
-		}
-	}
-	if strings.HasPrefix(host, ".") || strings.HasPrefix(host, "_") {
-		return "", AuthError{http.StatusBadRequest,
-			fmt.Sprintf("reserved host name %q", host)}
-	}
-	host = strings.TrimSuffix(host, ".")
-	return host, nil
-}
-
 type Authorization struct {
 	// If `nil`, any URL is allowed. If not, only those in the set are allowed.
 	repoURLs []string
@@ -98,7 +63,7 @@ func (auth *Authorization) ForgeRepoURL() string {
 }
 
 func authorizeDNSChallenge(r *http.Request) (*Authorization, error) {
-	host, err := GetHost(r)
+	domain, err := GetDomain(r)
 	if err != nil {
 		return nil, err
 	}
@@ -143,14 +108,14 @@ func authorizeDNSChallenge(r *http.Request) (*Authorization, error) {
 		param = password
 	}
 
-	challengeHostname := fmt.Sprintf("_git-pages-challenge.%s", host)
+	challengeHostname := fmt.Sprintf("_git-pages-challenge.%s", domain)
 	actualChallenges, err := net.LookupTXT(challengeHostname)
 	if err != nil {
 		return nil, AuthError{http.StatusUnauthorized,
 			fmt.Sprintf("failed to look up DNS challenge: %s TXT", challengeHostname)}
 	}
 
-	expectedChallenge := fmt.Sprintf("%x", sha256.Sum256(fmt.Appendf(nil, "%s %s", host, param)))
+	expectedChallenge := fmt.Sprintf("%x", sha256.Sum256(fmt.Appendf(nil, "%s %s", domain, param)))
 	if !slices.Contains(actualChallenges, expectedChallenge) {
 		return nil, AuthError{http.StatusUnauthorized, fmt.Sprintf(
 			"defeated by DNS challenge: %s TXT %v does not include %s",
@@ -167,7 +132,7 @@ func authorizeDNSChallenge(r *http.Request) (*Authorization, error) {
 }
 
 func authorizeDNSAllowlist(r *http.Request, scope string) (*Authorization, error) {
-	host, err := GetHost(r)
+	domain, err := GetDomain(r)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +142,7 @@ func authorizeDNSAllowlist(r *http.Request, scope string) (*Authorization, error
 		return nil, err
 	}
 
-	allowlistHostname := fmt.Sprintf("_%s.%s", scope, host)
+	allowlistHostname := fmt.Sprintf("_%s.%s", scope, domain)
 	records, err := net.LookupTXT(allowlistHostname)
 	if err != nil {
 		return nil, AuthError{http.StatusUnauthorized,
@@ -223,12 +188,12 @@ func authorizeDNSAllowlist(r *http.Request, scope string) (*Authorization, error
 
 // used for `/.git-pages/...` metadata
 func authorizeWildcardMatchHost(r *http.Request, pattern *WildcardPattern) (*Authorization, error) {
-	host, err := GetHost(r)
+	domain, err := GetDomain(r)
 	if err != nil {
 		return nil, err
 	}
 
-	if _, found := pattern.Matches(host, WildcardDomainAny); found {
+	if _, found := pattern.Matches(domain, WildcardDomainAny); found {
 		return &Authorization{
 			repoURLs: []string{},
 			branch:   "",
@@ -236,14 +201,14 @@ func authorizeWildcardMatchHost(r *http.Request, pattern *WildcardPattern) (*Aut
 	} else {
 		return nil, AuthError{
 			http.StatusUnauthorized,
-			fmt.Sprintf("domain %s does not match wildcard %s", host, pattern.GetHost()),
+			fmt.Sprintf("domain %s does not match wildcard %s", domain, pattern.GetHost()),
 		}
 	}
 }
 
 // used for updates to site content
 func authorizeWildcardMatchSite(r *http.Request, pattern *WildcardPattern) (*Authorization, error) {
-	host, err := GetHost(r)
+	domain, err := GetDomain(r)
 	if err != nil {
 		return nil, err
 	}
@@ -253,13 +218,13 @@ func authorizeWildcardMatchSite(r *http.Request, pattern *WildcardPattern) (*Aut
 		return nil, err
 	}
 
-	if userName, found := pattern.Matches(host, WildcardDomainPrimary); found {
+	if userName, found := pattern.Matches(domain, WildcardDomainPrimary); found {
 		repoURL, branch := pattern.ApplyTemplate(userName, projectName.String())
 		return &Authorization{repoURLs: []string{repoURL}, branch: branch}, nil
 	} else {
 		return nil, AuthError{
 			http.StatusUnauthorized,
-			fmt.Sprintf("domain %s does not match wildcard %s", host, pattern.GetHost()),
+			fmt.Sprintf("domain %s does not match wildcard %s", domain, pattern.GetHost()),
 		}
 	}
 }
@@ -267,29 +232,29 @@ func authorizeWildcardMatchSite(r *http.Request, pattern *WildcardPattern) (*Aut
 // used for compatibility with Codeberg Pages v2
 // see https://docs.codeberg.org/codeberg-pages/using-custom-domain/
 func authorizeCodebergPagesV2(r *http.Request) (*Authorization, error) {
-	host, err := GetHost(r)
+	domain, err := GetDomain(r)
 	if err != nil {
 		return nil, err
 	}
 
 	dnsRecords := []string{}
 
-	cnameRecord, err := net.LookupCNAME(host)
+	cnameRecord, err := net.LookupCNAME(domain.String())
 	// "LookupCNAME does not return an error if host does not contain DNS "CNAME" records,
 	// as long as host resolves to address records.
-	if err == nil && cnameRecord != host {
+	if err == nil && cnameRecord != domain.String() {
 		// LookupCNAME() returns a domain with the root label, i.e. `username.codeberg.page.`,
 		// with the trailing dot
 		dnsRecords = append(dnsRecords, strings.TrimSuffix(cnameRecord, "."))
 	}
 
-	txtRecords, err := net.LookupTXT(host)
+	txtRecords, err := net.LookupTXT(domain.String())
 	if err == nil {
 		dnsRecords = append(dnsRecords, txtRecords...)
 	}
 
 	if len(dnsRecords) > 0 {
-		logc.Printf(r.Context(), "auth: %s TXT/CNAME: %q\n", host, dnsRecords)
+		logc.Printf(r.Context(), "auth: %s TXT/CNAME: %q\n", domain, dnsRecords)
 	}
 
 	for _, dnsRecord := range dnsRecords {
@@ -328,7 +293,7 @@ func authorizeCodebergPagesV2(r *http.Request) (*Authorization, error) {
 
 	return nil, AuthError{
 		http.StatusUnauthorized,
-		fmt.Sprintf("domain %s does not have Codeberg Pages TXT or CNAME records", host),
+		fmt.Sprintf("domain %s does not have Codeberg Pages TXT or CNAME records", domain),
 	}
 }
 
@@ -610,7 +575,7 @@ func authorizeForgeWildcard(r *http.Request) (*Authorization, error) {
 		return nil, AuthError{http.StatusUnauthorized, "missing Forge-Authorization header"}
 	}
 
-	host, err := GetHost(r)
+	host, err := GetDomain(r)
 	if err != nil {
 		return nil, err
 	}
@@ -777,15 +742,15 @@ func AuthorizeDeletion(r *http.Request) (*Authorization, error) {
 }
 
 func CheckForbiddenDomain(r *http.Request) error {
-	host, err := GetHost(r)
+	domain, err := GetDomain(r)
 	if err != nil {
 		return err
 	}
 
-	host = strings.ToLower(host)
 	for _, reservedDomain := range config.Limits.ForbiddenDomains {
 		reservedDomain = strings.ToLower(reservedDomain)
-		if host == reservedDomain || strings.HasSuffix(host, fmt.Sprintf(".%s", reservedDomain)) {
+		if domain.String() == reservedDomain ||
+			strings.HasSuffix(domain.String(), fmt.Sprintf(".%s", reservedDomain)) {
 			return AuthError{http.StatusForbidden, "forbidden domain"}
 		}
 	}

@@ -9,15 +9,19 @@ import (
 	"net"
 	"net/http"
 	"slices"
-	"strings"
+
+	"codeberg.org/git-pages/git-pages/src/names"
 )
 
 func ServeProxy(w http.ResponseWriter, r *http.Request) {
-	domain := r.URL.Query().Get("domain")
-	if domain == "" {
+	domainParam := r.URL.Query().Get("domain")
+	if domainParam == "" {
 		proxyListDomains(w, r)
-	} else {
+	} else if domain, err := names.ParseDomain(domainParam, names.ParseDomainRelaxed); err == nil {
 		proxyCheckDomain(w, r, domain)
+	} else {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintln(w, err)
 	}
 }
 
@@ -28,27 +32,25 @@ func proxyListDomains(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "%s", err)
 		}
-		domain, _, _ := strings.Cut(metadata.Name, "/")
-		domainSet[domain] = Unit
+		domainSet[metadata.Name.Domain.String()] = Unit
 	}
 
 	w.Header().Add("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(slices.Collect(maps.Keys(domainSet)))
 }
 
-func proxyCheckDomain(w http.ResponseWriter, r *http.Request, domain string) {
+func proxyCheckDomain(w http.ResponseWriter, r *http.Request, domain names.Domain) {
+	var err error
+
 	// Save the backend some effort from queries that are essentially guaranteed to fail.
 	// While TLS certificates may be provisionsed for IP addresses under special circumstances[^1],
 	// this isn't really what git-pages is designed for, and object store accesses can cost money.
 	// [^1]: https://letsencrypt.org/2025/07/01/issuing-our-first-ip-address-certificate
-	if ip := net.ParseIP(domain); ip != nil {
+	if ip := net.ParseIP(domain.String()); ip != nil {
 		logc.Println(r.Context(), "proxy:", domain, 404, "(bare IP)")
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-
-	var err error
-	domain = strings.ToLower(domain)
 
 	// Run a cheap check as to whether we might be serving the domain.
 	found := existenceCache.CheckDomain(r.Context(), domain).IsPossible()
@@ -65,7 +67,7 @@ func proxyCheckDomain(w http.ResponseWriter, r *http.Request, domain string) {
 		// Pages v2, which would under some circumstances return certificates with subjectAltName
 		// not valid for the SNI. Go's TLS stack makes `tls.Dial` return an error for these,
 		// thankfully making it unnecessary to examine X.509 certificates manually here.)
-		found, err = tryDialWithSNI(r.Context(), domain)
+		found, err = tryDialWithSNI(r.Context(), domain.String())
 		if err != nil {
 			logc.Printf(r.Context(), "proxy err: check SNI: %s\n", err)
 		}

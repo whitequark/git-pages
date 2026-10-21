@@ -8,6 +8,8 @@ import (
 	"iter"
 	"strings"
 	"time"
+
+	"codeberg.org/git-pages/git-pages/src/names"
 )
 
 var ErrObjectNotFound = errors.New("not found")
@@ -46,7 +48,7 @@ type GetManifestOptions struct {
 }
 
 type ManifestMetadata struct {
-	Name         string
+	Name         names.Site
 	Size         int64
 	LastModified time.Time
 	ETag         string
@@ -103,7 +105,7 @@ type Backend interface {
 	EnumerateBlobs(ctx context.Context) iter.Seq2[BlobMetadata, error]
 
 	// Retrieve a manifest.
-	GetManifest(ctx context.Context, name string, opts GetManifestOptions) (
+	GetManifest(ctx context.Context, site names.Site, opts GetManifestOptions) (
 		manifest *Manifest, metadata ManifestMetadata, err error,
 	)
 
@@ -119,13 +121,13 @@ type Backend interface {
 
 	// Commit a manifest. This is an atomic operation; `GetManifest` calls will return either
 	// the old version or the new version of the manifest, never anything else.
-	CommitManifest(ctx context.Context, name string, manifest *Manifest, opts ModifyManifestOptions) error
+	CommitManifest(ctx context.Context, site names.Site, manifest *Manifest, opts ModifyManifestOptions) error
 
 	// Delete a manifest. This operation is initiated via the API.
-	DeleteManifest(ctx context.Context, name string, opts ModifyManifestOptions) error
+	DeleteManifest(ctx context.Context, site names.Site, opts ModifyManifestOptions) error
 
 	// Expire a manifest. This operation is initiated via a scheduled job.
-	ExpireManifest(ctx context.Context, name string) error
+	ExpireManifest(ctx context.Context, site names.Site) error
 
 	// Iterate through metadata of all manifests. Whether manifests that are newly added during
 	// iteration will appear in the results is unspecified.
@@ -139,17 +141,17 @@ type Backend interface {
 	HasSiteListChanged(ctx context.Context, since time.Time) (changed bool, lastChanged time.Time, err error)
 
 	// Check whether a domain has any deployments.
-	CheckDomain(ctx context.Context, domain string) (found bool, err error)
+	CheckDomain(ctx context.Context, domain names.Domain) (found bool, err error)
 
 	// Create a domain. This allows us to start serving content for the domain.
-	CreateDomain(ctx context.Context, domain string) error
+	CreateDomain(ctx context.Context, domain names.Domain) error
 
 	// Freeze a domain. This allows a site to be administratively locked, e.g. if it
 	// is discovered serving abusive content.
-	FreezeDomain(ctx context.Context, domain string) error
+	FreezeDomain(ctx context.Context, domain names.Domain) error
 
 	// Thaw a domain. This removes the previously placed administrative lock (if any).
-	UnfreezeDomain(ctx context.Context, domain string) error
+	UnfreezeDomain(ctx context.Context, domain names.Domain) error
 
 	// Append a record to the audit log.
 	AppendAuditLog(ctx context.Context, id AuditID, record *AuditRecord) error

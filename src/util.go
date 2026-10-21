@@ -19,6 +19,13 @@ func (t tuple[A, B]) Splat() (A, B) {
 	return t.A, t.B
 }
 
+func Must[T any](value T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return value
+}
+
 type BoundedReader struct {
 	inner io.Reader
 	fuel  int64

@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"codeberg.org/git-pages/git-pages/src/names"
 	"github.com/c2h5oh/datasize"
 	"github.com/go-git/go-git/v6/plumbing"
 	format "github.com/go-git/go-git/v6/plumbing/format/config"
@@ -338,11 +339,9 @@ func CompressFiles(ctx context.Context, manifest *Manifest) {
 // Apply post-processing steps to the manifest.
 // At the moment, there isn't a good way to report errors except to log them on the terminal.
 // (Perhaps in the future they could be exposed at `.git-pages/status.txt`?)
-func PrepareManifest(ctx context.Context, webRoot string, manifest *Manifest) error {
-	_, project, _ := strings.Cut(webRoot, "/")
-
+func PrepareManifest(ctx context.Context, site names.Site, manifest *Manifest) error {
 	// Parse Netlify-style `_redirects`.
-	if err := ProcessRedirectsFile(ctx, project, manifest); err != nil {
+	if err := ProcessRedirectsFile(ctx, site.Project, manifest); err != nil {
 		logc.Printf(ctx, "redirects err: %s\n", err)
 	} else if len(manifest.Redirects) > 0 {
 		logc.Printf(ctx, "redirects ok: %d rules\n", len(manifest.Redirects))
@@ -379,9 +378,9 @@ var putBlobSemaphore = make(chan struct{})
 // Uploads inline file data over certain size to the storage backend. Returns a copy of
 // the manifest updated to refer to an external content-addressable store.
 func StoreManifest(
-	ctx context.Context, name string, manifest *Manifest, opts ModifyManifestOptions,
+	ctx context.Context, site names.Site, manifest *Manifest, opts ModifyManifestOptions,
 ) (*Manifest, error) {
-	span, ctx := ObserveFunction(ctx, "StoreManifest", "manifest.name", name)
+	span, ctx := ObserveFunction(ctx, "StoreManifest", "manifest.name", site)
 	defer span.Finish()
 
 	extManifest := &Manifest{}
@@ -466,7 +465,7 @@ func StoreManifest(
 		return nil, err // currently ignores all but 1st error
 	}
 
-	if err := backend.CommitManifest(ctx, name, extManifest, opts); err != nil {
+	if err := backend.CommitManifest(ctx, site, extManifest, opts); err != nil {
 		if errors.Is(err, ErrDomainFrozen) {
 			return nil, err
 		} else {

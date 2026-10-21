@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"codeberg.org/git-pages/git-pages/src/names"
 	"github.com/c2h5oh/datasize"
 	"github.com/maypok86/otter/v2"
 	"github.com/minio/minio-go/v7"
@@ -128,7 +129,7 @@ type S3Backend struct {
 	client       *minio.Client
 	bucket       string
 	blobCache    *observedCache[string, *CachedBlob]
-	siteCache    *observedCache[string, *CachedManifest]
+	siteCache    *observedCache[names.Site, *CachedManifest]
 	featureCache *otter.Cache[BackendFeature, bool]
 }
 
@@ -224,7 +225,7 @@ func NewS3Backend(ctx context.Context, config *S3Config) (*S3Backend, error) {
 		EvictionNumberCounter: manifestCacheEvictionsCount,
 	}
 	siteCache, err := newObservedCache(makeCacheOptions(&config.SiteCache,
-		func(key string, value *CachedManifest) uint32 { return value.weight }),
+		func(key names.Site, value *CachedManifest) uint32 { return value.weight }),
 		siteCacheMetrics)
 	if err != nil {
 		return nil, err
@@ -410,8 +411,8 @@ func (s3 *S3Backend) EnumerateBlobs(ctx context.Context) iter.Seq2[BlobMetadata,
 	}
 }
 
-func manifestObjectName(name string) string {
-	return fmt.Sprintf("site/%s", name)
+func manifestObjectName(object string) string {
+	return fmt.Sprintf("site/%s", object)
 }
 
 func stagedManifestObjectName(manifestData []byte) string {
@@ -423,7 +424,7 @@ type s3ManifestLoader struct {
 }
 
 func (l s3ManifestLoader) Load(
-	ctx context.Context, key string,
+	ctx context.Context, key names.Site,
 ) (
 	*CachedManifest, error,
 ) {
@@ -431,7 +432,7 @@ func (l s3ManifestLoader) Load(
 }
 
 func (l s3ManifestLoader) Reload(
-	ctx context.Context, key string, oldValue *CachedManifest,
+	ctx context.Context, key names.Site, oldValue *CachedManifest,
 ) (
 	*CachedManifest, error,
 ) {
@@ -439,18 +440,18 @@ func (l s3ManifestLoader) Reload(
 }
 
 func (l s3ManifestLoader) load(
-	ctx context.Context, name string, oldManifest *CachedManifest,
+	ctx context.Context, site names.Site, oldManifest *CachedManifest,
 ) (
 	*CachedManifest, error,
 ) {
-	logc.Printf(ctx, "s3: get manifest %s\n", name)
+	logc.Printf(ctx, "s3: get manifest %s\n", site)
 
 	loader := func() (*CachedManifest, error) {
 		opts := minio.GetObjectOptions{}
 		if oldManifest != nil && oldManifest.metadata.ETag != "" {
 			opts.SetMatchETagExcept(oldManifest.metadata.ETag)
 		}
-		object, err := l.s3.client.GetObject(ctx, l.s3.bucket, manifestObjectName(name), opts)
+		object, err := l.s3.client.GetObject(ctx, l.s3.bucket, manifestObjectName(site.String()), opts)
 		// Note that many errors (e.g. NoSuchKey) will be reported only after this point.
 		if err != nil {
 			return nil, err
@@ -469,7 +470,7 @@ func (l s3ManifestLoader) load(
 
 		manifest, err := DecodeManifest(data)
 		if err != nil {
-			err = fmt.Errorf("decode %s: %w", name, err)
+			err = fmt.Errorf("decode %s: %w", site, err)
 			return nil, err
 		}
 
@@ -512,19 +513,19 @@ func (l s3ManifestLoader) load(
 }
 
 func (s3 *S3Backend) GetManifest(
-	ctx context.Context, name string, opts GetManifestOptions,
+	ctx context.Context, site names.Site, opts GetManifestOptions,
 ) (
 	manifest *Manifest, metadata ManifestMetadata, err error,
 ) {
 	if opts.BypassCache {
-		entry, found := s3.siteCache.Cache.GetEntry(name)
+		entry, found := s3.siteCache.Cache.GetEntry(site)
 		if found && entry.RefreshableAt().Before(time.Now()) {
-			s3.siteCache.Cache.Invalidate(name)
+			s3.siteCache.Cache.Invalidate(site)
 		}
 	}
 
 	var cached *CachedManifest
-	cached, err = s3.siteCache.Get(ctx, name, s3ManifestLoader{s3})
+	cached, err = s3.siteCache.Get(ctx, site, s3ManifestLoader{s3})
 	if err != nil {
 		return
 	} else {
@@ -543,11 +544,11 @@ func (s3 *S3Backend) StageManifest(ctx context.Context, manifest *Manifest) erro
 	return err
 }
 
-func domainFrozenObjectName(domain string) string {
-	return manifestObjectName(fmt.Sprintf("%s/.frozen", domain))
+func domainFrozenObjectName(domain names.Domain) string {
+	return manifestObjectName(fmt.Sprintf("%s/.frozen", domain.String()))
 }
 
-func (s3 *S3Backend) checkDomainFrozen(ctx context.Context, domain string) error {
+func (s3 *S3Backend) checkDomainFrozen(ctx context.Context, domain names.Domain) error {
 	_, err := s3.client.StatObject(ctx, s3.bucket, domainFrozenObjectName(domain),
 		minio.GetObjectOptions{})
 	if err == nil {
@@ -577,9 +578,9 @@ func (s3 *S3Backend) HasAtomicCAS(ctx context.Context) bool {
 }
 
 func (s3 *S3Backend) checkManifestPrecondition(
-	ctx context.Context, name string, opts ModifyManifestOptions,
+	ctx context.Context, site names.Site, opts ModifyManifestOptions,
 ) (exists bool, err error) {
-	stat, err := s3.client.StatObject(ctx, s3.bucket, manifestObjectName(name),
+	stat, err := s3.client.StatObject(ctx, s3.bucket, manifestObjectName(site.String()),
 		minio.GetObjectOptions{})
 	if err != nil {
 		errResp := minio.ToErrorResponse(err)
@@ -603,17 +604,16 @@ func (s3 *S3Backend) checkManifestPrecondition(
 }
 
 func (s3 *S3Backend) CommitManifest(
-	ctx context.Context, name string, manifest *Manifest, opts ModifyManifestOptions,
+	ctx context.Context, site names.Site, manifest *Manifest, opts ModifyManifestOptions,
 ) error {
 	data := EncodeManifest(manifest)
-	logc.Printf(ctx, "s3: commit manifest %x -> %s", sha256.Sum256(data), name)
+	logc.Printf(ctx, "s3: commit manifest %x -> %s", sha256.Sum256(data), site.String())
 
-	domain, _, _ := strings.Cut(name, "/")
-	if err := s3.checkDomainFrozen(ctx, domain); err != nil {
+	if err := s3.checkDomainFrozen(ctx, site.Domain); err != nil {
 		return err
 	}
 
-	existed, err := s3.checkManifestPrecondition(ctx, name, opts)
+	existed, err := s3.checkManifestPrecondition(ctx, site, opts)
 	if err != nil {
 		return err
 	}
@@ -628,11 +628,11 @@ func (s3 *S3Backend) CommitManifest(
 		// It does reliably work on MinIO at least.
 		putOptions.SetMatchETag(opts.IfMatch)
 	}
-	_, putErr := s3.client.PutObject(ctx, s3.bucket, manifestObjectName(name),
+	_, putErr := s3.client.PutObject(ctx, s3.bucket, manifestObjectName(site.String()),
 		bytes.NewReader(data), int64(len(data)), putOptions)
 	removeErr := s3.client.RemoveObject(ctx, s3.bucket, stagedManifestObjectName(data),
 		minio.RemoveObjectOptions{})
-	s3.siteCache.Cache.Invalidate(name)
+	s3.siteCache.Cache.Invalidate(site)
 	if putErr != nil {
 		if errResp := minio.ToErrorResponse(putErr); errResp.Code == "PreconditionFailed" {
 			return ErrPreconditionFailed
@@ -653,26 +653,25 @@ func (s3 *S3Backend) CommitManifest(
 }
 
 func (s3 *S3Backend) DeleteManifest(
-	ctx context.Context, name string, opts ModifyManifestOptions,
+	ctx context.Context, site names.Site, opts ModifyManifestOptions,
 ) error {
-	logc.Printf(ctx, "s3: delete manifest %s\n", name)
+	logc.Printf(ctx, "s3: delete manifest %s\n", site)
 
-	domain, _, _ := strings.Cut(name, "/")
-	if err := s3.checkDomainFrozen(ctx, domain); err != nil {
+	if err := s3.checkDomainFrozen(ctx, site.Domain); err != nil {
 		return err
 	}
 
-	existed, err := s3.checkManifestPrecondition(ctx, name, opts)
+	existed, err := s3.checkManifestPrecondition(ctx, site, opts)
 	if err != nil {
 		return err
 	}
 
-	err = s3.client.RemoveObject(ctx, s3.bucket, manifestObjectName(name),
+	err = s3.client.RemoveObject(ctx, s3.bucket, manifestObjectName(site.String()),
 		minio.RemoveObjectOptions{})
 	if err != nil {
 		return err
 	}
-	s3.siteCache.Cache.Invalidate(name)
+	s3.siteCache.Cache.Invalidate(site)
 
 	if existed {
 		if err := s3.bumpLastSiteUpdateTimestamp(ctx); err != nil {
@@ -684,9 +683,9 @@ func (s3 *S3Backend) DeleteManifest(
 }
 
 func (s3 *S3Backend) ExpireManifest(
-	ctx context.Context, name string,
+	ctx context.Context, site names.Site,
 ) error {
-	return s3.DeleteManifest(ctx, name, ModifyManifestOptions{})
+	return s3.DeleteManifest(ctx, site, ModifyManifestOptions{})
 }
 
 func (s3 *S3Backend) EnumerateManifests(ctx context.Context) iter.Seq2[*ManifestMetadata, error] {
@@ -705,14 +704,13 @@ func (s3 *S3Backend) EnumerateManifests(ctx context.Context) iter.Seq2[*Manifest
 			var err error
 			if err = object.Err; err == nil {
 				key := strings.TrimPrefix(object.Key, prefix)
-				_, project, _ := strings.Cut(key, "/")
 				if strings.HasSuffix(key, "/") {
 					continue // directory; skip
-				} else if project == "" || strings.HasPrefix(project, ".") && project != ".index" {
-					continue // internal; skip
+				} else if site, err := names.ParseSite(key); err != nil {
+					continue // not a site (marker, etc); skip
 				} else {
 					metadata = &ManifestMetadata{
-						Name:         key,
+						Name:         site,
 						Size:         object.Size,
 						LastModified: object.LastModified,
 						ETag:         object.ETag,
@@ -768,11 +766,11 @@ func (s3 *S3Backend) GetAllManifests(ctx context.Context) iter.Seq2[tuple[*Manif
 	}
 }
 
-func domainCheckObjectName(domain string) string {
+func domainCheckObjectName(domain names.Domain) string {
 	return manifestObjectName(fmt.Sprintf("%s/.exists", domain))
 }
 
-func (s3 *S3Backend) CheckDomain(ctx context.Context, domain string) (exists bool, err error) {
+func (s3 *S3Backend) CheckDomain(ctx context.Context, domain names.Domain) (exists bool, err error) {
 	logc.Printf(ctx, "s3: check domain %s\n", domain)
 
 	_, err = s3.client.StatObject(ctx, s3.bucket, domainCheckObjectName(domain),
@@ -803,7 +801,7 @@ func (s3 *S3Backend) CheckDomain(ctx context.Context, domain string) (exists boo
 	return
 }
 
-func (s3 *S3Backend) CreateDomain(ctx context.Context, domain string) error {
+func (s3 *S3Backend) CreateDomain(ctx context.Context, domain names.Domain) error {
 	logc.Printf(ctx, "s3: create domain %s\n", domain)
 
 	_, err := s3.client.PutObject(ctx, s3.bucket, domainCheckObjectName(domain),
@@ -811,7 +809,7 @@ func (s3 *S3Backend) CreateDomain(ctx context.Context, domain string) error {
 	return err
 }
 
-func (s3 *S3Backend) FreezeDomain(ctx context.Context, domain string) error {
+func (s3 *S3Backend) FreezeDomain(ctx context.Context, domain names.Domain) error {
 	logc.Printf(ctx, "s3: freeze domain %s\n", domain)
 
 	_, err := s3.client.PutObject(ctx, s3.bucket, domainFrozenObjectName(domain),
@@ -819,7 +817,7 @@ func (s3 *S3Backend) FreezeDomain(ctx context.Context, domain string) error {
 	return err
 }
 
-func (s3 *S3Backend) UnfreezeDomain(ctx context.Context, domain string) error {
+func (s3 *S3Backend) UnfreezeDomain(ctx context.Context, domain names.Domain) error {
 	logc.Printf(ctx, "s3: unfreeze domain %s\n", domain)
 
 	err := s3.client.RemoveObject(ctx, s3.bucket, domainFrozenObjectName(domain),
