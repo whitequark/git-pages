@@ -7,6 +7,21 @@ log-format = 'text'
 pages = 'tcp/localhost:3000'
 proxy = 'tcp/localhost:3001'
 metrics = 'tcp/localhost:3002'
+https = '-'
+
+[acme]
+email = ''
+accept-tos = false
+directory = 'https://acme-v02.api.letsencrypt.org/directory'
+
+[secrets]
+type = 'fs'
+
+[secrets.fs]
+root = './data'
+
+[secrets.s3]
+bucket-lookup = 'auto'
 
 [storage]
 type = 'fs'
@@ -15,7 +30,7 @@ type = 'fs'
 root = './data'
 
 [storage.s3]
-bucket-lookup = "auto"
+bucket-lookup = 'auto'
 
 [limits]
 max-site-size = '128MB'

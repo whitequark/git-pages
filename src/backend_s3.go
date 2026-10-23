@@ -22,25 +22,6 @@ import (
 )
 
 var (
-	blobsDedupedCount prometheus.Counter
-	blobsDedupedBytes prometheus.Counter
-
-	blobCacheHitsCount      prometheus.Counter
-	blobCacheHitsBytes      prometheus.Counter
-	blobCacheMissesCount    prometheus.Counter
-	blobCacheMissesBytes    prometheus.Counter
-	blobCacheEvictionsCount prometheus.Counter
-	blobCacheEvictionsBytes prometheus.Counter
-
-	manifestCacheHitsCount      prometheus.Counter
-	manifestCacheMissesCount    prometheus.Counter
-	manifestCacheEvictionsCount prometheus.Counter
-
-	s3GetObjectDurationSeconds *prometheus.HistogramVec
-	s3GetObjectResponseCount   *prometheus.CounterVec
-)
-
-func initS3BackendMetrics() {
 	blobsDedupedCount = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "git_pages_blobs_deduped",
 		Help: "Count of blobs deduplicated",
@@ -88,6 +69,11 @@ func initS3BackendMetrics() {
 		Help: "Count of manifests evicted from the cache",
 	})
 
+	secretOperationCount = *promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "git_pages_secret_operation_count",
+		Help: "Count of operations on secrets",
+	}, []string{"kind", "oper"})
+
 	s3GetObjectDurationSeconds = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "git_pages_s3_get_object_duration_seconds",
 		Help:    "Time to read a whole object from S3",
@@ -101,7 +87,7 @@ func initS3BackendMetrics() {
 		Name: "git_pages_s3_get_object_responses_count",
 		Help: "Count of s3:GetObject responses",
 	}, []string{"kind", "code"})
-}
+)
 
 // Blobs can be safely cached indefinitely. They only need to be evicted to preserve memory.
 type CachedBlob struct {
@@ -154,7 +140,9 @@ func makeCacheOptions[K comparable, V any](
 	return options
 }
 
-func NewS3Backend(ctx context.Context, config *S3Config) (*S3Backend, error) {
+func makeClientForBucket(
+	ctx context.Context, config *S3Config, isStorage bool,
+) (client *minio.Client, err error) {
 	var bucketLookup minio.BucketLookupType
 
 	switch config.BucketLookup {
@@ -168,7 +156,7 @@ func NewS3Backend(ctx context.Context, config *S3Config) (*S3Backend, error) {
 		return nil, fmt.Errorf("unknown bucket lookup type: %s", config.BucketLookup)
 	}
 
-	client, err := minio.New(config.Endpoint, &minio.Options{
+	client, err = minio.New(config.Endpoint, &minio.Options{
 		Creds: credentials.NewStaticV4(
 			config.AccessKeyID,
 			config.SecretAccessKey,
@@ -181,27 +169,35 @@ func NewS3Backend(ctx context.Context, config *S3Config) (*S3Backend, error) {
 		return nil, err
 	}
 
-	bucket := config.Bucket
-	exists, err := client.BucketExists(ctx, bucket)
+	exists, err := client.BucketExists(ctx, config.Bucket)
 	if err != nil {
 		return nil, err
 	} else if !exists {
-		logc.Printf(ctx, "s3: create bucket %s\n", bucket)
+		logc.Printf(ctx, "s3: create bucket %s\n", config.Bucket)
 
-		err = client.MakeBucket(ctx, bucket,
+		err = client.MakeBucket(ctx, config.Bucket,
 			minio.MakeBucketOptions{Region: config.Region})
 		if err != nil {
 			return nil, err
 		}
 
-		err = (&S3Backend{client: client, bucket: bucket}).
-			EnableFeature(ctx, FeatureCheckDomainMarker)
-		if err != nil {
-			return nil, err
+		if isStorage {
+			err = (&S3Backend{client: client, bucket: config.Bucket}).
+				EnableFeature(ctx, FeatureCheckDomainMarker)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	initS3BackendMetrics()
+	return client, nil
+}
+
+func NewS3Backend(ctx context.Context, config *S3StorageConfig) (*S3Backend, error) {
+	client, err := makeClientForBucket(ctx, &config.S3Config, true)
+	if err != nil {
+		return nil, err
+	}
 
 	blobCacheMetrics := observedCacheMetrics{
 		HitNumberCounter:      blobCacheHitsCount,
@@ -237,7 +233,7 @@ func NewS3Backend(ctx context.Context, config *S3Config) (*S3Backend, error) {
 		return nil, err
 	}
 
-	return &S3Backend{client, bucket, blobCache, siteCache, featureCache}, nil
+	return &S3Backend{client, config.Bucket, blobCache, siteCache, featureCache}, nil
 }
 
 func (s3 *S3Backend) Backend() Backend {
@@ -321,9 +317,9 @@ func (s3 *S3Backend) GetBlob(
 
 	observer := func(ctx context.Context, name string) (*CachedBlob, error) {
 		cached, err := loader(ctx, name)
-		var code = "OK"
-		if resp, ok := err.(minio.ErrorResponse); ok {
-			code = resp.Code
+		code := "OK"
+		if errResp, ok := err.(minio.ErrorResponse); ok {
+			code = errResp.Code
 		}
 		s3GetObjectResponseCount.With(prometheus.Labels{"kind": "blob", "code": code}).Inc()
 		return cached, err
@@ -482,9 +478,9 @@ func (l s3ManifestLoader) load(
 
 	observer := func() (*CachedManifest, error) {
 		cached, err := loader()
-		var code = "OK"
-		if resp, ok := err.(minio.ErrorResponse); ok {
-			code = resp.Code
+		code := "OK"
+		if errResp, ok := err.(minio.ErrorResponse); ok {
+			code = errResp.Code
 		}
 		s3GetObjectResponseCount.With(prometheus.Labels{"kind": "manifest", "code": code}).Inc()
 		return cached, err
@@ -1002,5 +998,88 @@ func (s3 *S3Backend) ExpireAuditRecord(ctx context.Context, id AuditID) error {
 	logc.Printf(ctx, "s3: expire audit record %s\n", id)
 
 	return s3.client.RemoveObject(ctx, s3.bucket, auditObjectName(id),
+		minio.RemoveObjectOptions{})
+}
+
+type S3Secrets struct {
+	client *minio.Client
+	bucket string
+}
+
+var _ Secrets = (*S3Secrets)(nil)
+
+func NewS3Secrets(ctx context.Context, config *S3Config) (*S3Secrets, error) {
+	client, err := makeClientForBucket(ctx, config, false)
+	if err != nil {
+		return nil, err
+	}
+	return &S3Secrets{client, config.Bucket}, nil
+}
+
+func (s3 *S3Secrets) Secrets() Secrets {
+	return s3
+}
+
+func acmeObjectName(name string) string {
+	return fmt.Sprintf("acme/%s", name)
+}
+
+func (s3 *S3Secrets) GetACME(
+	ctx context.Context, name string,
+) (
+	data []byte, err error,
+) {
+	logc.Printf(ctx, "s3: get acme %s\n", name)
+
+	secretOperationCount.With(prometheus.Labels{"kind": "acme", "oper": "get"}).Inc()
+
+	loader := func(ctx context.Context, name string) ([]byte, error) {
+		object, err := s3.client.GetObject(ctx, s3.bucket, acmeObjectName(name),
+			minio.GetObjectOptions{})
+		// Note that many errors (e.g. NoSuchKey) will be reported only after this point.
+		if err != nil {
+			return nil, err
+		}
+		defer object.Close()
+
+		return io.ReadAll(object)
+	}
+
+	startTime := time.Now()
+	data, err = loader(ctx, name)
+	s3GetObjectDurationSeconds.
+		With(prometheus.Labels{"kind": "acme"}).
+		Observe(time.Since(startTime).Seconds())
+
+	code := "OK"
+	if errResp, ok := err.(minio.ErrorResponse); ok {
+		code = errResp.Code
+	}
+	s3GetObjectResponseCount.With(prometheus.Labels{"kind": "acme", "code": code}).Inc()
+
+	if err != nil {
+		if errResp := minio.ToErrorResponse(err); errResp.Code == "NoSuchKey" {
+			err = fmt.Errorf("%w: %s", ErrObjectNotFound, errResp.Key)
+		}
+	}
+	return
+}
+
+func (s3 *S3Secrets) PutACME(ctx context.Context, name string, data []byte) error {
+	logc.Printf(ctx, "s3: put acme %s\n", name)
+
+	secretOperationCount.With(prometheus.Labels{"kind": "acme", "oper": "put"}).Inc()
+
+	_, err := s3.client.PutObject(ctx, s3.bucket, acmeObjectName(name),
+		bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{})
+	return err
+}
+
+func (s3 *S3Secrets) DeleteACME(ctx context.Context, name string) error {
+	logc.Printf(ctx, "s3: delete acme %s\n", name)
+
+	secretOperationCount.With(prometheus.Labels{"kind": "acme", "oper": "delete"}).Inc()
+
+	return s3.client.RemoveObject(ctx, s3.bucket, acmeObjectName(name),
 		minio.RemoveObjectOptions{})
 }

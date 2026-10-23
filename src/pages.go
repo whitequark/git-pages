@@ -115,6 +115,19 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	var manifest *Manifest
 	var metadata ManifestMetadata
 
+	if config.Feature("acme") {
+		if r.TLS == nil && config.Server.Https != "-" {
+			// If the pages server is not listening on port 443, it is presumed that traffic will
+			// be proxied to the configured listener from tcp/:443 by some other application.
+			u := *r.URL
+			u.Scheme = "https"
+			u.Host = r.Host
+			w.Header().Add("Strict-Transport-Security", "max-age=31536000")
+			http.Redirect(w, r, u.String(), http.StatusPermanentRedirect)
+			return nil
+		}
+	}
+
 	cacheControl, err := cacheobject.ParseRequestCacheControl(r.Header.Get("Cache-Control"))
 	if err != nil {
 		cacheControl = &cacheobject.RequestCacheDirectives{

@@ -64,8 +64,10 @@ type Config struct {
 	Features      []string            `toml:"features"`
 	LogFormat     string              `toml:"log-format" default:"text"`
 	Server        ServerConfig        `toml:"server"`
+	Acme          AcmeConfig          `toml:"acme"`
 	Wildcard      []WildcardConfig    `toml:"wildcard"`
 	Fallback      FallbackConfig      `toml:"fallback"`
+	Secrets       SecretsConfig       `toml:"secrets"`
 	Storage       StorageConfig       `toml:"storage"`
 	Limits        LimitsConfig        `toml:"limits"`
 	Audit         AuditConfig         `toml:"audit"`
@@ -76,6 +78,13 @@ type ServerConfig struct {
 	Pages   string `toml:"pages" default:"tcp/localhost:3000"`
 	Proxy   string `toml:"proxy" default:"tcp/localhost:3001"`
 	Metrics string `toml:"metrics" default:"tcp/localhost:3002"`
+	Https   string `toml:"https" default:"-"`
+}
+
+type AcmeConfig struct {
+	Email     string `toml:"email"`
+	AcceptTOS bool   `toml:"accept-tos" default:"false"`
+	Directory string `toml:"directory" default:"https://acme-v02.api.letsencrypt.org/directory"`
 }
 
 type WildcardConfig struct {
@@ -93,13 +102,13 @@ type FallbackConfig struct {
 	Insecure bool `toml:"insecure"`
 }
 
-type CacheConfig struct {
-	MaxSize  datasize.ByteSize `toml:"max-size"`
-	MaxAge   Duration          `toml:"max-age"`
-	MaxStale Duration          `toml:"max-stale"`
+type StorageConfig struct {
+	Type string          `toml:"type" default:"fs"`
+	FS   FSConfig        `toml:"fs"  default:"{\"Root\":\"./data\"}"`
+	S3   S3StorageConfig `toml:"s3"`
 }
 
-type StorageConfig struct {
+type SecretsConfig struct {
 	Type string   `toml:"type" default:"fs"`
 	FS   FSConfig `toml:"fs"  default:"{\"Root\":\"./data\"}"`
 	S3   S3Config `toml:"s3"`
@@ -110,15 +119,25 @@ type FSConfig struct {
 }
 
 type S3Config struct {
-	Endpoint        string      `toml:"endpoint"`
-	Insecure        bool        `toml:"insecure"`
-	BucketLookup    string      `toml:"bucket-lookup" default:"auto"`
-	AccessKeyID     string      `toml:"access-key-id"`
-	SecretAccessKey string      `toml:"secret-access-key"`
-	Region          string      `toml:"region"`
-	Bucket          string      `toml:"bucket"`
-	BlobCache       CacheConfig `toml:"blob-cache" default:"{\"MaxSize\":\"256MB\"}"`
-	SiteCache       CacheConfig `toml:"site-cache" default:"{\"MaxAge\":\"60s\",\"MaxStale\":\"1h\",\"MaxSize\":\"16MB\"}"`
+	Endpoint        string `toml:"endpoint"`
+	Insecure        bool   `toml:"insecure"`
+	BucketLookup    string `toml:"bucket-lookup" default:"auto"`
+	AccessKeyID     string `toml:"access-key-id"`
+	SecretAccessKey string `toml:"secret-access-key"`
+	Region          string `toml:"region"`
+	Bucket          string `toml:"bucket"`
+}
+
+type S3StorageConfig struct {
+	S3Config
+	BlobCache CacheConfig `toml:"blob-cache" default:"{\"MaxSize\":\"256MB\"}"`
+	SiteCache CacheConfig `toml:"site-cache" default:"{\"MaxAge\":\"60s\",\"MaxStale\":\"1h\",\"MaxSize\":\"16MB\"}"`
+}
+
+type CacheConfig struct {
+	MaxSize  datasize.ByteSize `toml:"max-size"`
+	MaxAge   Duration          `toml:"max-age"`
+	MaxStale Duration          `toml:"max-stale"`
 }
 
 type LimitsConfig struct {

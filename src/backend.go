@@ -181,8 +181,35 @@ func CreateBackend(ctx context.Context, config *StorageConfig) (backend Backend,
 			err = fmt.Errorf("s3 backend: %w", err)
 		}
 	default:
-		err = fmt.Errorf("unknown backend: %s", config.Type)
+		err = fmt.Errorf("unknown backend type: %s", config.Type)
 	}
 	backend = NewAuditedBackend(backend)
+	return
+}
+
+type Secrets interface {
+	// Retrieve an ACME secret. Returns ErrObjectNotFound if it does not exist.
+	GetACME(ctx context.Context, name string) ([]byte, error)
+
+	// Store an ACME secret.
+	PutACME(ctx context.Context, name string, data []byte) error
+
+	// Delete an ACME secret. Returns nil if it does not exist.
+	DeleteACME(ctx context.Context, name string) error
+}
+
+func CreateSecrets(ctx context.Context, config *SecretsConfig) (secrets Secrets, err error) {
+	switch config.Type {
+	case "fs":
+		if secrets, err = NewFSSecrets(ctx, &config.FS); err != nil {
+			err = fmt.Errorf("fs secrets: %w", err)
+		}
+	case "s3":
+		if secrets, err = NewS3Secrets(ctx, &config.S3); err != nil {
+			err = fmt.Errorf("s3 secrets: %w", err)
+		}
+	default:
+		err = fmt.Errorf("unknown secrets type: %s", config.Type)
+	}
 	return
 }

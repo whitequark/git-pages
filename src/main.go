@@ -30,6 +30,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/kankanreno/go-snowflake"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/crypto/acme"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -37,6 +38,7 @@ var config *Config
 var wildcards []*WildcardPattern
 var fallback http.Handler
 var backend Backend
+var secrets Secrets
 var existenceCache ExistenceCache
 
 func configureFeatures(ctx context.Context) (err error) {
@@ -46,7 +48,7 @@ func configureFeatures(ctx context.Context) (err error) {
 	for _, feature := range config.Features {
 		switch feature {
 		// Work-in-progress features:
-		// (none)
+		case "acme":
 		// Permanently unstable features:
 		case "codeberg-pages-compat", "relaxed-idna":
 		// Stabilized features:
@@ -128,7 +130,7 @@ func configureAudit(_ context.Context) (err error) {
 	return
 }
 
-func listen(ctx context.Context, name string, listen string) net.Listener {
+func listen(ctx context.Context, name string, listen string, tlsConfig *tls.Config) net.Listener {
 	if listen == "-" {
 		return nil
 	}
@@ -143,7 +145,7 @@ func listen(ctx context.Context, name string, listen string) net.Listener {
 		logc.Fatalf(ctx, "%s: %s\n", name, err)
 	}
 
-	return listener
+	return &tlsListener{listener, tlsConfig}
 }
 
 func panicHandler(handler http.Handler) http.Handler {
@@ -722,7 +724,7 @@ func Main(versionInfo string) {
 			logc.Fatalln(ctx, err)
 		}
 
-		go serve(ctx, listen(ctx, "audit", *auditServer), ObserveHTTPHandler(processor))
+		go serve(ctx, listen(ctx, "audit", *auditServer, nil), ObserveHTTPHandler(processor))
 
 		sys.WaitForInterrupt()
 		logc.Println(ctx, "audit: exiting")
@@ -883,9 +885,17 @@ func Main(versionInfo string) {
 		// spends some time initializing (which the S3 backend does) a proxy like Caddy can race
 		// with git-pages on startup and return errors for requests that would have been served
 		// just 0.5s later.
-		pagesListener := listen(ctx, "pages", config.Server.Pages)
-		proxyListener := listen(ctx, "caddy", config.Server.Proxy)
-		metricsListener := listen(ctx, "metrics", config.Server.Metrics)
+		pagesListener := listen(ctx, "pages", config.Server.Pages, nil)
+		proxyListener := listen(ctx, "caddy", config.Server.Proxy, nil)
+		metricsListener := listen(ctx, "metrics", config.Server.Metrics, nil)
+		httpsListener := net.Listener(nil)
+		if config.Feature("acme") {
+			httpsListener = listen(ctx, "https", config.Server.Https, ACMEConfig(ctx))
+		}
+
+		if secrets, err = CreateSecrets(ctx, &config.Secrets); err != nil {
+			logc.Fatalln(ctx, err)
+		}
 
 		if backend, err = CreateBackend(ctx, &config.Storage); err != nil {
 			logc.Fatalln(ctx, err)
@@ -896,12 +906,36 @@ func Main(versionInfo string) {
 			logc.Fatalln(ctx, err)
 		}
 
+		if config.Feature("acme") {
+			// Once dns-persist-01 lands, we should add a `git-pages -acme-dns-persist-01` option
+			// that computes and prints the CAA records for each of the configured wildcard domains.
+			// For now, just print the account URI and the JWK thumbprint. This information can
+			// be used to compute H(length_of_domain || domain_name || key || account_URL) by hand.
+			go func() {
+				if client, err := ACMEClient(ctx); err != nil {
+					logc.Printf(ctx, "acme: %s\n", err)
+				} else {
+					if account, err := client.GetReg(ctx, ""); err != nil {
+						logc.Printf(ctx, "acme: %s\n", err)
+					} else {
+						logc.Printf(ctx, "acme: account %s (%s)\n", account.URI, account.Status)
+					}
+					if thumbprint, err := acme.JWKThumbprint(client.Key.Public()); err != nil {
+						logc.Printf(ctx, "acme: %s\n", err)
+					} else {
+						logc.Printf(ctx, "acme: public key %s\n", thumbprint)
+					}
+				}
+			}()
+		}
+
 		middleware := chainHTTPMiddleware(
 			panicHandler,
 			remoteAddrMiddleware,
 			ObserveHTTPHandler,
 		)
 		go serve(ctx, pagesListener, middleware(http.HandlerFunc(ServePages)))
+		go serve(ctx, httpsListener, middleware(http.HandlerFunc(ServePages)))
 		go serve(ctx, proxyListener, middleware(http.HandlerFunc(ServeProxy)))
 		go serve(ctx, metricsListener, promhttp.Handler())
 

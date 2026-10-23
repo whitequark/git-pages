@@ -8,6 +8,11 @@ log-format = "text"
 pages = "tcp/localhost:3000"
 proxy = "tcp/localhost:3001"
 metrics = "tcp/localhost:3002"
+https = "tcp/localhost:3003"
+
+[acme]
+email = 'username@example.org'
+accept-tos = true
 
 [[wildcard]] # non-default section
 domain = "codeberg.page"
@@ -21,6 +26,12 @@ max-preview-lifetime = 7 # in days
 [fallback] # non-default section
 proxy-to = "https://codeberg.page"
 insecure = false
+
+[secrets]
+type = "fs"
+
+[secrets.fs]
+root = "./data"
 
 [storage]
 type = "fs"

@@ -16,17 +16,8 @@ import (
 	sys "codeberg.org/git-pages/git-pages/src/sys"
 )
 
-type FSBackend struct {
-	blobRoot     *os.Root
-	siteRoot     *os.Root
-	auditRoot    *os.Root
-	hasAtomicCAS bool
-}
-
-var _ Backend = (*FSBackend)(nil)
-
-func maybeCreateOpenRoot(dir string, name string) (*os.Root, error) {
-	dirName := filepath.Join(dir, name)
+func maybeCreateOpenRoot(parts ...string) (*os.Root, error) {
+	dirName := filepath.Join(parts...)
 
 	if err := os.MkdirAll(dirName, 0o755); err != nil && !errors.Is(err, os.ErrExist) {
 		return nil, fmt.Errorf("mkdir: %w", err)
@@ -41,7 +32,7 @@ func maybeCreateOpenRoot(dir string, name string) (*os.Root, error) {
 }
 
 func createTempInRoot(root *os.Root, name string, data []byte) (string, error) {
-	tempFile, err := os.CreateTemp(root.Name(), name)
+	tempFile, err := os.CreateTemp(root.Name(), name) // uses perms 0o600
 	if err != nil {
 		return "", fmt.Errorf("mktemp: %w", err)
 	}
@@ -72,6 +63,15 @@ func checkAtomicCAS(root *os.Root) bool {
 	funlockErr := sys.FileUnlock(file)
 	return (flockErr == nil && funlockErr == nil)
 }
+
+type FSBackend struct {
+	blobRoot     *os.Root
+	siteRoot     *os.Root
+	auditRoot    *os.Root
+	hasAtomicCAS bool
+}
+
+var _ Backend = (*FSBackend)(nil)
 
 func NewFSBackend(ctx context.Context, config *FSConfig) (*FSBackend, error) {
 	blobRoot, err := maybeCreateOpenRoot(config.Root, "blob")
@@ -576,4 +576,61 @@ func (fs *FSBackend) DetachAuditRecord(ctx context.Context, id AuditID) error {
 
 func (fs *FSBackend) ExpireAuditRecord(ctx context.Context, id AuditID) error {
 	return fs.auditRoot.Remove(id.String())
+}
+
+type FSSecrets struct {
+	acmeRoot *os.Root
+}
+
+var _ Secrets = (*FSSecrets)(nil)
+
+func NewFSSecrets(ctx context.Context, config *FSConfig) (*FSSecrets, error) {
+	certRoot, err := maybeCreateOpenRoot(config.Root, "acme")
+	if err != nil {
+		return nil, fmt.Errorf("secrets: %w", err)
+	}
+	if err = certRoot.Chmod(".", 0o700); err != nil {
+		return nil, fmt.Errorf("chmod: %w", err)
+	}
+	return &FSSecrets{certRoot}, nil
+}
+
+func (fs *FSSecrets) Secrets() Secrets {
+	return fs
+}
+
+func (fs *FSSecrets) GetACME(
+	ctx context.Context, name string,
+) (
+	data []byte, err error,
+) {
+	file, err := fs.acmeRoot.Open(name)
+	if errors.Is(err, os.ErrNotExist) {
+		err = fmt.Errorf("%w: %s", ErrObjectNotFound, err.(*os.PathError).Path)
+		return
+	} else if err != nil {
+		err = fmt.Errorf("open: %w", err)
+		return
+	}
+	defer file.Close()
+	return io.ReadAll(file)
+}
+
+func (fs *FSSecrets) PutACME(ctx context.Context, name string, data []byte) error {
+	tempPath, err := createTempInRoot(fs.acmeRoot, ".tmp", data)
+	if err != nil {
+		return err
+	}
+	if err := fs.acmeRoot.Rename(tempPath, name); err != nil {
+		return fmt.Errorf("rename: %w", err)
+	}
+	return nil
+}
+
+func (fs *FSSecrets) DeleteACME(ctx context.Context, name string) error {
+	if err := fs.acmeRoot.Remove(name); err == nil || errors.Is(err, os.ErrNotExist) {
+		return nil
+	} else {
+		return err
+	}
 }
