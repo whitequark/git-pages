@@ -93,7 +93,8 @@ func (d Domain) EffectiveTLDPlusOne(extraSuffixes []Domain) Domain {
 
 	eTLDp1, err := publicsuffix.EffectiveTLDPlusOne(d.String())
 	if err != nil {
-		panic(fmt.Sprintf("internal error: %s", err))
+		// This can happen if the domain itself is on the PSL, e.g. `codeberg.page`.
+		return d
 	}
 
 	return Domain{eTLDp1}

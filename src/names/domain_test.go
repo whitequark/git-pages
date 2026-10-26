@@ -68,4 +68,7 @@ func TestDomainProperties(t *testing.T) {
 		"example.co.uk")
 	checkEq(t, Domain{"foo.example.co.uk"}.EffectiveTLDPlusOne([]Domain{}).String(),
 		"example.co.uk")
+	// domain below must be on PSL
+	checkEq(t, Domain{"codeberg.page"}.EffectiveTLDPlusOne([]Domain{}).String(),
+		"codeberg.page")
 }
