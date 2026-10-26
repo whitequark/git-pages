@@ -1,6 +1,7 @@
 package git_pages
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
@@ -23,6 +24,11 @@ type AuthError struct {
 
 func (e AuthError) Error() string {
 	return e.error
+}
+
+func lookupTXT(ctx context.Context, name string) ([]string, error) {
+	// This function can be used for mocking TXT lookups for local testing.
+	return net.DefaultResolver.LookupTXT(ctx, name)
 }
 
 func IsUnauthorized(err error) bool {
@@ -109,7 +115,7 @@ func authorizeDNSChallenge(r *http.Request) (*Authorization, error) {
 	}
 
 	challengeHostname := fmt.Sprintf("_git-pages-challenge.%s", domain)
-	actualChallenges, err := net.LookupTXT(challengeHostname)
+	actualChallenges, err := lookupTXT(r.Context(), challengeHostname)
 	if err != nil {
 		return nil, AuthError{http.StatusUnauthorized,
 			fmt.Sprintf("failed to look up DNS challenge: %s TXT", challengeHostname)}
@@ -143,7 +149,7 @@ func authorizeDNSAllowlist(r *http.Request, scope string) (*Authorization, error
 	}
 
 	allowlistHostname := fmt.Sprintf("_%s.%s", scope, domain)
-	records, err := net.LookupTXT(allowlistHostname)
+	records, err := lookupTXT(r.Context(), allowlistHostname)
 	if err != nil {
 		return nil, AuthError{http.StatusUnauthorized,
 			fmt.Sprintf("failed to look up DNS repository allowlist: %s TXT", allowlistHostname)}
@@ -239,7 +245,7 @@ func authorizeCodebergPagesV2(r *http.Request) (*Authorization, error) {
 
 	dnsRecords := []string{}
 
-	cnameRecord, err := net.LookupCNAME(domain.String())
+	cnameRecord, err := net.DefaultResolver.LookupCNAME(r.Context(), domain.String())
 	// "LookupCNAME does not return an error if host does not contain DNS "CNAME" records,
 	// as long as host resolves to address records.
 	if err == nil && cnameRecord != domain.String() {
@@ -248,7 +254,7 @@ func authorizeCodebergPagesV2(r *http.Request) (*Authorization, error) {
 		dnsRecords = append(dnsRecords, strings.TrimSuffix(cnameRecord, "."))
 	}
 
-	txtRecords, err := net.LookupTXT(domain.String())
+	txtRecords, err := lookupTXT(r.Context(), domain.String())
 	if err == nil {
 		dnsRecords = append(dnsRecords, txtRecords...)
 	}
