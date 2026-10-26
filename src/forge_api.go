@@ -111,6 +111,7 @@ func CheckGogsRepositoryPushPermission(baseURL *url.URL, authorization string) e
 	}
 
 	var repositoryInfo struct {
+		FullName    string `json:"full_name"`
 		Permissions struct {
 			Push bool `json:"push"`
 		} `json:"permissions"`
@@ -124,6 +125,14 @@ func CheckGogsRepositoryPushPermission(baseURL *url.URL, authorization string) e
 				request.URL,
 			),
 		}, err)
+	}
+
+	if repositoryInfo.FullName != ownerAndRepo {
+		return AuthError{
+			http.StatusUnauthorized,
+			fmt.Sprintf("authorization out-of-date: repository %s has been renamed to %s",
+				ownerAndRepo, repositoryInfo.FullName),
+		}
 	}
 
 	if !repositoryInfo.Permissions.Push {

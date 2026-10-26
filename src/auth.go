@@ -514,10 +514,7 @@ func AuthorizeBranch(branch string, auth *Authorization) error {
 // Check whether a forge token has access to a repository, and if it does, which user it
 // belongs to. Precondition: `repoURL` is well-formed.
 func authorizeGogsUser(repoURL string, forgeToken string) (*Authorization, error) {
-	parsedRepoURL, err := url.Parse(repoURL)
-	if err != nil {
-		panic(err)
-	}
+	parsedRepoURL := Must(url.Parse(repoURL))
 
 	authorizedUser, err := FetchGogsAuthorizedUser(parsedRepoURL, forgeToken)
 	if err != nil {
