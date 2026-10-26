@@ -42,7 +42,9 @@ func AnalyzeStorage(ctx context.Context) ([]*StorageSize, error) {
 	}
 
 	getStats := func(domain names.Domain) *storageData {
-		domain = domain.EffectiveTLDPlusOne(extraSuffixes)
+		if domain.IsValid() {
+			domain = domain.EffectiveTLDPlusOne(extraSuffixes)
+		}
 		if _, found := thickStats[domain]; !found {
 			thickStats[domain] = &storageData{
 				siteBlobs:  map[string]int64{},
