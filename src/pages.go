@@ -175,7 +175,8 @@ func getPage(w http.ResponseWriter, r *http.Request) error {
 	projectPathPrefix := "/" // 2xx and 4xx redirect target URLs must start with this prefix
 	if projectName, projectPath, hasProjectSlash := strings.Cut(sitePath, "/"); projectName != "" {
 		var project names.Project
-		if project, err = names.ParseProject(projectName); err == nil {
+		var projectNameErr error
+		if project, projectNameErr = names.ParseProject(projectName); projectNameErr == nil {
 			site := names.Site{Domain: domain, Project: project}
 			if existenceCache.CheckSite(r.Context(), site).IsPossible() {
 				var projectManifest *Manifest
