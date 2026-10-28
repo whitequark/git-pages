@@ -204,6 +204,8 @@ func UpdateFromArchive(
 	return
 }
 
+var errPartialUpdateSiteMustExist = errors.New("site must exist to apply partial update")
+
 func PartialUpdateFromArchive(
 	ctx context.Context,
 	site names.Site,
@@ -222,6 +224,9 @@ func PartialUpdateFromArchive(
 	oldManifest, oldMetadata, err := backend.GetManifest(ctx, site,
 		GetManifestOptions{BypassCache: true})
 	if err != nil {
+		if errors.Is(err, ErrObjectNotFound) {
+			err = joinErrors(errPartialUpdateSiteMustExist, err)
+		}
 		logc.Printf(ctx, "patch %s err: %s", site, err)
 		result = UpdateResult{UpdateError, nil, err}
 		return
