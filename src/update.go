@@ -22,14 +22,36 @@ func (err UnresolvedRefError) Error() string {
 	return fmt.Sprintf("%d unresolved blob references", len(err.missing))
 }
 
-type UpdateOptions struct {
-	expiresAt time.Time
+type EscalatedProblemsError struct {
+	problems []*Problem
 }
 
-func (opts *UpdateOptions) Apply(manifest *Manifest) {
+func (err EscalatedProblemsError) Error() string {
+	return fmt.Sprintf("%d escalated problems", len(err.problems))
+}
+
+type Problems int
+
+const (
+	ProblemsNonFatal Problems = iota
+	ProblemsFatal
+)
+
+type UpdateOptions struct {
+	expiresAt time.Time
+	problems  Problems
+}
+
+func (opts *UpdateOptions) Apply(manifest *Manifest) error {
 	if !opts.expiresAt.IsZero() {
 		manifest.ExpiresAt = timestamppb.New(opts.expiresAt)
 	}
+	if opts.problems == ProblemsFatal {
+		if len(manifest.Problems) > 0 {
+			return EscalatedProblemsError{manifest.Problems}
+		}
+	}
+	return nil
 }
 
 type UpdateOutcome int
@@ -70,7 +92,7 @@ func Update(
 				outcome = UpdateDeleted
 			}
 		}
-	} else if err = PrepareManifest(ctx, site, newManifest); err == nil {
+	} else {
 		storedManifest, err = StoreManifest(ctx, site, newManifest, opts)
 		if err == nil {
 			err = backend.CreateDomain(ctx, site.Domain)
@@ -140,8 +162,13 @@ func UpdateFromRepository(
 	} else if err != nil {
 		result = UpdateResult{UpdateError, nil, err}
 	} else {
-		opts.Apply(newManifest)
-		result = Update(ctx, site, oldManifest, newManifest, ModifyManifestOptions{})
+		if err = PrepareManifest(ctx, site, newManifest); err != nil {
+			result = UpdateResult{UpdateError, nil, err}
+		} else if err = opts.Apply(newManifest); err != nil {
+			result = UpdateResult{UpdateError, nil, err}
+		} else {
+			result = Update(ctx, site, oldManifest, newManifest, ModifyManifestOptions{})
+		}
 	}
 
 	return
@@ -198,8 +225,13 @@ func UpdateFromArchive(
 		if repoURL != "" {
 			newManifest.RepoUrl = &repoURL
 		}
-		opts.Apply(newManifest)
-		result = Update(ctx, site, oldManifest, newManifest, ModifyManifestOptions{})
+		if err = PrepareManifest(ctx, site, newManifest); err != nil {
+			result = UpdateResult{UpdateError, nil, err}
+		} else if err = opts.Apply(newManifest); err != nil {
+			result = UpdateResult{UpdateError, nil, err}
+		} else {
+			result = Update(ctx, site, oldManifest, newManifest, ModifyManifestOptions{})
+		}
 	}
 	return
 }
@@ -266,17 +298,22 @@ func PartialUpdateFromArchive(
 		logc.Printf(ctx, "patch %s err: %s", site, err)
 		result = UpdateResult{UpdateError, nil, err}
 	} else {
-		opts.Apply(newManifest)
-		result = Update(ctx, site, oldManifest, newManifest,
-			ModifyManifestOptions{
-				IfUnmodifiedSince: oldMetadata.LastModified,
-				IfMatch:           oldMetadata.ETag,
-			})
-		// The `If-Unmodified-Since` precondition is internally generated here, which means its
-		// failure shouldn't be surfaced as-is in the HTTP response. If we also accepted options
-		// from the client, then that precondition failure should surface in the response.
-		if errors.Is(result.err, ErrPreconditionFailed) {
-			result.err = ErrWriteConflict
+		if err = PrepareManifest(ctx, site, newManifest); err != nil {
+			result = UpdateResult{UpdateError, nil, err}
+		} else if err = opts.Apply(newManifest); err != nil {
+			result = UpdateResult{UpdateError, nil, err}
+		} else {
+			result = Update(ctx, site, oldManifest, newManifest,
+				ModifyManifestOptions{
+					IfUnmodifiedSince: oldMetadata.LastModified,
+					IfMatch:           oldMetadata.ETag,
+				})
+			// The `If-Unmodified-Since` precondition is internally generated here, which means its
+			// failure shouldn't be surfaced as-is in the HTTP response. If we also accepted options
+			// from the client, then that precondition failure should surface in the response.
+			if errors.Is(result.err, ErrPreconditionFailed) {
+				result.err = ErrWriteConflict
+			}
 		}
 	}
 

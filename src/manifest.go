@@ -227,9 +227,9 @@ func EnsureLeadingDirectories(manifest *Manifest) {
 	}
 }
 
-func GetProblemReport(manifest *Manifest) []string {
+func GetProblemReport(problems []*Problem) []string {
 	var report []string
-	for _, problem := range manifest.Problems {
+	for _, problem := range problems {
 		report = append(report,
 			fmt.Sprintf("/%s: %s", problem.GetPath(), problem.GetCause()))
 	}

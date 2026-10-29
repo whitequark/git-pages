@@ -557,6 +557,16 @@ func getUpdateOptions(
 		}
 	}
 
+	switch r.Header.Get("If-Problems") {
+	case "", "*":
+		opts.problems = ProblemsNonFatal
+	case "none":
+		opts.problems = ProblemsFatal
+	default:
+		http.Error(w, "malformed If-Problems: header", http.StatusBadRequest)
+		return
+	}
+
 	ok = true
 	return
 }
@@ -741,6 +751,7 @@ func reportUpdateResult(w http.ResponseWriter, r *http.Request, result UpdateRes
 		}
 	}
 
+	var fatalProblemsErr EscalatedProblemsError
 	switch result.outcome {
 	case UpdateError:
 		if errors.Is(result.err, ErrSiteTooLarge) {
@@ -765,6 +776,8 @@ func reportUpdateResult(w http.ResponseWriter, r *http.Request, result UpdateRes
 			w.WriteHeader(http.StatusForbidden)
 		} else if errors.As(result.err, &unresolvedRefErr) {
 			w.WriteHeader(http.StatusUnprocessableEntity)
+		} else if errors.As(result.err, &fatalProblemsErr) {
+			w.WriteHeader(http.StatusPreconditionFailed)
 		} else {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
@@ -785,11 +798,14 @@ func reportUpdateResult(w http.ResponseWriter, r *http.Request, result UpdateRes
 		} else {
 			fmt.Fprintln(w, "(archive)")
 		}
-		for _, problem := range GetProblemReport(result.manifest) {
+		for _, problem := range GetProblemReport(result.manifest.Problems) {
 			fmt.Fprintln(w, problem)
 		}
 	} else if result.err != nil {
 		fmt.Fprintln(w, result.err)
+		for _, problem := range GetProblemReport(fatalProblemsErr.problems) {
+			fmt.Fprintln(w, problem)
+		}
 	} else {
 		fmt.Fprintln(w, "internal error")
 	}
@@ -950,7 +966,7 @@ func postPage(w http.ResponseWriter, r *http.Request) error {
 		fmt.Fprintln(w, "deleted")
 	}
 	if result.manifest != nil {
-		report := GetProblemReport(result.manifest)
+		report := GetProblemReport(result.manifest.Problems)
 		if len(report) > 0 {
 			fmt.Fprintln(w, "problems:")
 		}
