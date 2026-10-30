@@ -127,7 +127,7 @@ func CheckGogsRepositoryPushPermission(baseURL *url.URL, authorization string) e
 		}, err)
 	}
 
-	if repositoryInfo.FullName != ownerAndRepo {
+	if !strings.EqualFold(repositoryInfo.FullName, ownerAndRepo) {
 		return AuthError{
 			http.StatusUnauthorized,
 			fmt.Sprintf("authorization out-of-date: repository %s has been renamed to %s",
