@@ -113,17 +113,19 @@ func TranslateWildcards(wildcardConfigs []WildcardConfig) ([]*WildcardPattern, e
 			}
 		}
 
+		previewDomainParts := []string{}
 		if wildcardConfig.PreviewDomain != "" {
 			if wildcardConfig.Authorization != "forgejo" {
 				return nil, fmt.Errorf(
 					"wildcard pattern: previews require Forgejo authorization",
 				)
 			}
+			previewDomainParts = strings.Split(wildcardConfig.PreviewDomain, ".")
 		}
 
 		wildcardPatterns = append(wildcardPatterns, &WildcardPattern{
 			Domain:             strings.Split(wildcardConfig.Domain, "."),
-			PreviewDomain:      strings.Split(wildcardConfig.PreviewDomain, "."),
+			PreviewDomain:      previewDomainParts,
 			CloneURL:           cloneURLTemplate,
 			IndexRepo:          indexRepoTemplate,
 			IndexBranch:        indexRepoBranch,
