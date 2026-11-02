@@ -102,7 +102,12 @@ func AnalyzeStorage(ctx context.Context) ([]*StorageSize, error) {
 
 	// Now aggregate the information.
 	for domain, stats := range thickStats {
-		sizes := StorageSize{Domain: domain.String()}
+		sizes := StorageSize{}
+		if domain.IsValid() {
+			sizes.Domain = domain.String()
+		} else {
+			sizes.Domain = "*"
+		}
 		sizes.CurrentSize += stats.siteManifests
 		for _, size := range stats.siteBlobs {
 			sizes.CurrentSize += size
