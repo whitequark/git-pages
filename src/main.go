@@ -190,6 +190,7 @@ func siteArg(arg string) (site names.Site) {
 	switch strings.Count(arg, "/") {
 	case 0:
 		site.Domain = domainArg(arg)
+		site.Project = names.IndexProject
 	case 1:
 		if site, err = names.ParseSite(arg); err != nil {
 			logc.Fatalf(context.Background(), "invalid site argument: %s\n", err)
