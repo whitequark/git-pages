@@ -70,16 +70,46 @@ func CompareManifest(left *Manifest, right *Manifest) bool {
 		return false
 	}
 	for name, leftEntry := range left.Contents {
-		rightEntry := right.Contents[name]
-		if rightEntry == nil {
-			return false
-		}
+		rightEntry := right.GetContents()[name]
 		if leftEntry.GetType() != rightEntry.GetType() {
 			return false
 		}
-		if !bytes.Equal(leftEntry.Data, rightEntry.Data) {
+		if !bytes.Equal(leftEntry.GetData(), rightEntry.GetData()) {
 			return false
 		}
+	}
+	if len(left.GetRedirects()) != len(right.GetRedirects()) {
+		return false
+	}
+	for index, leftRedirectRule := range left.GetRedirects() {
+		rightRedirectRule := right.GetRedirects()[index]
+		if !proto.Equal(leftRedirectRule, rightRedirectRule) {
+			return false
+		}
+	}
+	if len(left.GetHeaders()) != len(right.GetHeaders()) {
+		return false
+	}
+	for index, leftHeaderRule := range left.GetHeaders() {
+		rightHeaderRule := right.GetHeaders()[index]
+		if !proto.Equal(leftHeaderRule, rightHeaderRule) {
+			return false
+		}
+	}
+	if len(left.GetBasicAuth()) != len(right.GetBasicAuth()) {
+		return false
+	}
+	for index, leftBasicAuthRule := range left.GetBasicAuth() {
+		rightBasicAuthRule := right.GetBasicAuth()[index]
+		if !proto.Equal(leftBasicAuthRule, rightBasicAuthRule) {
+			return false
+		}
+	}
+	if !proto.Equal(left.GetExpiresAt(), right.GetExpiresAt()) {
+		return false
+	}
+	if left.GetComment() != right.GetComment() {
+		return false
 	}
 	return true
 }
