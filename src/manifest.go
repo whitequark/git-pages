@@ -52,6 +52,9 @@ func IsManifestEmpty(manifest *Manifest) bool {
 	if len(manifest.Contents) > 1 {
 		return false
 	}
+	if len(manifest.Redirects) > 0 {
+		return false
+	}
 	for name, entry := range manifest.Contents {
 		if name == "" && entry.GetType() == Type_Directory {
 			return true
