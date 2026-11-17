@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - v*
     tags:
       - v*
   pull_request:
@@ -14,9 +15,7 @@ env:
 
 jobs:
   check:
-    runs-on: debian-trixie
-    container:
-      image: docker.io/library/node:24-trixie-slim@sha256:ae91dcc111a68c9d2d81ff2a17bda61be126426176fde6fe7d08ab13b7f50573
+    runs-on: ["medium", "debian-13-x86_64"]
     steps:
       - name: Check out source code
         uses: https://code.forgejo.org/actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -26,8 +25,8 @@ jobs:
           go-version: '>=1.26.10 <1.27.2' # upper limit for staticcheck at 2026-10-09
       - name: Install dependencies
         run: |
-          apt-get -y update
-          apt-get -y install ca-certificates
+          sudo apt-get -y update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -y install ca-certificates
           go install honnef.co/go/tools/cmd/staticcheck@latest
       - name: Build service
         run: |
@@ -44,15 +43,14 @@ jobs:
     # IMPORTANT: This workflow step will not work without the Releases unit enabled!
     if: ${{ forge.ref == 'refs/heads/main' || startsWith(forge.event.ref, 'refs/tags/v') }}
     needs: [check]
-    runs-on: debian-trixie
-    container:
-      image: docker.io/library/node:24-trixie-slim@sha256:ae91dcc111a68c9d2d81ff2a17bda61be126426176fde6fe7d08ab13b7f50573
+    runs-on: ["medium", "debian-13-x86_64"]
     steps:
       - name: Install dependencies
         run: |
-          apt-get -y update
-          apt-get -y install ca-certificates git
+          sudo apt-get -y update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -y install ca-certificates git curl jq
           # git needs to be installed for build information embedding to work
+          # curl and jq are dependencies of actions/forgejo-release
       - name: Check out source code
         uses: https://code.forgejo.org/actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -85,14 +83,12 @@ jobs:
   package:
     if: ${{ forge.ref == 'refs/heads/main' || startsWith(forge.event.ref, 'refs/tags/v') }}
     needs: [check]
-    runs-on: debian-trixie
-    container:
-      image: docker.io/library/node:24-trixie-slim@sha256:ae91dcc111a68c9d2d81ff2a17bda61be126426176fde6fe7d08ab13b7f50573
+    runs-on: ["medium", "debian-13-x86_64"]
     steps:
       - name: Install dependencies
         run: |
-          apt-get -y update
-          apt-get -y install ca-certificates buildah qemu-user-binfmt
+          sudo apt-get -y update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -y install ca-certificates buildah qemu-user-binfmt
       - name: Check out source code
         uses: https://code.forgejo.org/actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Authenticate with Docker
@@ -101,7 +97,7 @@ jobs:
             -u ${{ vars.PACKAGES_USER }} -p ${{ secrets.PACKAGES_TOKEN }} ${FORGE}
       - name: Build container
         run: |
-          printf '[storage]\ndriver="vfs"\nrunroot="/run/containers/storage"\ngraphroot="/var/lib/containers/storage"\n' | tee /etc/containers/storage.conf
+          printf '[storage]\ndriver="vfs"\nrunroot="/run/containers/storage"\ngraphroot="/var/lib/containers/storage"\n' | sudo tee /etc/containers/storage.conf
           buildah build ${CACHE} --arch=amd64 --tag=container:${VER}-amd64
           buildah build ${CACHE} --arch=arm64 --tag=container:${VER}-arm64
           buildah manifest create container:${VER} \
@@ -110,7 +106,6 @@ jobs:
         env:
           BUILDAH_ISOLATION: chroot
           VER: ${{ startsWith(forge.event.ref, 'refs/tags/v') && forge.ref_name || 'latest' }}
-          CACHE: ${{ format('--authfile=/tmp/authfile-{0}.json --layers --cache-from {0}/{1}/cache --cache-to {0}/{1}/cache', env.FORGE, forge.repository) }}
       - if: ${{ forge.repository == 'git-pages/git-pages' }}
         name: Push container to Codeberg
         run: |
@@ -118,3 +113,33 @@ jobs:
             --all container:${VER} "docker://${FORGE}/${{ forge.repository }}:${VER/v/}"
         env:
           VER: ${{ startsWith(forge.event.ref, 'refs/tags/v') && forge.ref_name || 'latest' }}
+
+  gomod2nix:
+    runs-on: ["medium", "debian-13-x86_64"]
+    steps:
+      - name: Install Nix
+        uses: https://github.com/cachix/install-nix-action@ab739621df7a23f52766f9ccc97f38da6b7af14f # v31
+      - name: Check out source code
+        uses: https://code.forgejo.org/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ secrets.PUSH_TOKEN || forgejo.token }}
+      - name: Regenerate gomod2nix
+        run: |
+          nix develop --command gomod2nix
+          nix build
+      # Automatic update.
+      - if: ${{ forgejo.event_name == 'pull_request' && startsWith(forgejo.head_ref, 'renovate/') }}
+        name: Diff gomod2nix (auto-commit)
+        run: |
+          if ! git diff --color --exit-code; then
+            git config set user.name forgejo-actions
+            git config set user.email noreply@forgejo.org
+            git add -u
+            git commit -m "Auto-update gomod2nix."
+            git push origin HEAD:${{ forgejo.head_ref }}
+          fi
+      # Manual update. It's not clear how to make automatic update work in forks.
+      - if: ${{ !(forgejo.event_name == 'pull_request' && startsWith(forgejo.head_ref, 'renovate/')) }}
+        name: Diff gomod2nix (check)
+        run: |
+          git diff --color --exit-code
