@@ -576,7 +576,7 @@ func Main(versionInfo string) {
 		}
 
 	case *purgeDomain != "":
-		domain := domainArg(*freezeDomain)
+		domain := domainArg(*purgeDomain)
 
 		purgeCount := 0
 		for metadata, err := range backend.EnumerateManifests(ctx) {
