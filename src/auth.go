@@ -137,7 +137,25 @@ func authorizeDNSChallenge(r *http.Request) (*Authorization, error) {
 	}, nil
 }
 
-func authorizeDNSAllowlist(r *http.Request, scope string) (*Authorization, error) {
+type dnsAllowlistMode int
+
+const (
+	dnsAllowlistRepository dnsAllowlistMode = iota
+	dnsAllowlistForgeAuthorization
+	dnsAllowlistForgePreviewAuthorization
+)
+
+func authorizeDNSAllowlist(r *http.Request, mode dnsAllowlistMode) (*Authorization, error) {
+	scope := ""
+	switch mode {
+	case dnsAllowlistRepository:
+		scope = "repository"
+	case dnsAllowlistForgeAuthorization:
+		scope = "forge-allowlist"
+	case dnsAllowlistForgePreviewAuthorization:
+		scope = "forge-preview-allowlist"
+	}
+
 	domain, err := GetDomain(r)
 	if err != nil {
 		return nil, err
@@ -148,16 +166,27 @@ func authorizeDNSAllowlist(r *http.Request, scope string) (*Authorization, error
 		return nil, err
 	}
 
-	allowlistHostname := fmt.Sprintf("_%s.%s", scope, domain)
+	allowlistHostname := fmt.Sprintf("_git-pages-%s.%s", scope, domain)
 	records, err := lookupTXT(r.Context(), allowlistHostname)
 	if err != nil {
 		return nil, AuthError{http.StatusUnauthorized,
 			fmt.Sprintf("failed to look up DNS repository allowlist: %s TXT", allowlistHostname)}
 	}
 
-	if !projectName.IsIndex() {
-		return nil, AuthError{http.StatusUnauthorized,
-			"DNS repository allowlist only authorizes index site"}
+	switch mode {
+	case dnsAllowlistRepository, dnsAllowlistForgeAuthorization:
+		if !projectName.IsIndex() {
+			return nil, AuthError{http.StatusUnauthorized,
+				"DNS repository allowlist only authorizes index site"}
+		}
+	case dnsAllowlistForgePreviewAuthorization:
+		if projectName, _, isPreview := projectName.GetPullRequest(); !isPreview {
+			return nil, AuthError{http.StatusUnauthorized,
+				"DNS repository preview allowlist only authorizes preview sites"}
+		} else if projectName != "" {
+			return nil, AuthError{http.StatusUnauthorized,
+				"DNS repository preview allowlist only authorizes index preview sites"}
+		}
 	}
 
 	var (
@@ -379,7 +408,7 @@ func AuthorizeUpdateFromRepository(r *http.Request) (*Authorization, error) {
 
 	// DNS allowlist gives authority to update but not delete.
 	if r.Method == http.MethodPut || r.Method == http.MethodPost {
-		auth, err = authorizeDNSAllowlist(r, "git-pages-repository")
+		auth, err = authorizeDNSAllowlist(r, dnsAllowlistRepository)
 		if err != nil && IsUnauthorized(err) {
 			causes = append(causes, err)
 		} else if err != nil { // bad request
@@ -640,8 +669,14 @@ func authorizeForgeDNSAllowlist(r *http.Request) (*Authorization, error) {
 		return nil, AuthError{http.StatusUnauthorized, "missing Forge-Authorization header"}
 	}
 
+	projectName, err := names.ParseProjectURL(r.URL)
+	if err != nil {
+		return nil, err
+	}
+
 	var errs []error
-	if dnsAuth, err := authorizeDNSAllowlist(r, "git-pages-forge-allowlist"); err != nil {
+
+	if dnsAuth, err := authorizeDNSAllowlist(r, dnsAllowlistForgeAuthorization); err != nil {
 		errs = append(errs, err)
 	} else if dnsAuth != nil {
 		// DNS allows uploads from some repositories, but we don't know yet if the forge token
@@ -652,6 +687,22 @@ func authorizeForgeDNSAllowlist(r *http.Request) (*Authorization, error) {
 				errs = append(errs, err)
 			} else {
 				// There is both DNS authorization and forge authorization.
+				return auth, nil
+			}
+		}
+	}
+
+	if dnsAuth, err := authorizeDNSAllowlist(r, dnsAllowlistForgePreviewAuthorization); err != nil {
+		errs = append(errs, err)
+	} else if dnsAuth != nil {
+		// DNS allows uploads from some repositories, but we don't know yet if the forge token
+		// corresponds to a `pull_request` workflow in one of these repositories.
+		for _, repoURL := range dnsAuth.repoURLs {
+			_, prNumber, _ := projectName.GetPullRequest()
+			auth, err := authorizeForgejoActionRun(repoURL, forgeToken, prNumber)
+			if err != nil {
+				errs = append(errs, err)
+			} else {
 				return auth, nil
 			}
 		}
