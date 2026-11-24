@@ -64,6 +64,8 @@
 
           go = pkgs.go_1_27;
           modules = ./gomod2nix.toml;
+
+          meta.mainProgram = "git-pages";
         };
       in
       {
