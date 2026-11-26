@@ -602,6 +602,12 @@ func Main(versionInfo string) {
 			if err != nil {
 				logc.Fatalln(ctx, err)
 			}
+			if record.Manifest != nil {
+				// Records can get pretty large, and there can be a lot of them, which puts
+				// pressure on the GC. We can't fetch them in order, so this is the second best
+				// option to improve performance.
+				record.Manifest.Contents = nil
+			}
 			records = append(records, record)
 		}
 
