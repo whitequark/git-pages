@@ -10,7 +10,10 @@ import (
 	"time"
 )
 
-const maxForgeResponseSize = 65536
+// See https://codeberg.org/git-pages/git-pages/issues/320.
+// Certain automated workflows can create PR descriptions as long as ~100 kB, so make sure there
+// is enough margin for all but the worst cases.
+const maxForgeResponseSize = 1048576
 
 var errResponseTooLong = errors.New("forge response too long")
 
